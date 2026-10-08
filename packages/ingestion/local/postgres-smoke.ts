@@ -1,17 +1,15 @@
-import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { Client, type QueryResult } from "pg";
-import type {
-  ImportedBuildDataset,
-  NormalizedBuild,
-  RecipeOutput,
-  RecipeReagent,
-} from "@forever-professions/contracts";
+import { Pool, type PoolClient } from "pg";
+import type { ImportedBuildDataset } from "@forever-professions/contracts";
 import {
-  createDsqlBatches,
-  createRawDatasetKey,
-  normalizeBuildDataset,
+  ingestBuildDataset,
+  type RawDatasetPutInput,
+  type RawDatasetPutStatus,
+  type RawDatasetStore,
+  type SqlExecutor,
+  type SqlQueryResult,
+  type TransactionRunner,
 } from "../src/index.js";
 
 const defaultConnectionUrl =
@@ -23,9 +21,7 @@ function localConnectionUrl(): string {
   const allowedHosts = new Set(["127.0.0.1", "localhost", "::1"]);
 
   if (!allowedHosts.has(parsed.hostname) || parsed.pathname !== "/forever_professions_local") {
-    throw new Error(
-      "The local smoke test only connects to forever_professions_local on localhost.",
-    );
+    throw new Error("The local smoke test only connects to forever_professions_local on localhost.");
   }
 
   return value;
@@ -105,11 +101,21 @@ function sampleDataset(): ImportedBuildDataset {
   };
 }
 
+class MemoryRawDatasetStore implements RawDatasetStore {
+  readonly objects = new Map<string, Uint8Array>();
+
+  async putIfAbsent(input: RawDatasetPutInput): Promise<RawDatasetPutStatus> {
+    if (this.objects.has(input.key)) return "already-exists";
+    this.objects.set(input.key, new Uint8Array(input.body));
+    return "created";
+  }
+}
+
 function localizeDdl(sql: string): string {
   return sql.replace("CREATE INDEX ASYNC IF NOT EXISTS", "CREATE INDEX IF NOT EXISTS");
 }
 
-async function applyMigrations(client: Client): Promise<number> {
+async function applyMigrations(pool: Pool): Promise<number> {
   const sqlDirectory = fileURLToPath(new URL("../sql/", import.meta.url));
   const migrationFiles = (await readdir(sqlDirectory))
     .filter((name) => name.endsWith(".sql"))
@@ -117,13 +123,14 @@ async function applyMigrations(client: Client): Promise<number> {
 
   for (const filename of migrationFiles) {
     const ddl = localizeDdl(await readFile(new URL(`../sql/${filename}`, import.meta.url), "utf8"));
-    await client.query(ddl);
+    await pool.query(ddl);
   }
 
   return migrationFiles.length;
 }
 
-async function clearLocalRows(client: Client): Promise<void> {
+async function clearLocalRows(pool: Pool): Promise<void> {
+  const client = await pool.connect();
   await client.query("BEGIN");
   try {
     await client.query("DELETE FROM recipe_output");
@@ -141,204 +148,45 @@ async function clearLocalRows(client: Client): Promise<void> {
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
+  } finally {
+    client.release();
   }
 }
 
-async function assertExists(
-  client: Client,
-  query: string,
-  values: readonly unknown[],
-  message: string,
-): Promise<void> {
-  const result = await client.query(query, [...values]);
-  if (result.rowCount !== 1) throw new Error(message);
-}
-
-async function writeBatches<T>(
-  client: Client,
-  rows: readonly T[],
-  insert: (client: Client, row: T) => Promise<QueryResult>,
-): Promise<number> {
-  const batches = createDsqlBatches(rows, { maximumRows: 2 });
-
-  for (const batch of batches) {
-    await client.query("BEGIN");
-    try {
-      for (const row of batch) await insert(client, row);
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    }
-  }
-
-  return batches.length;
-}
-
-async function insertNormalizedBuild(
-  client: Client,
-  build: NormalizedBuild,
-  rawObjectKey: string,
-  rawSha256: string,
-): Promise<Record<string, number>> {
-  const batchCounts: Record<string, number> = {};
-
-  batchCounts.wowBuild = await writeBatches(client, [build.build], (database, row) =>
-    database.query(
-      "INSERT INTO wow_build (build_id, version, released_at, imported_at, raw_object_key, raw_sha256) VALUES ($1, $2, $3, $4, $5, $6)",
-      [row.id, row.version, row.releasedAt ?? null, new Date().toISOString(), rawObjectKey, rawSha256],
-    ),
-  );
-  batchCounts.sources = await writeBatches(client, build.sources, (database, row) =>
-    database.query(
-      "INSERT INTO data_source (source_id, source_kind, label, source_url) VALUES ($1, $2, $3, $4)",
-      [row.id, row.kind, row.label, row.url ?? null],
-    ),
-  );
-  batchCounts.professions = await writeBatches(client, build.professions, (database, row) =>
-    database.query(
-      "INSERT INTO profession (profession_id, slug, name) VALUES ($1, $2, $3)",
-      [row.id, row.slug, row.name],
-    ),
-  );
-  batchCounts.items = await writeBatches(client, build.items, (database, row) =>
-    database.query("INSERT INTO item (item_id, game_id, name) VALUES ($1, $2, $3)", [
-      row.id,
-      row.gameId ?? null,
-      row.name,
-    ]),
-  );
-  batchCounts.recipes = await writeBatches(client, build.recipes, async (database, row) => {
-    await assertExists(
-      database,
-      "SELECT 1 FROM profession WHERE profession_id = $1",
-      [row.professionId],
-      `Missing profession ${row.professionId}.`,
-    );
-    return database.query("INSERT INTO recipe (recipe_id, profession_id) VALUES ($1, $2)", [
-      row.id,
-      row.professionId,
-    ]);
-  });
-  batchCounts.verifications = await writeBatches(
-    client,
-    build.verifications,
-    (database, row) =>
-      database.query(
-        "INSERT INTO verification (verification_id, status, verified_at, verified_by, notes) VALUES ($1, $2, $3, $4, $5)",
-        [
-          row.id,
-          row.status,
-          row.verifiedAt ?? null,
-          row.verifiedBy ?? null,
-          row.notes ?? null,
-        ],
-      ),
-  );
-  batchCounts.recipeVersions = await writeBatches(
-    client,
-    build.recipeVersions,
-    async (database, row) => {
-      await assertExists(
-        database,
-        "SELECT 1 FROM recipe WHERE recipe_id = $1",
-        [row.recipeId],
-        `Missing recipe ${row.recipeId}.`,
-      );
-      await assertExists(
-        database,
-        "SELECT 1 FROM wow_build WHERE build_id = $1",
-        [row.buildId],
-        `Missing build ${row.buildId}.`,
-      );
-      return database.query(
-        "INSERT INTO recipe_version (recipe_version_id, recipe_id, build_id, name) VALUES ($1, $2, $3, $4)",
-        [row.id, row.recipeId, row.buildId, row.name],
-      );
+function createSqlExecutor(client: PoolClient): SqlExecutor {
+  return {
+    query: async (sql, values): Promise<SqlQueryResult> => {
+      const result =
+        values === undefined ? await client.query(sql) : await client.query(sql, [...values]);
+      return {
+        rowCount: result.rowCount,
+        rows: result.rows as readonly Record<string, unknown>[],
+      };
     },
-  );
-  batchCounts.thresholds = await writeBatches(client, build.thresholds, async (database, row) => {
-    await assertExists(
-      database,
-      "SELECT 1 FROM recipe_version WHERE recipe_version_id = $1",
-      [row.recipeVersionId],
-      `Missing recipe version ${row.recipeVersionId}.`,
-    );
-    return database.query(
-      "INSERT INTO recipe_threshold (recipe_version_id, orange, yellow, green, gray) VALUES ($1, $2, $3, $4, $5)",
-      [row.recipeVersionId, row.orange, row.yellow, row.green, row.gray],
-    );
-  });
-  batchCounts.provenance = await writeBatches(client, build.provenance, async (database, row) => {
-    await assertExists(
-      database,
-      "SELECT 1 FROM recipe_version WHERE recipe_version_id = $1",
-      [row.recipeVersionId],
-      `Missing recipe version ${row.recipeVersionId}.`,
-    );
-    await assertExists(
-      database,
-      "SELECT 1 FROM data_source WHERE source_id = $1",
-      [row.sourceId],
-      `Missing source ${row.sourceId}.`,
-    );
-    await assertExists(
-      database,
-      "SELECT 1 FROM verification WHERE verification_id = $1",
-      [row.verificationId],
-      `Missing verification ${row.verificationId}.`,
-    );
-    return database.query(
-      "INSERT INTO provenance (provenance_id, recipe_version_id, source_id, verification_id, notes) VALUES ($1, $2, $3, $4, $5)",
-      [row.id, row.recipeVersionId, row.sourceId, row.verificationId, row.notes ?? null],
-    );
-  });
-
-  const insertReagent = async (database: Client, row: RecipeReagent): Promise<QueryResult> => {
-    await assertExists(
-      database,
-      "SELECT 1 FROM recipe_version WHERE recipe_version_id = $1",
-      [row.recipeVersionId],
-      `Missing recipe version ${row.recipeVersionId}.`,
-    );
-    await assertExists(
-      database,
-      "SELECT 1 FROM item WHERE item_id = $1",
-      [row.itemId],
-      `Missing item ${row.itemId}.`,
-    );
-    return database.query(
-      "INSERT INTO recipe_reagent (recipe_version_id, item_id, quantity) VALUES ($1, $2, $3)",
-      [row.recipeVersionId, row.itemId, row.quantity],
-    );
   };
-  batchCounts.reagents = await writeBatches(client, build.reagents, insertReagent);
-
-  const insertOutput = async (database: Client, row: RecipeOutput): Promise<QueryResult> => {
-    await assertExists(
-      database,
-      "SELECT 1 FROM recipe_version WHERE recipe_version_id = $1",
-      [row.recipeVersionId],
-      `Missing recipe version ${row.recipeVersionId}.`,
-    );
-    await assertExists(
-      database,
-      "SELECT 1 FROM item WHERE item_id = $1",
-      [row.itemId],
-      `Missing item ${row.itemId}.`,
-    );
-    return database.query(
-      "INSERT INTO recipe_output (recipe_version_id, item_id, minimum_quantity, maximum_quantity) VALUES ($1, $2, $3, $4)",
-      [row.recipeVersionId, row.itemId, row.minimumQuantity, row.maximumQuantity],
-    );
-  };
-  batchCounts.outputs = await writeBatches(client, build.outputs, insertOutput);
-
-  return batchCounts;
 }
 
-async function verifyDatabase(client: Client): Promise<Record<string, number>> {
-  const counts = await client.query<{
+function createLocalTransactionRunner(pool: Pool): TransactionRunner {
+  return {
+    transaction: async (work) => {
+      const client = await pool.connect();
+      await client.query("BEGIN");
+      try {
+        const result = await work(createSqlExecutor(client));
+        await client.query("COMMIT");
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+  };
+}
+
+async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
+  const counts = await pool.query<{
     builds: string;
     items: string;
     recipe_versions: string;
@@ -357,7 +205,7 @@ async function verifyDatabase(client: Client): Promise<Record<string, number>> {
   ] as const;
   let orphanCount = 0;
   for (const orphanQuery of orphanQueries) {
-    const result = await client.query<{ count: string }>(orphanQuery);
+    const result = await pool.query<{ count: string }>(orphanQuery);
     orphanCount += Number(result.rows[0]?.count ?? 0);
   }
   if (orphanCount !== 0) throw new Error(`Local database contains ${orphanCount} orphan rows.`);
@@ -373,25 +221,46 @@ async function verifyDatabase(client: Client): Promise<Record<string, number>> {
 }
 
 async function main(): Promise<void> {
-  const imported = sampleDataset();
-  const rawJson = JSON.stringify(imported);
-  const rawSha256 = createHash("sha256").update(rawJson).digest("hex");
-  const rawObjectKey = createRawDatasetKey(imported.build.id, rawSha256);
-  const normalized = normalizeBuildDataset(imported);
-  const client = new Client({ connectionString: localConnectionUrl() });
+  const pool = new Pool({ connectionString: localConnectionUrl(), max: 3 });
+  const rawStore = new MemoryRawDatasetStore();
+  const transactionRunner = createLocalTransactionRunner(pool);
+  const rawBytes = new TextEncoder().encode(JSON.stringify(sampleDataset()));
 
-  await client.connect();
   try {
-    const migrationsApplied = await applyMigrations(client);
-    await clearLocalRows(client);
-    const batches = await insertNormalizedBuild(client, normalized, rawObjectKey, rawSha256);
-    const rows = await verifyDatabase(client);
+    const migrationsApplied = await applyMigrations(pool);
+    await clearLocalRows(pool);
+    const firstImport = await ingestBuildDataset({
+      rawBytes,
+      rawStore,
+      transactionRunner,
+      importedAt: "2026-01-01T00:00:00.000Z",
+      maximumRows: 2,
+    });
+    const repeatedImport = await ingestBuildDataset({
+      rawBytes,
+      rawStore,
+      transactionRunner,
+      importedAt: "2026-01-02T00:00:00.000Z",
+      maximumRows: 2,
+    });
+    const rows = await verifyDatabase(pool);
 
     process.stdout.write(
-      `${JSON.stringify({ migrationsApplied, rawObjectKey, batches, rows }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          migrationsApplied,
+          rawObjectKey: firstImport.rawObjectKey,
+          rawObjectStatuses: [firstImport.rawObjectStatus, repeatedImport.rawObjectStatus],
+          rawObjects: rawStore.objects.size,
+          batches: firstImport.batches,
+          rows,
+        },
+        null,
+        2,
+      )}\n`,
     );
   } finally {
-    await client.end();
+    await pool.end();
   }
 }
 

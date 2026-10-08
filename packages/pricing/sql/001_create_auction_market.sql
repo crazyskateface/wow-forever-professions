@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS auction_market (
+  market_id VARCHAR(255) PRIMARY KEY,
+  provider VARCHAR(32) NOT NULL,
+  game VARCHAR(64) NOT NULL,
+  ruleset VARCHAR(64) NOT NULL,
+  faction VARCHAR(32) NOT NULL,
+  region VARCHAR(32) NOT NULL,
+  label VARCHAR(256) NOT NULL,
+  refreshed_at TIMESTAMP NOT NULL
+);

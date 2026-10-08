@@ -9,15 +9,21 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:dsql": "tsx scripts/dsql-smoke.ts",
     "test:live": "tsx scripts/ah-ledger-smoke.ts",
+    "test:local-db": "tsx local/postgres-smoke.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.live.json --noEmit"
   },
   "dependencies": {
     "@forever-professions/contracts": "workspace:*",
+    "@forever-professions/ingestion": "workspace:*",
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@aws-sdk/credential-providers": "3.1147.0",
     "@types/node": "26.6.4",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.1",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vitest": "5.0.3"

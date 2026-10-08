@@ -16,12 +16,21 @@
       "reagents": [
         {
           "itemId": "heavy-leather",
+          "gameItemId": 4234,
           "name": "Heavy Leather",
           "quantity": 5
         },
         {
           "itemId": "fine-thread",
+          "gameItemId": 2321,
           "name": "Fine Thread",
+          "quantity": 1
+        }
+      ],
+      "outputs": [
+        {
+          "itemId": "heavy-armor-kit-item",
+          "name": "Heavy Armor Kit",
           "quantity": 1
         }
       ],
@@ -44,13 +53,22 @@
       "reagents": [
         {
           "itemId": "thick-leather",
+          "gameItemId": 4304,
           "name": "Thick Leather",
           "quantity": 5
         },
         {
           "itemId": "silken-thread",
+          "gameItemId": 4291,
           "name": "Silken Thread",
           "quantity": 2
+        }
+      ],
+      "outputs": [
+        {
+          "itemId": "nightscape-headband-item",
+          "name": "Nightscape Headband",
+          "quantity": 1
         }
       ],
       "provenance": {

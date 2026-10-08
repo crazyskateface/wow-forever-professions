@@ -9,7 +9,9 @@ cdk.out/
 .vite/
 .turbo/
 .cache/
+.tmp/
 *.tsbuildinfo
+cdk-outputs*.json
 
 # Local configuration and secrets
 .env

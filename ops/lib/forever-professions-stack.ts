@@ -1,9 +1,6 @@
 import path from "node:path";
 import {
-  CfnCondition,
   CfnOutput,
-  CfnParameter,
-  CfnResource,
   Duration,
   Fn,
   RemovalPolicy,
@@ -14,15 +11,35 @@ import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import type { Construct } from "constructs";
+import {
+  DATA_CLUSTER_ENDPOINT_PARAMETER_NAME,
+  DATA_CLUSTER_IDENTIFIER_PARAMETER_NAME,
+} from "./forever-professions-data-stack";
 
 export class ForeverProfessionsStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
+
+    const dataClusterEndpoint = ssm.StringParameter.valueForStringParameter(
+      this,
+      DATA_CLUSTER_ENDPOINT_PARAMETER_NAME,
+    );
+    const dataClusterIdentifier = ssm.StringParameter.valueForStringParameter(
+      this,
+      DATA_CLUSTER_IDENTIFIER_PARAMETER_NAME,
+    );
+    const dataClusterArn = this.formatArn({
+      service: "dsql",
+      resource: "cluster",
+      resourceName: dataClusterIdentifier,
+    });
 
     const siteBucket = new s3.Bucket(this, "SiteBucket", {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -31,37 +48,6 @@ export class ForeverProfessionsStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
       versioned: true,
     });
-
-    const rawDataBucket = new s3.Bucket(this, "RawDataBucket", {
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      enforceSSL: true,
-      objectOwnership: s3.ObjectOwnership.BUCKET_OWNER_ENFORCED,
-      removalPolicy: RemovalPolicy.RETAIN,
-      versioned: true,
-    });
-
-    const provisionDataCluster = new CfnParameter(this, "ProvisionDataCluster", {
-      type: "String",
-      allowedValues: ["true", "false"],
-      default: "false",
-      description: "Provision the Phase 2 Aurora DSQL cluster.",
-    });
-    const dataClusterEnabled = new CfnCondition(this, "DataClusterEnabled", {
-      expression: Fn.conditionEquals(provisionDataCluster.valueAsString, "true"),
-    });
-    const dataCluster = new CfnResource(this, "DataCluster", {
-      type: "AWS::DSQL::Cluster",
-      properties: {
-        DeletionProtectionEnabled: true,
-        Tags: [
-          { Key: "Project", Value: "forever-professions" },
-          { Key: "Purpose", Value: "versioned-profession-data" },
-        ],
-      },
-    });
-    dataCluster.cfnOptions.condition = dataClusterEnabled;
-    dataCluster.applyRemovalPolicy(RemovalPolicy.RETAIN);
 
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
@@ -91,6 +77,7 @@ export class ForeverProfessionsStack extends Stack {
       runtime: lambda.Runtime.NODEJS_24_X,
       architecture: lambda.Architecture.ARM_64,
       memorySize: 256,
+      reservedConcurrentExecutions: 5,
       timeout: Duration.seconds(10),
       logGroup: apiLogGroup,
       tracing: lambda.Tracing.ACTIVE,
@@ -100,9 +87,17 @@ export class ForeverProfessionsStack extends Stack {
         target: "node24",
       },
       environment: {
+        DSQL_ENDPOINT: dataClusterEndpoint,
         NODE_OPTIONS: "--enable-source-maps",
+        PRICING_DATABASE_ROLE: "forever_professions_pricing_reader",
       },
     });
+    apiFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dsql:DbConnect"],
+        resources: [dataClusterArn],
+      }),
+    );
 
     const apiIntegration = new integrations.HttpLambdaIntegration(
       "ApiIntegration",
@@ -113,27 +108,34 @@ export class ForeverProfessionsStack extends Stack {
       defaultIntegration: apiIntegration,
       corsPreflight: {
         allowHeaders: ["content-type"],
-        allowMethods: [apigwv2.CorsHttpMethod.GET, apigwv2.CorsHttpMethod.OPTIONS],
+        allowMethods: [
+          apigwv2.CorsHttpMethod.GET,
+          apigwv2.CorsHttpMethod.POST,
+          apigwv2.CorsHttpMethod.OPTIONS,
+        ],
         allowOrigins: ["*"],
         maxAge: Duration.days(1),
       },
     });
+    distribution.addBehavior(
+      "api/*",
+      new origins.HttpOrigin(Fn.select(2, Fn.split("/", api.apiEndpoint))),
+      {
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy:
+          cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      },
+    );
 
     new CfnOutput(this, "WebUrl", {
       value: `https://${distribution.distributionDomainName}`,
     });
     new CfnOutput(this, "ApiUrl", { value: api.apiEndpoint });
+    new CfnOutput(this, "ApiFunctionRoleArn", {
+      value: apiFunction.role!.roleArn,
+    });
     new CfnOutput(this, "SiteBucketName", { value: siteBucket.bucketName });
-    new CfnOutput(this, "RawDataBucketName", { value: rawDataBucket.bucketName });
-
-    const dataClusterIdentifier = new CfnOutput(this, "DataClusterIdentifier", {
-      value: dataCluster.ref,
-    });
-    dataClusterIdentifier.condition = dataClusterEnabled;
-
-    const dataClusterEndpoint = new CfnOutput(this, "DataClusterEndpoint", {
-      value: dataCluster.getAtt("Endpoint").toString(),
-    });
-    dataClusterEndpoint.condition = dataClusterEnabled;
   }
 }

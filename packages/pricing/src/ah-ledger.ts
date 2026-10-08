@@ -155,9 +155,13 @@ export class AhLedgerAuctionPriceProvider implements AuctionPriceProvider {
         });
       }
 
+      const median = item.median && item.median > 0 ? item.median : undefined;
+      const minimumBuyout =
+        item.minBuyout && item.minBuyout > 0 ? item.minBuyout : undefined;
+
       if (
         item.observedAt === null ||
-        (item.median === null && item.minBuyout === null)
+        (median === undefined && minimumBuyout === undefined)
       ) {
         return auctionPriceObservationSchema.parse({
           ...base,
@@ -170,12 +174,10 @@ export class AhLedgerAuctionPriceProvider implements AuctionPriceProvider {
         ...base,
         status: "available",
         observedAt: item.observedAt,
-        ...(item.median === null
+        ...(median === undefined ? {} : { medianUnitPriceCopper: median }),
+        ...(minimumBuyout === undefined
           ? {}
-          : { medianUnitPriceCopper: item.median }),
-        ...(item.minBuyout === null
-          ? {}
-          : { minimumBuyoutUnitPriceCopper: item.minBuyout }),
+          : { minimumBuyoutUnitPriceCopper: minimumBuyout }),
         ...(item.quantity === null ? {} : { quantity: item.quantity }),
         ...(item.salesPerDay === null
           ? {}

@@ -6,6 +6,10 @@ import {
   importedBuildDatasetSchema,
   professionFixtureSchema,
   recipeOutputSchema,
+  routeOptimizationRequestSchema,
+  routeOptimizationResponseSchema,
+  shoppingListRequestSchema,
+  shoppingListResponseSchema,
   skillThresholdsSchema,
 } from "./index.js";
 
@@ -114,6 +118,18 @@ describe("shared contracts", () => {
         fetchedAt: "2026-10-08T01:46:13.000Z",
       }),
     ).toThrow("at least one price field");
+
+    expect(() =>
+      auctionPriceObservationSchema.parse({
+        provider: "ah-ledger",
+        marketId: "forever.rp.horde.us",
+        gameItemId: 2589,
+        status: "available",
+        medianUnitPriceCopper: 0,
+        observedAt: "2026-10-07T22:46:00.000Z",
+        fetchedAt: "2026-10-08T01:46:13.000Z",
+      }),
+    ).toThrow();
   });
 
   it("rejects invalid auction price requests at the provider boundary", () => {
@@ -121,6 +137,150 @@ describe("shared contracts", () => {
       auctionPriceRequestSchema.parse({
         marketId: "forever.pvp.horde.us",
         gameItemIds: [2589, -1],
+      }),
+    ).toThrow();
+  });
+
+  it("validates route optimization requests and requires a market for cost", () => {
+    expect(
+      routeOptimizationRequestSchema.parse({
+        professionId: "leatherworking",
+        marketId: "forever.pvp.horde.us",
+        startSkill: 150,
+        targetSkill: 180,
+        objective: "cost",
+        constraints: { knownRecipeIds: ["heavy-armor-kit"] },
+      }),
+    ).toBeDefined();
+    expect(() =>
+      routeOptimizationRequestSchema.parse({
+        professionId: "leatherworking",
+        startSkill: 150,
+        targetSkill: 180,
+        objective: "cost",
+      }),
+    ).toThrow("marketId");
+  });
+
+  it("accepts complete and blocked route results", () => {
+    const base = {
+      objective: "crafts",
+      startSkill: 150,
+      targetSkill: 151,
+      steps: [
+        {
+          skill: 150,
+          recipeId: "heavy-armor-kit",
+          recipeName: "Heavy Armor Kit",
+          skillUpProbability: 1,
+          expectedCrafts: 1,
+          expectedMaterials: 6,
+        },
+      ],
+      segments: [
+        {
+          recipeId: "heavy-armor-kit",
+          recipeName: "Heavy Armor Kit",
+          startSkill: 150,
+          endSkill: 151,
+          expectedSkillUps: 1,
+          expectedCrafts: 1,
+          expectedMaterials: 6,
+        },
+      ],
+      totals: {
+        expectedSkillUps: 1,
+        expectedCrafts: 1,
+        expectedMaterials: 6,
+      },
+    } as const;
+    expect(
+      routeOptimizationResponseSchema.parse({
+        professionId: "leatherworking",
+        result: { status: "complete", ...base },
+      }),
+    ).toBeDefined();
+    expect(
+      routeOptimizationResponseSchema.parse({
+        professionId: "leatherworking",
+        result: {
+          status: "blocked",
+          ...base,
+          blockedAtSkill: 151,
+          reason: "no-eligible-recipe",
+        },
+      }),
+    ).toBeDefined();
+  });
+
+  it("validates shopping-list requests and complete plans", () => {
+    expect(
+      shoppingListRequestSchema.parse({
+        professionId: "leatherworking",
+        marketId: "forever.pvp.horde.us",
+        route: [{ recipeId: "heavy-armor-kit", expectedCrafts: 12.5 }],
+      }),
+    ).toMatchObject({ strategy: "cheapest" });
+
+    expect(
+      shoppingListResponseSchema.parse({
+        professionId: "leatherworking",
+        marketId: "forever.pvp.horde.us",
+        plan: {
+          status: "complete",
+          strategy: "cheapest",
+          routeReagents: [
+            { itemId: "heavy-leather", itemName: "Heavy Leather", quantity: 62.5 },
+          ],
+          purchases: [
+            {
+              itemId: "heavy-leather",
+              itemName: "Heavy Leather",
+              quantity: 62.5,
+              unitPriceCopper: 125,
+              expectedCostCopper: 7_812.5,
+            },
+          ],
+          crafts: [],
+          unresolved: [],
+          cycles: [],
+          knownSubtotalCopper: 7_812.5,
+          expectedCostCopper: 7_812.5,
+        },
+      }),
+    ).toBeDefined();
+  });
+
+  it("keeps incomplete shopping totals explicit", () => {
+    expect(() =>
+      shoppingListResponseSchema.parse({
+        professionId: "leatherworking",
+        marketId: "forever.pvp.horde.us",
+        plan: {
+          status: "complete",
+          strategy: "cheapest",
+          routeReagents: [],
+          purchases: [],
+          crafts: [],
+          unresolved: [
+            {
+              itemId: "unknown",
+              itemName: "Unknown",
+              quantity: 1,
+              reason: "missing-price",
+            },
+          ],
+          cycles: [],
+          knownSubtotalCopper: 0,
+        },
+      }),
+    ).toThrow("expected total");
+
+    expect(() =>
+      shoppingListRequestSchema.parse({
+        professionId: "leatherworking",
+        marketId: "forever.pvp.horde.us",
+        route: [],
       }),
     ).toThrow();
   });

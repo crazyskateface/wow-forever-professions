@@ -20,6 +20,21 @@ export interface CurrentAuctionPriceStore {
   ): Promise<void>;
 }
 
+export interface AuctionMarketStore {
+  upsertMarkets(markets: readonly AuctionMarket[], refreshedAt?: string): Promise<void>;
+}
+
+export interface CurrentAuctionPriceReader {
+  listMarkets(): Promise<readonly AuctionMarket[]>;
+  getCurrentPrices(request: AuctionPriceRequest): Promise<readonly AuctionPriceObservation[]>;
+  listTrackedGameItemIds(): Promise<readonly number[]>;
+}
+
+export interface AuctionPricingRepository
+  extends AuctionMarketStore,
+    CurrentAuctionPriceStore,
+    CurrentAuctionPriceReader {}
+
 export interface AuctionPriceRefreshReport {
   readonly provider: AuctionPriceProviderId;
   readonly marketId: string;

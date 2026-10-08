@@ -1,0 +1,22 @@
+{
+  "name": "@forever-professions/pricing-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/handler.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@forever-professions/ingestion": "workspace:*",
+    "@forever-professions/pricing": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "8.10.164",
+    "@types/node": "26.6.4",
+    "typescript": "7.0.2"
+  }
+}

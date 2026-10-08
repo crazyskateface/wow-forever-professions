@@ -1,21 +1,239 @@
 import { describe, expect, it } from "vitest";
-import { healthResponseSchema, recipesResponseSchema } from "@forever-professions/contracts";
+import {
+  healthResponseSchema,
+  recipesResponseSchema,
+  routeOptimizationResponseSchema,
+  shoppingListResponseSchema,
+} from "@forever-professions/contracts";
 import { routeRequest } from "./router.js";
 
 describe("fixture API router", () => {
-  it("returns a contract-valid health response", () => {
-    const response = routeRequest("GET", "/health");
+  it("answers browser preflight for POST routes", async () => {
+    const response = await routeRequest("OPTIONS", "/api/routes/optimize");
+    expect(response).toMatchObject({
+      statusCode: 204,
+      headers: {
+        "access-control-allow-headers": "content-type",
+        "access-control-allow-methods": "GET,POST,OPTIONS",
+        "access-control-allow-origin": "*",
+      },
+      body: "",
+    });
+  });
+
+  it("returns a contract-valid health response", async () => {
+    const response = await routeRequest("GET", "/health");
     expect(response.statusCode).toBe(200);
     expect(() => healthResponseSchema.parse(JSON.parse(response.body))).not.toThrow();
   });
 
-  it("returns fixture recipes for a known profession", () => {
-    const response = routeRequest("GET", "/professions/leatherworking/recipes");
+  it("returns fixture recipes for a known profession", async () => {
+    const response = await routeRequest("GET", "/professions/leatherworking/recipes");
     expect(response.statusCode).toBe(200);
     expect(recipesResponseSchema.parse(JSON.parse(response.body))).toHaveLength(2);
   });
 
-  it("returns 404 for an unknown recipe", () => {
-    expect(routeRequest("GET", "/recipes/not-real").statusCode).toBe(404);
+  it("returns 404 for an unknown recipe", async () => {
+    expect((await routeRequest("GET", "/recipes/not-real")).statusCode).toBe(404);
+  });
+
+  it("serves stored auction observations without calling a provider", async () => {
+    const response = await routeRequest(
+      "GET",
+      "/api/auction/prices",
+      { marketId: "forever.pvp.horde.us", itemIds: "2589" },
+      {
+        pricing: {
+          async listMarkets() {
+            return [];
+          },
+          async listTrackedGameItemIds() {
+            return [2589];
+          },
+          async getCurrentPrices() {
+            return [
+              {
+                provider: "manual",
+                marketId: "forever.pvp.horde.us",
+                gameItemId: 2589,
+                status: "available",
+                observedAt: "2026-10-08T06:00:00.000Z",
+                fetchedAt: "2026-10-08T06:01:00.000Z",
+                medianUnitPriceCopper: 37,
+              },
+            ];
+          },
+        },
+      },
+    );
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body)).toMatchObject({
+      marketId: "forever.pvp.horde.us",
+      observations: [{ gameItemId: 2589, medianUnitPriceCopper: 37 }],
+    });
+  });
+
+  it("optimizes a cost route from stored prices", async () => {
+    const response = await routeRequest(
+      "POST",
+      "/api/routes/optimize",
+      {},
+      {
+        pricing: {
+          async listMarkets() {
+            return [];
+          },
+          async listTrackedGameItemIds() {
+            return [4234, 2321, 4304, 4291];
+          },
+          async getCurrentPrices({ marketId, gameItemIds }) {
+            return gameItemIds.map((gameItemId) => ({
+              provider: "manual" as const,
+              marketId,
+              gameItemId,
+              status: "available" as const,
+              observedAt: "2026-10-08T06:00:00.000Z",
+              fetchedAt: "2026-10-08T06:01:00.000Z",
+              medianUnitPriceCopper: 10,
+            }));
+          },
+        },
+      },
+      {
+        professionId: "leatherworking",
+        marketId: "forever.pvp.horde.us",
+        startSkill: 150,
+        targetSkill: 180,
+        objective: "cost",
+        constraints: { knownRecipeIds: ["heavy-armor-kit"] },
+      },
+    );
+    expect(response.statusCode).toBe(200);
+    const parsed = routeOptimizationResponseSchema.parse(JSON.parse(response.body));
+    expect(parsed.result).toMatchObject({
+      status: "complete",
+      startSkill: 150,
+      targetSkill: 180,
+      segments: [{ recipeId: "heavy-armor-kit", startSkill: 150, endSkill: 180 }],
+    });
+  });
+
+  it("validates optimizer bodies and surfaces fixture coverage gaps", async () => {
+    expect(
+      (await routeRequest("POST", "/api/routes/optimize", {}, {}, {})).statusCode,
+    ).toBe(400);
+
+    const response = await routeRequest(
+      "POST",
+      "/api/routes/optimize",
+      {},
+      {},
+      {
+        professionId: "leatherworking",
+        startSkill: 190,
+        targetSkill: 205,
+        objective: "crafts",
+      },
+    );
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body)).toMatchObject({
+      result: {
+        status: "blocked",
+        blockedAtSkill: 190,
+        reason: "no-eligible-recipe",
+      },
+    });
+  });
+
+  it("aggregates route reagents into a stored-price shopping list", async () => {
+    const response = await routeRequest(
+      "POST",
+      "/api/shopping-list",
+      {},
+      {
+        pricing: {
+          async listMarkets() {
+            return [];
+          },
+          async listTrackedGameItemIds() {
+            return [4234, 2321, 4304, 4291];
+          },
+          async getCurrentPrices({ marketId, gameItemIds }) {
+            return gameItemIds.map((gameItemId) => ({
+              provider: "manual" as const,
+              marketId,
+              gameItemId,
+              status: "available" as const,
+              observedAt: "2026-10-08T06:00:00.000Z",
+              fetchedAt: "2026-10-08T06:01:00.000Z",
+              medianUnitPriceCopper: 10,
+              attribution: {
+                text: "Test prices",
+                url: "https://example.invalid/prices",
+              },
+            }));
+          },
+        },
+      },
+      {
+        professionId: "leatherworking",
+        marketId: "forever.pvp.horde.us",
+        route: [{ recipeId: "heavy-armor-kit", expectedCrafts: 2.5 }],
+        strategy: "cheapest",
+      },
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      shoppingListResponseSchema.parse(JSON.parse(response.body)),
+    ).toMatchObject({
+      plan: {
+        status: "complete",
+        routeReagents: [
+          { itemId: "fine-thread", quantity: 2.5 },
+          { itemId: "heavy-leather", quantity: 12.5 },
+        ],
+        purchases: [
+          { itemId: "fine-thread", quantity: 2.5, expectedCostCopper: 25 },
+          { itemId: "heavy-leather", quantity: 12.5, expectedCostCopper: 125 },
+        ],
+        crafts: [],
+        expectedCostCopper: 150,
+      },
+    });
+  });
+
+  it("validates shopping-list bodies and recipe references", async () => {
+    expect(
+      (await routeRequest("POST", "/api/shopping-list", {}, {}, {})).statusCode,
+    ).toBe(400);
+
+    const response = await routeRequest(
+      "POST",
+      "/api/shopping-list",
+      {},
+      {
+        pricing: {
+          async listMarkets() {
+            return [];
+          },
+          async listTrackedGameItemIds() {
+            return [];
+          },
+          async getCurrentPrices() {
+            return [];
+          },
+        },
+      },
+      {
+        professionId: "leatherworking",
+        marketId: "forever.pvp.horde.us",
+        route: [{ recipeId: "not-real", expectedCrafts: 1 }],
+      },
+    );
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body)).toMatchObject({
+      error: "Route references unknown recipe not-real.",
+    });
   });
 });

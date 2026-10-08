@@ -8,18 +8,24 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "import:client-data": "tsx scripts/import-client-data.ts",
     "test": "vitest run",
+    "test:dsql": "tsx scripts/dsql-smoke.ts",
     "test:local-db": "tsx local/postgres-smoke.ts",
     "typecheck:local": "tsc -p tsconfig.local.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@forever-professions/contracts": "workspace:*"
+    "@aws-sdk/client-s3": "3.1147.0",
+    "@aws-sdk/credential-providers": "3.1147.0",
+    "@aws/aurora-dsql-node-postgres-connector": "0.1.9",
+    "@forever-professions/contracts": "workspace:*",
+    "pg": "8.23.1",
+    "pg-connection-string": "2.14.1"
   },
   "devDependencies": {
     "@types/node": "26.6.4",
     "@types/pg": "8.23.1",
-    "pg": "8.23.1",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vitest": "5.0.3"

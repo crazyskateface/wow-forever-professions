@@ -15,11 +15,15 @@ Browser ---- API Gateway HTTP API ---- TypeScript Lambda
    |                                      |
 client-side profession math         fixture data (Phase 1)
                                           |
-                                  Aurora DSQL (later)
+                              versioned Aurora DSQL data
 
-EventBridge Scheduler (later) ---- ingestion Lambdas
-                                          |
-                               raw build data in S3
+EventBridge Scheduler ---- pricing Lambda ---- AH Ledger
+                              |
+                     current prices in DSQL
+
+Versioned ingestion ---- raw build data in S3
+          |
+ versioned data in DSQL
 ```
 
 Calculator interaction stays in the browser after recipe data loads. This avoids API calls while a skill slider moves and keeps the experience immediate. AWS infrastructure stays serverless: no Vercel, always-running EC2/ECS service, Kubernetes, Redis, or search cluster without a demonstrated need.
@@ -44,7 +48,7 @@ Before Phase 1 exits, expand the calculator UX, verify Forever mechanics, add me
 
 ## Phase 2 — versioned Forever data and ingestion
 
-Status: in progress. Versioned contracts, pure normalization and recipe diffs, DSQL-safe batching and schema files, immutable raw-data keying, a retained S3 bucket, and opt-in DSQL infrastructure are established. The connector-backed writer and first real client-data adapter are next.
+Status: data foundation complete. Versioned contracts, pure normalization and recipe diffs, DSQL-safe schema and batching, conditional raw S3 uploads, the official connector-backed resumable writer, a retained S3 bucket, a scoped ingestion role, and the termination-protected DSQL development cluster are established. The live AWS path has been validated twice for idempotency. Acquiring and transforming an authoritative Forever client export remains a content task; the cloud validation fixture is not game data.
 
 - Introduce `wow_build`, profession, item, recipe, recipe-version, reagent, output, source, threshold, provenance, and verification models.
 - Preserve raw imported client datasets in S3 by build.
@@ -55,7 +59,7 @@ Status: in progress. Versioned contracts, pure normalization and recipe diffs, D
 
 ## Phase 3 — auction pricing
 
-Status: in progress. Normalized price contracts, the `AuctionPriceProvider` boundary, AH Ledger/manual/no-price adapters, and storage-neutral refresh orchestration are established. A DSQL current-price store and opt-in EventBridge scheduled worker are next.
+Status: complete for current-price delivery. Normalized contracts, the `AuctionPriceProvider` boundary, AH Ledger/manual/no-price adapters, bounded DSQL storage, a dedicated scheduled Lambda with retries and a dead-letter queue, stored-price API routes, manual smoke tools, and calculator attribution are established. The Blizzard adapter and price history remain deliberately deferred.
 
 - Define an `AuctionPriceProvider` boundary.
 - Add AH Ledger, Blizzard (when feasible), manual, and no-price providers behind it.
@@ -65,12 +69,16 @@ Status: in progress. Normalized price contracts, the `AuctionPriceProvider` boun
 
 ## Phase 4 — leveling route optimizer
 
+Status: complete for the fixture-backed route-planning product path. The pure optimizer recalculates probability and expected cost at every skill; supports cost/craft/material objectives and known-recipe/trainer/exclusion constraints; groups adjacent choices into route segments; and reports exact coverage or price-data blockers. Shared Zod contracts, a stored-price-backed POST endpoint, manual smoke tools, a route-planner UI, and links back to the calculator are established. Expanding coverage requires verified Forever recipe and acquisition data rather than optimizer changes.
+
 - Optimize from a starting skill to a target skill.
 - Support cost, craft-count, material-count, known-recipe, trainer-only, and exclusion strategies.
 - Recalculate expected cost as skill-up probability changes; do not use one static craft count.
 - Link route segments back to the normal recipe calculator.
 
 ## Phase 5 — shopping list and nested crafting
+
+Status: complete for the fixture-backed product path. A pure recursive planner aggregates route reagents, supports cheapest/buy-only/craft-first strategies, compares stored auction prices with intermediate crafting costs, and reports missing data or cycles explicitly. Shared contracts, a POST endpoint, manual smoke tooling, and the route-linked UI are established. The controlled fixture has no real intermediate chain; deployed nested results await verified Forever recipe outputs rather than invented data.
 
 - Aggregate route reagents.
 - Compare buying with crafting intermediate reagents when prices exist.
@@ -91,7 +99,3 @@ Status: in progress. Normalized price contracts, the `AuctionPriceProvider` boun
 ## Later, only if usage justifies it
 
 User accounts, characters, learned-recipe sync, personalized routes, add-on integration, historical auction charts, community submissions, a public API, additional WoW versions, and monetization.
-
-## Explicitly out of scope for the current Phase 3 slice
-
-Production database writes, scheduled auction refreshes, Blizzard Forever auction ingestion, authentication, user accounts, and route optimization are not enabled. The Aurora DSQL resource remains opt-in until its schema and writer have been validated on a development cluster.

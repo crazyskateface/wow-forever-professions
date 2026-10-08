@@ -9,13 +9,21 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/local.ts",
+    "optimize": "tsx scripts/optimize.ts",
+    "request": "tsx scripts/request.ts",
+    "shopping": "tsx scripts/shopping.ts",
+    "smoke": "tsx scripts/smoke.ts",
     "start": "tsx src/local.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json"
   },
   "dependencies": {
     "@forever-professions/contracts": "workspace:*",
-    "@forever-professions/fixtures": "workspace:*"
+    "@forever-professions/fixtures": "workspace:*",
+    "@forever-professions/ingestion": "workspace:*",
+    "@forever-professions/optimizer": "workspace:*",
+    "@forever-professions/pricing": "workspace:*",
+    "@forever-professions/shopping": "workspace:*"
   },
   "devDependencies": {
     "@types/aws-lambda": "8.10.164",

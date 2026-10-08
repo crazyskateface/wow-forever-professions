@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS auction_price_current (
+  provider VARCHAR(32) NOT NULL,
+  market_id VARCHAR(255) NOT NULL,
+  game_item_id INTEGER NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  observed_at TIMESTAMP,
+  fetched_at TIMESTAMP NOT NULL,
+  median_unit_price_copper BIGINT,
+  minimum_buyout_unit_price_copper BIGINT,
+  quantity BIGINT,
+  estimated_sales_per_day DECIMAL(20, 4),
+  unavailable_reason VARCHAR(64),
+  attribution_text VARCHAR(256),
+  attribution_url TEXT,
+  PRIMARY KEY (provider, market_id, game_item_id),
+  CHECK (status IN ('available', 'unavailable')),
+  CHECK (median_unit_price_copper IS NULL OR median_unit_price_copper > 0),
+  CHECK (minimum_buyout_unit_price_copper IS NULL OR minimum_buyout_unit_price_copper > 0),
+  CHECK (quantity IS NULL OR quantity >= 0),
+  CHECK (estimated_sales_per_day IS NULL OR estimated_sales_per_day >= 0)
+);
