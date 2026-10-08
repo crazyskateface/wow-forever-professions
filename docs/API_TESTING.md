@@ -20,6 +20,7 @@ Request any route directly:
 
 ```text
 pnpm api:request -- /api/health
+pnpm api:request -- /api/professions/leatherworking
 pnpm api:request -- /api/professions
 pnpm api:request -- '/api/auction/prices?marketId=forever.pvp.horde.us&itemIds=4234,2321'
 pnpm api:optimize -- 150 180 cost

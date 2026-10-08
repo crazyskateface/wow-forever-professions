@@ -78,7 +78,7 @@ Pass an API Gateway base URL to test a deployment: `pnpm api:smoke -- https://ex
 
 ## DSQL validation
 
-`pnpm pricing:dsql:test` applies the three Phase 3 migrations, maps the worker and API IAM roles to scoped database roles, verifies idempotent writes, confirms an older fetch cannot replace a newer observation, and reads the result back through the application repository. Required environment variables are documented in `packages/pricing/scripts/dsql-smoke.ts`.
+`pnpm pricing:dsql:test` applies the three Phase 3 migrations, maps the worker and API IAM roles to scoped database roles, verifies idempotent writes, confirms an older fetch cannot replace a newer observation, and reads the result back through the application repository. Set `APPLICATION_READER_ROLE_ARN` to the `ApiFunctionRoleArn` stack output so the shared `forever_professions_application_reader` role receives read-only access to recipe and pricing tables. The remaining required environment variables are documented in `packages/pricing/scripts/dsql-smoke.ts`.
 
 ## Phase result
 

@@ -11,7 +11,7 @@ import {
 import { DsqlAuctionPricingRepository } from "../src/index.js";
 
 const writerDatabaseRole = "forever_professions_pricing_writer";
-const readerDatabaseRole = "forever_professions_pricing_reader";
+const readerDatabaseRole = "forever_professions_application_reader";
 const roleArnPattern = /^arn:aws:iam::(\d{12}):role\/[A-Za-z0-9+=,.@_/-]{1,512}$/;
 
 function requiredEnvironment(name: string): string {
@@ -101,10 +101,7 @@ async function configureRoles(
   if (readerRoleArn !== undefined) {
     await ensureDatabaseRole(runner, readerDatabaseRole);
     await ensureRoleMapping(runner, readerDatabaseRole, readerRoleArn);
-    await executeOne(
-      runner,
-      `GRANT SELECT ON auction_market, auction_price_current TO ${readerDatabaseRole}`,
-    );
+    await executeOne(runner, `GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${readerDatabaseRole}`);
   }
 }
 
@@ -113,7 +110,7 @@ async function main(): Promise<void> {
   const region = requiredEnvironment("AWS_REGION");
   const workerRoleArn = requiredEnvironment("PRICING_WRITER_ROLE_ARN");
   const testRoleArn = requiredEnvironment("PRICING_TEST_ROLE_ARN");
-  const readerRoleArn = optionalRoleArn("PRICING_READER_ROLE_ARN");
+  const readerRoleArn = optionalRoleArn("APPLICATION_READER_ROLE_ARN");
   for (const roleArn of [workerRoleArn, testRoleArn]) {
     if (!roleArnPattern.test(roleArn)) throw new Error("Pricing writer role ARN is invalid.");
   }

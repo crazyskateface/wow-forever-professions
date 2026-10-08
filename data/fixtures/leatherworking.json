@@ -36,7 +36,10 @@
       ],
       "provenance": {
         "source": "fixture",
-        "verified": false,
+        "sourceLabel": "Illustrative Phase 1 fixture",
+        "verification": {
+          "status": "unverified"
+        },
         "notes": "Illustrative Phase 1 values only; not verified for World of Warcraft: Forever."
       }
     },
@@ -73,7 +76,10 @@
       ],
       "provenance": {
         "source": "fixture",
-        "verified": false,
+        "sourceLabel": "Illustrative Phase 1 fixture",
+        "verification": {
+          "status": "unverified"
+        },
         "notes": "Illustrative Phase 1 values only; not verified for World of Warcraft: Forever."
       }
     }

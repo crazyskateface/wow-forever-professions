@@ -3,6 +3,7 @@ import {
   auctionPriceRequestSchema,
   auctionPricesResponseSchema,
   healthResponseSchema,
+  professionFixtureSchema,
   professionsResponseSchema,
   recipeSchema,
   recipesResponseSchema,
@@ -10,6 +11,7 @@ import {
   shoppingListRequestSchema,
 } from "@forever-professions/contracts";
 import { professionFixtures } from "@forever-professions/fixtures";
+import type { RecipeCatalogReader } from "@forever-professions/ingestion";
 import type { CurrentAuctionPriceReader } from "@forever-professions/pricing";
 import {
   optimizeFixtureRoute,
@@ -39,7 +41,23 @@ function json(statusCode: number, value: unknown): ApiResponse {
 }
 
 export interface ApiDependencies {
+  readonly catalog?: RecipeCatalogReader;
   readonly pricing?: CurrentAuctionPriceReader;
+}
+
+async function findProfession(
+  professionId: string,
+  dependencies: ApiDependencies,
+) {
+  return dependencies.catalog
+    ? dependencies.catalog.getProfession(professionId)
+    : professionFixtures.find(({ id }) => id === professionId);
+}
+
+async function findRecipe(recipeId: string, dependencies: ApiDependencies) {
+  return dependencies.catalog
+    ? dependencies.catalog.getRecipe(recipeId)
+    : professionFixtures.flatMap(({ recipes }) => recipes).find(({ id }) => id === recipeId);
 }
 
 export async function routeRequest(
@@ -61,11 +79,9 @@ export async function routeRequest(
     if (!request.success) {
       return json(400, { error: "A valid route optimization request is required." });
     }
-    const profession = professionFixtures.find(
-      ({ id }) => id === request.data.professionId,
-    );
-    if (!profession) return json(404, { error: "Profession not found." });
     try {
+      const profession = await findProfession(request.data.professionId, dependencies);
+      if (!profession) return json(404, { error: "Profession not found." });
       return json(
         200,
         await optimizeFixtureRoute(request.data, profession, dependencies.pricing),
@@ -84,11 +100,9 @@ export async function routeRequest(
     if (!request.success) {
       return json(400, { error: "A valid shopping-list request is required." });
     }
-    const profession = professionFixtures.find(
-      ({ id }) => id === request.data.professionId,
-    );
-    if (!profession) return json(404, { error: "Profession not found." });
     try {
+      const profession = await findProfession(request.data.professionId, dependencies);
+      if (!profession) return json(404, { error: "Profession not found." });
       return json(
         200,
         await buildFixtureShoppingList(
@@ -122,33 +136,56 @@ export async function routeRequest(
   }
 
   if (normalizedPath === "/professions") {
-    return json(
-      200,
-      professionsResponseSchema.parse(
-        professionFixtures.map(({ id, name }) => ({ id, name })),
-      ),
-    );
+    try {
+      const professions = dependencies.catalog
+        ? await dependencies.catalog.listProfessions()
+        : professionFixtures.map(({ id, name }) => ({ id, name }));
+      return json(200, professionsResponseSchema.parse(professions));
+    } catch {
+      return json(503, { error: "Recipe catalog is temporarily unavailable." });
+    }
+  }
+
+  const professionMatch = normalizedPath.match(/^\/professions\/([^/]+)$/);
+  if (professionMatch) {
+    try {
+      const profession = await findProfession(
+        decodeURIComponent(professionMatch[1]!),
+        dependencies,
+      );
+      if (!profession) return json(404, { error: "Profession not found." });
+      return json(200, professionFixtureSchema.parse(profession));
+    } catch {
+      return json(503, { error: "Recipe catalog is temporarily unavailable." });
+    }
   }
 
   const professionRecipesMatch = normalizedPath.match(
     /^\/professions\/([^/]+)\/recipes$/,
   );
   if (professionRecipesMatch) {
-    const profession = professionFixtures.find(
-      ({ id }) => id === decodeURIComponent(professionRecipesMatch[1]!),
-    );
-    if (!profession) return json(404, { error: "Profession not found." });
-    return json(200, recipesResponseSchema.parse(profession.recipes));
+    try {
+      const profession = await findProfession(
+        decodeURIComponent(professionRecipesMatch[1]!),
+        dependencies,
+      );
+      if (!profession) return json(404, { error: "Profession not found." });
+      return json(200, recipesResponseSchema.parse(profession.recipes));
+    } catch {
+      return json(503, { error: "Recipe catalog is temporarily unavailable." });
+    }
   }
 
   const recipeMatch = normalizedPath.match(/^\/recipes\/([^/]+)$/);
   if (recipeMatch) {
     const requestedId = decodeURIComponent(recipeMatch[1]!);
-    const recipe = professionFixtures
-      .flatMap(({ recipes }) => recipes)
-      .find(({ id }) => id === requestedId);
-    if (!recipe) return json(404, { error: "Recipe not found." });
-    return json(200, recipeSchema.parse(recipe));
+    try {
+      const recipe = await findRecipe(requestedId, dependencies);
+      if (!recipe) return json(404, { error: "Recipe not found." });
+      return json(200, recipeSchema.parse(recipe));
+    } catch {
+      return json(503, { error: "Recipe catalog is temporarily unavailable." });
+    }
   }
 
   if (normalizedPath === "/auction/markets") {

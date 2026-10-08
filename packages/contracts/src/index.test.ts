@@ -36,6 +36,39 @@ describe("shared contracts", () => {
     ).toThrow();
   });
 
+  it("preserves structured source and verification metadata for recipe data", () => {
+    expect(
+      professionFixtureSchema.parse({
+        build: "fixture-0",
+        id: "leatherworking",
+        name: "Leatherworking",
+        recipes: [
+          {
+            id: "heavy-armor-kit",
+            name: "Heavy Armor Kit",
+            professionId: "leatherworking",
+            thresholds: { orange: 150, yellow: 170, green: 180, gray: 190 },
+            reagents: [],
+            outputs: [
+              { itemId: "heavy-armor-kit-item", name: "Heavy Armor Kit", quantity: 1 },
+            ],
+            provenance: {
+              source: "classic-fallback",
+              sourceLabel: "Classic reference",
+              verification: { status: "unverified" },
+              notes: "Awaiting Forever verification.",
+            },
+          },
+        ],
+      }).recipes[0]?.provenance,
+    ).toEqual({
+      source: "classic-fallback",
+      sourceLabel: "Classic reference",
+      verification: { status: "unverified" },
+      notes: "Awaiting Forever verification.",
+    });
+  });
+
   it("accepts a versioned imported build dataset", () => {
     expect(
       importedBuildDatasetSchema.parse({
@@ -160,6 +193,23 @@ describe("shared contracts", () => {
         objective: "cost",
       }),
     ).toThrow("marketId");
+  });
+
+  it("accepts a complete imported profession recipe selection", () => {
+    expect(
+      routeOptimizationRequestSchema.safeParse({
+        professionId: "leatherworking",
+        startSkill: 1,
+        targetSkill: 300,
+        objective: "crafts",
+        constraints: {
+          knownRecipeIds: Array.from(
+            { length: 603 },
+            (_, index) => `spell-${index + 1}`,
+          ),
+        },
+      }).success,
+    ).toBe(true);
   });
 
   it("accepts complete and blocked route results", () => {

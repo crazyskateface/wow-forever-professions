@@ -13,7 +13,7 @@ private S3 web build
 
 Browser ---- API Gateway HTTP API ---- TypeScript Lambda
    |                                      |
-client-side profession math         fixture data (Phase 1)
+client-side profession math       versioned recipe catalog
                                           |
                               versioned Aurora DSQL data
 
@@ -48,7 +48,7 @@ Before Phase 1 exits, expand the calculator UX, verify Forever mechanics, add me
 
 ## Phase 2 — versioned Forever data and ingestion
 
-Status: data foundation complete. Versioned contracts, pure normalization and recipe diffs, DSQL-safe schema and batching, conditional raw S3 uploads, the official connector-backed resumable writer, a retained S3 bucket, a scoped ingestion role, and the termination-protected DSQL development cluster are established. The live AWS path has been validated twice for idempotency. Acquiring and transforming an authoritative Forever client export remains a content task; the cloud validation fixture is not game data.
+Status: data foundation complete. Versioned contracts, pure normalization and recipe diffs, DSQL-safe schema and batching, conditional raw S3 uploads, the official connector-backed resumable writer, a retained S3 bucket, a scoped ingestion role, and the termination-protected DSQL development cluster are established. The live AWS path has been validated twice for idempotency. A real Forever client snapshot is now transformed and locally validated; independent evidence is still required before it can be called authoritative.
 
 - Introduce `wow_build`, profession, item, recipe, recipe-version, reagent, output, source, threshold, provenance, and verification models.
 - Preserve raw imported client datasets in S3 by build.
@@ -69,7 +69,7 @@ Status: complete for current-price delivery. Normalized contracts, the `AuctionP
 
 ## Phase 4 — leveling route optimizer
 
-Status: complete for the fixture-backed route-planning product path. The pure optimizer recalculates probability and expected cost at every skill; supports cost/craft/material objectives and known-recipe/trainer/exclusion constraints; groups adjacent choices into route segments; and reports exact coverage or price-data blockers. Shared Zod contracts, a stored-price-backed POST endpoint, manual smoke tools, a route-planner UI, and links back to the calculator are established. Expanding coverage requires verified Forever recipe and acquisition data rather than optimizer changes.
+Status: complete for the catalog-backed route-planning product path. The pure optimizer recalculates probability and expected cost at every skill; supports cost/craft/material objectives and known-recipe/trainer/exclusion constraints; groups adjacent choices into route segments; and reports exact coverage or price-data blockers. Shared Zod contracts, a stored-price-backed POST endpoint, manual smoke tools, a route-planner UI, and links back to the calculator are established. Reliable trainer constraints still require verified Forever acquisition data rather than optimizer changes.
 
 - Optimize from a starting skill to a target skill.
 - Support cost, craft-count, material-count, known-recipe, trainer-only, and exclusion strategies.
@@ -78,13 +78,15 @@ Status: complete for the fixture-backed route-planning product path. The pure op
 
 ## Phase 5 — shopping list and nested crafting
 
-Status: complete for the fixture-backed product path. A pure recursive planner aggregates route reagents, supports cheapest/buy-only/craft-first strategies, compares stored auction prices with intermediate crafting costs, and reports missing data or cycles explicitly. Shared contracts, a POST endpoint, manual smoke tooling, and the route-linked UI are established. The controlled fixture has no real intermediate chain; deployed nested results await verified Forever recipe outputs rather than invented data.
+Status: complete for the catalog-backed product path. A pure recursive planner aggregates route reagents, supports cheapest/buy-only/craft-first strategies, compares stored auction prices with intermediate crafting costs, and reports missing data or cycles explicitly. Shared contracts, a POST endpoint, manual smoke tooling, and the route-linked UI are established. The imported graph can exercise real intermediate chains, while provisional output quantities remain visibly unverified.
 
 - Aggregate route reagents.
 - Compare buying with crafting intermediate reagents when prices exist.
 - Detect and prevent cycles in recursive crafting graphs.
 
 ## Phase 6 — verification and data quality
+
+Status: in progress. Structured provenance now flows through storage, API contracts, the calculator, and route planner. A reproducible client-data import provides 603 Leatherworking recipes for Forever build 1.60.1.69977, the application can read the normalized SQL catalog instead of fixtures, and a generated audit identifies missing names, omitted borrowed ranks, provisional outputs, and incomplete review metadata. Observed-in-game evidence and field-level provenance remain outstanding before the data can be called authoritative.
 
 - Track `client-data`, `observed-in-game`, `classic-fallback`, `community-verified`, and `manual-override` provenance.
 - Surface uncertainty instead of presenting fallback data as authoritative.

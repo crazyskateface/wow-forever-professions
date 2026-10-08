@@ -2,7 +2,7 @@
 
 A TypeScript monorepo for a modern, application-first World of Warcraft: Forever profession calculator inspired by Professions.gg.
 
-The repository contains a fixture-backed calculator, the Phase 2 versioned-data foundation, the Phase 3 auction-pricing path, the Phase 4 leveling-route optimizer, and the Phase 5 shopping planner. Routes recalculate expected crafts, materials, and stored-price cost at each skill; shopping plans aggregate their reagents and safely compare buying with recursive intermediate crafting. Missing data and cycles remain explicit instead of being guessed. Blizzard pricing remains deferred until a documented Forever API is available.
+The repository contains a database-backed calculator, the Phase 2 versioned-data foundation, the Phase 3 auction-pricing path, the Phase 4 leveling-route optimizer, the Phase 5 shopping planner, and the Phase 6 data-quality workflow. A bundled, reproducible Forever client-data import provides 603 Leatherworking recipes while preserving known gaps as explicit warnings. Routes recalculate expected crafts, materials, and stored-price cost at each skill; shopping plans aggregate their reagents and safely compare buying with recursive intermediate crafting. Recipe responses retain structured source and verification metadata, and the UI calls out unverified, fallback, or rejected inputs instead of hiding uncertainty. Blizzard pricing remains deferred until a documented Forever API is available.
 
 ## Requirements
 
@@ -19,9 +19,12 @@ pnpm dev:web
 
 The web app runs at `http://localhost:5173`.
 
-In another terminal, the fixture API can run locally:
+The API uses its small illustrative fixture by default. To run it with the bundled client-data catalog, start and import the local database first:
 
 ```text
+pnpm db:local:up
+pnpm data:import:local -- data/imports/forever-1.60.1.69977-leatherworking.json
+$env:LOCAL_DATABASE_URL = "postgresql://forever_professions:local-only@127.0.0.1:55432/forever_professions_local"
 pnpm dev:api
 ```
 
@@ -56,10 +59,11 @@ packages/pricing           Auction provider adapters and refresh orchestration
 packages/optimizer         Pure leveling-route optimization
 packages/shopping          Pure shopping-list and nested-crafting planning
 data/fixtures              Controlled Phase 1 data
+data/imports               Reproducible client-data imports and quality reports
 ops                        AWS CDK application
 docs                       Architecture and roadmap
 references/professions-gg  Original design-reference screenshots
 .agents/skills             Placeholders for future project-specific Codex skills
 ```
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for phase boundaries, [docs/PHASE2_DATA.md](docs/PHASE2_DATA.md) for ingestion, [docs/PHASE3_PRICING.md](docs/PHASE3_PRICING.md) for pricing, [docs/PHASE4_OPTIMIZER.md](docs/PHASE4_OPTIMIZER.md) for route planning, [docs/PHASE5_SHOPPING.md](docs/PHASE5_SHOPPING.md) for shopping plans, and [docs/API_TESTING.md](docs/API_TESTING.md) for manual endpoint testing. The managed root [AGENTS.md](AGENTS.md) protects synced project sources; scoped agent guidance lives beside the code it governs.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for phase boundaries, [docs/PHASE2_DATA.md](docs/PHASE2_DATA.md) for ingestion, [docs/PHASE3_PRICING.md](docs/PHASE3_PRICING.md) for pricing, [docs/PHASE4_OPTIMIZER.md](docs/PHASE4_OPTIMIZER.md) for route planning, [docs/PHASE5_SHOPPING.md](docs/PHASE5_SHOPPING.md) for shopping plans, [docs/PHASE6_DATA_QUALITY.md](docs/PHASE6_DATA_QUALITY.md) for verification and uncertainty handling, and [docs/API_TESTING.md](docs/API_TESTING.md) for manual endpoint testing. The managed root [AGENTS.md](AGENTS.md) protects synced project sources; scoped agent guidance lives beside the code it governs.

@@ -2,25 +2,29 @@ import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
 } from "aws-lambda";
-import { createAuroraDsqlTransactionRunner } from "@forever-professions/ingestion";
+import {
+  createAuroraDsqlTransactionRunner,
+  SqlRecipeCatalogReader,
+} from "@forever-professions/ingestion";
 import { DsqlAuctionPricingRepository } from "@forever-professions/pricing";
 import { routeRequest } from "./router.js";
 
 const endpoint = process.env.DSQL_ENDPOINT?.trim();
 const region = process.env.AWS_REGION?.trim();
-const databaseRole = process.env.PRICING_DATABASE_ROLE?.trim();
-const pricing =
+const databaseRole =
+  process.env.DATA_DATABASE_ROLE?.trim() ?? process.env.PRICING_DATABASE_ROLE?.trim();
+const database =
   endpoint && region && databaseRole
-    ? new DsqlAuctionPricingRepository(
-        createAuroraDsqlTransactionRunner({
-          host: endpoint,
-          user: databaseRole,
-          region,
-          maxConnections: 3,
-          idleTimeoutMilliseconds: 45_000,
-        }),
-      )
+    ? createAuroraDsqlTransactionRunner({
+        host: endpoint,
+        user: databaseRole,
+        region,
+        maxConnections: 3,
+        idleTimeoutMilliseconds: 45_000,
+      })
     : undefined;
+const pricing = database ? new DsqlAuctionPricingRepository(database) : undefined;
+const catalog = database ? new SqlRecipeCatalogReader(database) : undefined;
 
 export async function handler(
   event: APIGatewayProxyEventV2,
@@ -40,7 +44,10 @@ export async function handler(
     event.requestContext.http.method,
     event.rawPath,
     event.queryStringParameters ?? {},
-    pricing === undefined ? {} : { pricing },
+    {
+      ...(catalog === undefined ? {} : { catalog }),
+      ...(pricing === undefined ? {} : { pricing }),
+    },
     body,
   );
 }

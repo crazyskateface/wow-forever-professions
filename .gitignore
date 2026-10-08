@@ -10,6 +10,7 @@ cdk.out/
 .turbo/
 .cache/
 .tmp/
+.local-data/
 *.tsbuildinfo
 cdk-outputs*.json
 

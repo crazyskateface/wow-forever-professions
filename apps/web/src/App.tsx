@@ -7,9 +7,11 @@ import {
 } from "react";
 import {
   auctionPricesResponseSchema,
+  professionFixtureSchema,
   routeOptimizationResponseSchema,
   shoppingListResponseSchema,
   type AuctionPriceObservation,
+  type ProfessionFixture,
   type Recipe,
   type RouteObjective,
   type RouteOptimizationResponse,
@@ -17,6 +19,7 @@ import {
   type ShoppingStrategy,
 } from "@forever-professions/contracts";
 import {
+  assessDataQuality,
   getExpectedCraftsForSkillUp,
   getExpectedReagentQuantity,
   getRecipeDifficulty,
@@ -55,6 +58,40 @@ function initials(value: string): string {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function DataQualityNotice({ build, recipe }: { build: string; recipe: Recipe }) {
+  const assessment = assessDataQuality(
+    recipe.provenance.source,
+    recipe.provenance.verification.status,
+  );
+
+  return (
+    <section
+      className={`data-quality quality-${assessment.level}`}
+      aria-labelledby="data-quality-title"
+    >
+      <div className="data-quality-summary">
+        <span className="quality-icon" aria-hidden="true">!</span>
+        <div>
+          <span className="section-kicker">Data quality</span>
+          <h2 id="data-quality-title">{assessment.label}</h2>
+        </div>
+      </div>
+      <dl>
+        <div><dt>Source</dt><dd>{recipe.provenance.sourceLabel}</dd></div>
+        <div><dt>Verification</dt><dd>{recipe.provenance.verification.status}</dd></div>
+        <div><dt>Build</dt><dd>{build}</dd></div>
+      </dl>
+      <div className="data-quality-copy">
+        <p>{assessment.explanation}</p>
+        {recipe.provenance.verification.notes ? (
+          <p>{recipe.provenance.verification.notes}</p>
+        ) : null}
+        {recipe.provenance.notes ? <p>{recipe.provenance.notes}</p> : null}
+      </div>
+    </section>
+  );
 }
 
 function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
@@ -124,8 +161,22 @@ function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
 }
 
 export function App() {
+  const [profession, setProfession] = useState<ProfessionFixture>(leatherworkingFixture);
+  const [catalogError, setCatalogError] = useState<string>();
   const [recipeId, setRecipeId] = useState(leatherworkingFixture.recipes[0]!.id);
-  const recipe = leatherworkingFixture.recipes.find(({ id }) => id === recipeId)!;
+  const recipe =
+    profession.recipes.find(({ id }) => id === recipeId) ?? profession.recipes[0]!;
+  const recipeQuality = assessDataQuality(
+    recipe.provenance.source,
+    recipe.provenance.verification.status,
+  );
+  const nonAuthoritativeRecipeCount = profession.recipes.filter(
+    (candidate) =>
+      !assessDataQuality(
+        candidate.provenance.source,
+        candidate.provenance.verification.status,
+      ).authoritative,
+  ).length;
   const [skill, setSkill] = useState(MIN_PROFESSION_SKILL);
   const [prices, setPrices] = useState<readonly AuctionPriceObservation[]>([]);
   const [priceError, setPriceError] = useState<string>();
@@ -147,6 +198,31 @@ export function App() {
   const [shoppingResponse, setShoppingResponse] = useState<ShoppingListResponse>();
   const [shoppingError, setShoppingError] = useState<string>();
   const [shoppingLoading, setShoppingLoading] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/professions/${leatherworkingFixture.id}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return professionFixtureSchema.parse(await response.json());
+      })
+      .then((loadedProfession) => {
+        if (loadedProfession.recipes.length === 0) {
+          throw new Error("The profession catalog contains no usable recipes.");
+        }
+        setProfession(loadedProfession);
+        setRecipeId(loadedProfession.recipes[0]!.id);
+        setKnownRecipeIds(loadedProfession.recipes.map(({ id }) => id));
+        setCatalogError(undefined);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setCatalogError("The API catalog is unavailable, so the illustrative fixture is shown.");
+      });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     function focusSearch(event: KeyboardEvent): void {
@@ -217,7 +293,7 @@ export function App() {
     };
   }, [calculation.probability, prices, recipe.reagents]);
 
-  const filteredRecipes = leatherworkingFixture.recipes.filter(({ name }) =>
+  const filteredRecipes = profession.recipes.filter(({ name }) =>
     name.toLowerCase().includes(search.trim().toLowerCase()),
   );
 
@@ -251,7 +327,7 @@ export function App() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          professionId: leatherworkingFixture.id,
+          professionId: profession.id,
           marketId: "forever.pvp.horde.us",
           startSkill: routeStartSkill,
           targetSkill: routeTargetSkill,
@@ -278,7 +354,7 @@ export function App() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          professionId: leatherworkingFixture.id,
+          professionId: profession.id,
           marketId: "forever.pvp.horde.us",
           route: routeResponse.result.segments.map(
             ({ recipeId: id, expectedCrafts }) => ({ recipeId: id, expectedCrafts }),
@@ -298,7 +374,7 @@ export function App() {
   }
 
   function openRouteRecipe(nextRecipeId: string, routeSkill: number): void {
-    const nextRecipe = leatherworkingFixture.recipes.find(({ id }) => id === nextRecipeId);
+    const nextRecipe = profession.recipes.find(({ id }) => id === nextRecipeId);
     if (nextRecipe === undefined) return;
     setRecipeId(nextRecipe.id);
     setSkill(Math.min(MAX_PROFESSION_SKILL, Math.max(MIN_PROFESSION_SKILL, routeSkill)));
@@ -328,7 +404,7 @@ export function App() {
         <aside className="profession-rail" aria-label="Profession and recipe selection">
           <div className="profession-select">
             <span className="profession-icon" aria-hidden="true">LW</span>
-            <span><small>Profession</small>{leatherworkingFixture.name}</span>
+            <span><small>Profession</small>{profession.name}</span>
             <span aria-hidden="true">⌄</span>
           </div>
 
@@ -373,7 +449,7 @@ export function App() {
             ))}
           </nav>
 
-          <div className="rail-footer"><span>Forever build</span><strong>{leatherworkingFixture.build}</strong></div>
+          <div className="rail-footer"><span>Forever build</span><strong>{profession.build}</strong></div>
         </aside>
 
         <main className="main-workspace">
@@ -387,9 +463,15 @@ export function App() {
               <section className="recipe-hero" aria-labelledby="recipe-title">
                 <div className="hero-title-row">
                   <span className="hero-item-icon" aria-hidden="true">{initials(recipe.name)}</span>
-                  <div><div className="breadcrumb">{leatherworkingFixture.name} <span>/</span> Recipe</div><h1 id="recipe-title">{recipe.name}</h1></div>
+                  <div><div className="breadcrumb">{profession.name} <span>/</span> Recipe</div><h1 id="recipe-title">{recipe.name}</h1></div>
                 </div>
                 <div className="hero-actions">
+                  <span
+                    className={`quality-chip quality-${recipeQuality.level}`}
+                    title={recipeQuality.explanation}
+                  >
+                    {recipeQuality.label} data
+                  </span>
                   <span className={`difficulty ${calculation.difficulty}`}><i aria-hidden="true" />{calculation.difficulty}</span>
                   <button onClick={() => setWorkspaceView("planner")} type="button">Use in route</button>
                 </div>
@@ -441,7 +523,8 @@ export function App() {
                 {pricing.attribution ? <a className="attribution" href={pricing.attribution.url} rel="noreferrer" target="_blank">{pricing.attribution.text}</a> : null}
               </section>
 
-              <section className="data-note"><span aria-hidden="true">i</span><p><strong>Fixture data</strong>{recipe.provenance.notes}</p></section>
+              {catalogError ? <p className="price-status">{catalogError}</p> : null}
+              <DataQualityNotice build={profession.build} recipe={recipe} />
             </>
           ) : (
             <section className="route-planner" aria-labelledby="route-title">
@@ -449,6 +532,15 @@ export function App() {
                 <div><span className="section-kicker">Leveling planner</span><h1 id="route-title">Build the best route</h1><p>Compare every known recipe at each skill and optimize for cost, craft count, or material use.</p></div>
                 <span className="planner-badge">{knownRecipeIds.length} known recipes</span>
               </div>
+              {nonAuthoritativeRecipeCount > 0 ? (
+                <section className="planner-quality-note" aria-label="Route data quality warning">
+                  <span className="quality-icon" aria-hidden="true">!</span>
+                  <div>
+                    <strong>Route inputs are not yet authoritative</strong>
+                    <p>{nonAuthoritativeRecipeCount} of {profession.recipes.length} available recipes use unverified or fallback data. Route math is deterministic, but its result is only as reliable as those inputs.</p>
+                  </div>
+                </section>
+              ) : null}
               <form className="route-form" onSubmit={submitRoute}>
                 <div className="route-field-grid">
                   <label><span>Starting skill</span><input min="0" onChange={(event) => setRouteStartSkill(Number(event.target.value))} type="number" value={routeStartSkill} /></label>
@@ -457,7 +549,7 @@ export function App() {
                 </div>
                 <fieldset className="known-recipes">
                   <legend>Recipes you know</legend>
-                  {leatherworkingFixture.recipes.map((candidate) => <label key={candidate.id}><input checked={knownRecipeIds.includes(candidate.id)} onChange={() => toggleKnownRecipe(candidate.id)} type="checkbox" /><span>{candidate.name}</span></label>)}
+                  {profession.recipes.map((candidate) => <label key={candidate.id}><input checked={knownRecipeIds.includes(candidate.id)} onChange={() => toggleKnownRecipe(candidate.id)} type="checkbox" /><span>{candidate.name}</span></label>)}
                   <label><input checked={trainerOnly} onChange={(event) => setTrainerOnly(event.target.checked)} type="checkbox" /><span>Trainer recipes only</span></label>
                   <small>Acquisition sources are not yet verified for Forever.</small>
                 </fieldset>

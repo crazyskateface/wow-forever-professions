@@ -88,8 +88,8 @@ export class ForeverProfessionsStack extends Stack {
       },
       environment: {
         DSQL_ENDPOINT: dataClusterEndpoint,
+        DATA_DATABASE_ROLE: "forever_professions_application_reader",
         NODE_OPTIONS: "--enable-source-maps",
-        PRICING_DATABASE_ROLE: "forever_professions_pricing_reader",
       },
     });
     apiFunction.addToRolePolicy(

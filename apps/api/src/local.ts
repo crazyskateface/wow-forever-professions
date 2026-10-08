@@ -1,8 +1,13 @@
 import { createServer, type IncomingMessage } from "node:http";
+import { createPostgresRecipeCatalogReader } from "@forever-professions/ingestion";
 import { localPricingReader } from "./local-pricing.js";
 import { routeRequest } from "./router.js";
 
 const port = Number.parseInt(process.env.PORT ?? "3001", 10);
+const localDatabaseUrl = process.env.LOCAL_DATABASE_URL?.trim();
+const localCatalog = localDatabaseUrl
+  ? createPostgresRecipeCatalogReader({ connectionString: localDatabaseUrl })
+  : undefined;
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   if (request.method === "GET" || request.method === "HEAD") return undefined;
@@ -28,7 +33,10 @@ const server = createServer(async (request, response) => {
     request.method ?? "GET",
     url.pathname,
     Object.fromEntries(url.searchParams),
-    { pricing: localPricingReader },
+    {
+      ...(localCatalog === undefined ? {} : { catalog: localCatalog }),
+      pricing: localPricingReader,
+    },
     await readJsonBody(request),
   );
 
@@ -37,5 +45,15 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, () => {
-  console.log(`Forever Professions API listening on http://localhost:${port}`);
+  console.log(
+    `Forever Professions API listening on http://localhost:${port} (${localCatalog ? "PostgreSQL catalog" : "fixture catalog"})`,
+  );
 });
+
+async function close(): Promise<void> {
+  server.close();
+  await localCatalog?.end();
+}
+
+process.once("SIGINT", close);
+process.once("SIGTERM", close);

@@ -7,8 +7,11 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "audit:build": "tsx scripts/audit-build.ts",
     "build": "tsc -p tsconfig.json",
+    "convert:professiondb": "tsx scripts/convert-professiondb.ts",
     "import:client-data": "tsx scripts/import-client-data.ts",
+    "import:local": "tsx scripts/import-local.ts",
     "test": "vitest run",
     "test:dsql": "tsx scripts/dsql-smoke.ts",
     "test:local-db": "tsx local/postgres-smoke.ts",

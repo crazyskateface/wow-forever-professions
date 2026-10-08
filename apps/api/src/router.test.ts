@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   healthResponseSchema,
+  professionFixtureSchema,
   recipesResponseSchema,
   routeOptimizationResponseSchema,
   shoppingListResponseSchema,
 } from "@forever-professions/contracts";
+import { leatherworkingFixture } from "@forever-professions/fixtures";
 import { routeRequest } from "./router.js";
 
 describe("fixture API router", () => {
@@ -30,7 +32,60 @@ describe("fixture API router", () => {
   it("returns fixture recipes for a known profession", async () => {
     const response = await routeRequest("GET", "/professions/leatherworking/recipes");
     expect(response.statusCode).toBe(200);
-    expect(recipesResponseSchema.parse(JSON.parse(response.body))).toHaveLength(2);
+    const recipes = recipesResponseSchema.parse(JSON.parse(response.body));
+    expect(recipes).toHaveLength(2);
+    expect(recipes[0]?.provenance).toMatchObject({
+      source: "fixture",
+      sourceLabel: "Illustrative Phase 1 fixture",
+      verification: { status: "unverified" },
+    });
+  });
+
+  it("serves a complete profession from the configured catalog", async () => {
+    const response = await routeRequest(
+      "GET",
+      "/api/professions/leatherworking",
+      {},
+      {
+        catalog: {
+          async listProfessions() {
+            return [{ id: "leatherworking", name: "Leatherworking" }];
+          },
+          async getProfession(professionId) {
+            return professionId === "leatherworking" ? leatherworkingFixture : undefined;
+          },
+          async getRecipe(recipeId) {
+            return leatherworkingFixture.recipes.find(({ id }) => id === recipeId);
+          },
+        },
+      },
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(professionFixtureSchema.parse(JSON.parse(response.body))).toEqual(
+      leatherworkingFixture,
+    );
+  });
+
+  it("reports an unavailable configured catalog instead of silently using fixtures", async () => {
+    const response = await routeRequest("GET", "/api/professions", {}, {
+      catalog: {
+        async listProfessions() {
+          throw new Error("database unavailable");
+        },
+        async getProfession() {
+          return undefined;
+        },
+        async getRecipe() {
+          return undefined;
+        },
+      },
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(JSON.parse(response.body)).toEqual({
+      error: "Recipe catalog is temporarily unavailable.",
+    });
   });
 
   it("returns 404 for an unknown recipe", async () => {

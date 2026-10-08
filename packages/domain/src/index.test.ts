@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assessDataQuality,
   getExpectedCraftsForSkillUp,
   getRecipeDifficulty,
   getSkillUpProbability,
@@ -28,5 +29,32 @@ describe("skill-up probability", () => {
   it("returns infinite expected crafts when a skill-up is impossible", () => {
     expect(getExpectedCraftsForSkillUp(0)).toBe(Number.POSITIVE_INFINITY);
     expect(getExpectedCraftsForSkillUp(0.25)).toBe(4);
+  });
+});
+
+describe("data quality", () => {
+  it("does not promote Classic fallback data to authoritative", () => {
+    expect(assessDataQuality("classic-fallback", "verified")).toMatchObject({
+      level: "fallback",
+      authoritative: false,
+    });
+  });
+
+  it("surfaces rejected data ahead of its source classification", () => {
+    expect(assessDataQuality("observed-in-game", "rejected")).toMatchObject({
+      level: "rejected",
+      authoritative: false,
+    });
+  });
+
+  it("only treats verified Forever provenance as authoritative", () => {
+    expect(assessDataQuality("community-verified", "verified")).toMatchObject({
+      level: "verified",
+      authoritative: true,
+    });
+    expect(assessDataQuality("client-data", "unverified")).toMatchObject({
+      level: "unverified",
+      authoritative: false,
+    });
   });
 });

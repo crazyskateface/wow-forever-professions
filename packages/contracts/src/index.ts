@@ -23,19 +23,6 @@ export const skillThresholdsSchema = z
     { message: "Thresholds must be ordered orange <= yellow <= green <= gray." },
   );
 
-export const provenanceSchema = z.object({
-  source: z.enum([
-    "client-data",
-    "observed-in-game",
-    "classic-fallback",
-    "community-verified",
-    "manual-override",
-    "fixture",
-  ]),
-  verified: z.boolean(),
-  notes: z.string().min(1).optional(),
-});
-
 export const wowBuildSchema = z.object({
   id: z.string().min(1),
   version: z.string().min(1),
@@ -69,6 +56,13 @@ export const verificationSchema = z.object({
   status: verificationStatusSchema,
   verifiedAt: z.iso.datetime().optional(),
   verifiedBy: z.string().min(1).optional(),
+  notes: z.string().min(1).optional(),
+});
+
+export const provenanceSchema = z.object({
+  source: dataSourceKindSchema,
+  sourceLabel: z.string().min(1),
+  verification: verificationSchema.omit({ id: true }),
   notes: z.string().min(1).optional(),
 });
 
@@ -259,11 +253,13 @@ export const auctionPricesResponseSchema = z.object({
 
 export const routeObjectiveSchema = z.enum(["cost", "crafts", "materials"]);
 
+const recipeIdSelectionSchema = z.array(z.string().min(1)).max(3_000);
+
 export const routeConstraintsSchema = z.object({
-  knownRecipeIds: z.array(z.string().min(1)).max(500).optional(),
+  knownRecipeIds: recipeIdSelectionSchema.optional(),
   trainerOnly: z.boolean().optional(),
-  excludedRecipeIds: z.array(z.string().min(1)).max(500).optional(),
-  excludedItemIds: z.array(z.string().min(1)).max(500).optional(),
+  excludedRecipeIds: recipeIdSelectionSchema.optional(),
+  excludedItemIds: recipeIdSelectionSchema.optional(),
 });
 
 export const routeOptimizationRequestSchema = z
@@ -376,7 +372,7 @@ export const shoppingListRequestSchema = z.object({
   marketId: z.string().min(1),
   route: z.array(shoppingRouteCraftRequirementSchema).min(1).max(500),
   strategy: shoppingStrategySchema.default("cheapest"),
-  knownRecipeIds: z.array(z.string().min(1)).max(500).optional(),
+  knownRecipeIds: recipeIdSelectionSchema.optional(),
 });
 
 export const shoppingQuantitySchema = z.object({
@@ -522,6 +518,7 @@ export type UnavailableAuctionPriceObservation = z.infer<
   typeof unavailableAuctionPriceObservationSchema
 >;
 export type DataSource = z.infer<typeof dataSourceSchema>;
+export type DataSourceKind = z.infer<typeof dataSourceKindSchema>;
 export type ImportedBuildDataset = z.infer<typeof importedBuildDatasetSchema>;
 export type ImportedProfession = z.infer<typeof importedProfessionSchema>;
 export type ImportedRecipe = z.infer<typeof importedRecipeSchema>;
@@ -529,6 +526,7 @@ export type ItemModel = z.infer<typeof itemModelSchema>;
 export type NormalizedBuild = z.infer<typeof normalizedBuildSchema>;
 export type ProfessionModel = z.infer<typeof professionModelSchema>;
 export type ProvenanceRecord = z.infer<typeof provenanceRecordSchema>;
+export type RecipeProvenance = z.infer<typeof provenanceSchema>;
 export type ProfessionFixture = z.infer<typeof professionFixtureSchema>;
 export type ProfessionSummary = z.infer<typeof professionSummarySchema>;
 export type Recipe = z.infer<typeof recipeSchema>;
@@ -538,4 +536,5 @@ export type RecipeReagent = z.infer<typeof recipeReagentSchema>;
 export type RecipeThreshold = z.infer<typeof recipeThresholdSchema>;
 export type RecipeVersion = z.infer<typeof recipeVersionSchema>;
 export type Verification = z.infer<typeof verificationSchema>;
+export type VerificationStatus = z.infer<typeof verificationStatusSchema>;
 export type WowBuild = z.infer<typeof wowBuildSchema>;

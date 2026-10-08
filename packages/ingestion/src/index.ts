@@ -11,8 +11,12 @@ export {
   DSQL_TRANSACTION_LIMITS,
   type DsqlBatchOptions,
 } from "./batching.js";
+export * from "./catalog.js";
 export * from "./dsql.js";
+export * from "./data-quality.js";
 export * from "./import.js";
+export * from "./professiondb.js";
+export * from "./postgres.js";
 export * from "./raw-store.js";
 export * from "./writer.js";
 
