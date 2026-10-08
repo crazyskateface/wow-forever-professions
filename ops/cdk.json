@@ -1,0 +1,7 @@
+{
+  "app": "node ./node_modules/tsx/dist/cli.mjs bin/app.ts",
+  "watch": {
+    "include": ["bin/**/*.ts", "lib/**/*.ts", "../apps/api/src/**/*.ts"],
+    "exclude": ["dist", "cdk.out", "node_modules"]
+  }
+}

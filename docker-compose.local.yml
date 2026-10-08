@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: forever-professions-postgres
+    environment:
+      POSTGRES_DB: forever_professions_local
+      POSTGRES_PASSWORD: local-only
+      POSTGRES_USER: forever_professions
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forever_professions -d forever_professions_local"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data

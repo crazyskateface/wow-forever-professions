@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS profession (
+  profession_id VARCHAR(128) PRIMARY KEY,
+  slug VARCHAR(128) NOT NULL UNIQUE,
+  name VARCHAR(256) NOT NULL
+);

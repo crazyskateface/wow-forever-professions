@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+  - data/fixtures
+  - ops
+
+engineStrict: true
+preferWorkspacePackages: true
+sharedWorkspaceLockfile: true
+
+allowBuilds:
+  esbuild: true

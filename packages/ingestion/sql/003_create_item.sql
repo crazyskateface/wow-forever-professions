@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS item (
+  item_id VARCHAR(128) PRIMARY KEY,
+  game_id INTEGER,
+  name VARCHAR(256) NOT NULL
+);

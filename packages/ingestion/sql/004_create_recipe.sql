@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS recipe (
+  recipe_id VARCHAR(128) PRIMARY KEY,
+  profession_id VARCHAR(128) NOT NULL
+);

@@ -1,0 +1,63 @@
+{
+  "build": "fixture-0",
+  "id": "leatherworking",
+  "name": "Leatherworking",
+  "recipes": [
+    {
+      "id": "heavy-armor-kit",
+      "name": "Heavy Armor Kit",
+      "professionId": "leatherworking",
+      "thresholds": {
+        "orange": 150,
+        "yellow": 170,
+        "green": 180,
+        "gray": 190
+      },
+      "reagents": [
+        {
+          "itemId": "heavy-leather",
+          "name": "Heavy Leather",
+          "quantity": 5
+        },
+        {
+          "itemId": "fine-thread",
+          "name": "Fine Thread",
+          "quantity": 1
+        }
+      ],
+      "provenance": {
+        "source": "fixture",
+        "verified": false,
+        "notes": "Illustrative Phase 1 values only; not verified for World of Warcraft: Forever."
+      }
+    },
+    {
+      "id": "nightscape-headband",
+      "name": "Nightscape Headband",
+      "professionId": "leatherworking",
+      "thresholds": {
+        "orange": 205,
+        "yellow": 225,
+        "green": 235,
+        "gray": 245
+      },
+      "reagents": [
+        {
+          "itemId": "thick-leather",
+          "name": "Thick Leather",
+          "quantity": 5
+        },
+        {
+          "itemId": "silken-thread",
+          "name": "Silken Thread",
+          "quantity": 2
+        }
+      ],
+      "provenance": {
+        "source": "fixture",
+        "verified": false,
+        "notes": "Illustrative Phase 1 values only; not verified for World of Warcraft: Forever."
+      }
+    }
+  ]
+}

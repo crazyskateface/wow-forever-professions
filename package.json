@@ -1,0 +1,32 @@
+{
+  "name": "forever-professions",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.19.0",
+      "onFail": "download"
+    }
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "db:local:down": "docker compose -f docker-compose.local.yml down",
+    "db:local:test": "pnpm --filter @forever-professions/ingestion test:local-db",
+    "db:local:up": "docker compose -f docker-compose.local.yml up -d --wait",
+    "dev:api": "pnpm --filter @forever-professions/api dev",
+    "dev:web": "pnpm --filter @forever-professions/web dev",
+    "pricing:live:test": "pnpm --filter @forever-professions/pricing test:live",
+    "synth": "pnpm --filter @forever-professions/ops synth",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "verify": "pnpm typecheck && pnpm test && pnpm build && pnpm synth"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
