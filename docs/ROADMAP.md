@@ -94,7 +94,9 @@ Status: in progress. Structured provenance now flows through storage, API contra
 
 ## Phase 7 — polish and launch
 
-- URL-addressable recipes, build selection, change notices, metadata, analytics, and monitoring.
+Status: an early full-catalog UX slice is complete. Recipe and known-recipe lists are virtualized for the 603-record import, search covers recipe IDs and material names, bulk selection is bounded, catalog loading/fallback/empty states are explicit, and recipe URLs participate in browser history.
+
+- Build selection, change notices, metadata, analytics, and monitoring.
 - Accessibility, performance, responsive refinement, and complete loading/empty/error states.
 - Preserve the application-first design.
 

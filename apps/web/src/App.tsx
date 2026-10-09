@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type ReactNode,
 } from "react";
 import {
   auctionPricesResponseSchema,
@@ -29,9 +30,146 @@ import { leatherworkingFixture } from "@forever-professions/fixtures";
 
 type WorkspaceView = "calculator" | "planner";
 type RecipeListView = "guide" | "recipes";
+type CatalogState = "loading" | "ready" | "fixture" | "fallback";
 
 const MIN_PROFESSION_SKILL = 0;
 const MAX_PROFESSION_SKILL = 300;
+const RECIPE_ROW_HEIGHT = 78;
+const GUIDE_ROW_HEIGHT = 114;
+const KNOWN_RECIPE_ROW_HEIGHT = 48;
+const VIRTUAL_OVERSCAN = 5;
+
+interface VirtualListProps<Item> {
+  readonly ariaLabel: string;
+  readonly className: string;
+  readonly empty: ReactNode;
+  readonly getKey: (item: Item) => string;
+  readonly items: readonly Item[];
+  readonly renderItem: (item: Item, index: number) => ReactNode;
+  readonly resetKey: string;
+  readonly rowHeight: number;
+  readonly selectedIndex?: number;
+}
+
+function VirtualList<Item>({
+  ariaLabel,
+  className,
+  empty,
+  getKey,
+  items,
+  renderItem,
+  resetKey,
+  rowHeight,
+  selectedIndex,
+}: VirtualListProps<Item>) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(400);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const updateHeight = () => setViewportHeight(viewport.clientHeight);
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (viewport) viewport.scrollTop = 0;
+    setScrollTop(0);
+  }, [resetKey]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || selectedIndex === undefined || selectedIndex < 0) return;
+    const itemTop = selectedIndex * rowHeight;
+    const itemBottom = itemTop + rowHeight;
+    if (itemTop < viewport.scrollTop) viewport.scrollTop = itemTop;
+    else if (itemBottom > viewport.scrollTop + viewport.clientHeight) {
+      viewport.scrollTop = itemBottom - viewport.clientHeight;
+    }
+  }, [items.length, rowHeight, selectedIndex]);
+
+  const firstIndex = Math.max(
+    0,
+    Math.floor(scrollTop / rowHeight) - VIRTUAL_OVERSCAN,
+  );
+  const lastIndex = Math.min(
+    items.length,
+    Math.ceil((scrollTop + viewportHeight) / rowHeight) + VIRTUAL_OVERSCAN,
+  );
+  const visibleItems = items.slice(firstIndex, lastIndex);
+
+  return (
+    <div
+      aria-label={ariaLabel}
+      className={className}
+      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      ref={viewportRef}
+      role="list"
+    >
+      {items.length === 0 ? empty : (
+        <div className="virtual-list-space" style={{ height: items.length * rowHeight }}>
+          {visibleItems.map((item, visibleIndex) => {
+            const index = firstIndex + visibleIndex;
+            return (
+              <div
+                aria-posinset={index + 1}
+                aria-setsize={items.length}
+                className="virtual-list-row"
+                key={getKey(item)}
+                role="listitem"
+                style={{ height: rowHeight, top: index * rowHeight }}
+              >
+                {renderItem(item, index)}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function recipeIdFromUrl(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return new URL(window.location.href).searchParams.get("recipe") ?? undefined;
+}
+
+function writeRecipeUrl(recipeId: string, mode: "push" | "replace"): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("recipe", recipeId);
+  window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
+}
+
+function scrollToWorkspaceOnMobile(): void {
+  if (typeof window === "undefined" || !window.matchMedia("(max-width: 900px)").matches) {
+    return;
+  }
+  const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? "auto"
+    : "smooth";
+  window.requestAnimationFrame(() =>
+    document.querySelector(".main-workspace")?.scrollIntoView({ behavior, block: "start" }),
+  );
+}
+
+function catalogHeadline(state: CatalogState, recipeCount: number): string {
+  switch (state) {
+    case "loading":
+      return "Loading recipe catalog…";
+    case "fixture":
+      return "Illustrative fixture catalog";
+    case "fallback":
+      return "Using fallback catalog";
+    case "ready":
+      return `${recipeCount} recipes ready`;
+  }
+}
 
 function formatNumber(value: number): string {
   return Number.isFinite(value) ? value.toFixed(2) : "—";
@@ -162,7 +300,9 @@ function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
 
 export function App() {
   const [profession, setProfession] = useState<ProfessionFixture>(leatherworkingFixture);
+  const [catalogState, setCatalogState] = useState<CatalogState>("loading");
   const [catalogError, setCatalogError] = useState<string>();
+  const [catalogReload, setCatalogReload] = useState(0);
   const [recipeId, setRecipeId] = useState(leatherworkingFixture.recipes[0]!.id);
   const recipe =
     profession.recipes.find(({ id }) => id === recipeId) ?? profession.recipes[0]!;
@@ -184,6 +324,7 @@ export function App() {
   const [recipeListView, setRecipeListView] = useState<RecipeListView>("guide");
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const [knownRecipeSearch, setKnownRecipeSearch] = useState("");
   const [routeStartSkill, setRouteStartSkill] = useState(150);
   const [routeTargetSkill, setRouteTargetSkill] = useState(180);
   const [routeObjective, setRouteObjective] = useState<RouteObjective>("cost");
@@ -201,6 +342,8 @@ export function App() {
 
   useEffect(() => {
     const controller = new AbortController();
+    setCatalogState("loading");
+    setCatalogError(undefined);
     fetch(`/api/professions/${leatherworkingFixture.id}`, {
       signal: controller.signal,
     })
@@ -212,17 +355,58 @@ export function App() {
         if (loadedProfession.recipes.length === 0) {
           throw new Error("The profession catalog contains no usable recipes.");
         }
+        const requestedRecipeId = recipeIdFromUrl();
+        const selectedRecipe = loadedProfession.recipes.find(
+          ({ id }) => id === requestedRecipeId,
+        ) ?? loadedProfession.recipes[0]!;
+        const usesFixtureCatalog = loadedProfession.recipes.every(
+          ({ provenance }) => provenance.source === "fixture",
+        );
         setProfession(loadedProfession);
-        setRecipeId(loadedProfession.recipes[0]!.id);
+        setRecipeId(selectedRecipe.id);
         setKnownRecipeIds(loadedProfession.recipes.map(({ id }) => id));
-        setCatalogError(undefined);
+        setCatalogState(usesFixtureCatalog ? "fixture" : "ready");
+        setCatalogError(
+          usesFixtureCatalog
+            ? "The API is serving the illustrative development fixture."
+            : undefined,
+        );
+        writeRecipeUrl(selectedRecipe.id, "replace");
+        if (requestedRecipeId === selectedRecipe.id) scrollToWorkspaceOnMobile();
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
+        const fallbackRecipe = leatherworkingFixture.recipes.find(
+          ({ id }) => id === recipeIdFromUrl(),
+        ) ?? leatherworkingFixture.recipes[0]!;
+        setProfession(leatherworkingFixture);
+        setRecipeId(fallbackRecipe.id);
+        setKnownRecipeIds(leatherworkingFixture.recipes.map(({ id }) => id));
+        setCatalogState("fallback");
         setCatalogError("The API catalog is unavailable, so the illustrative fixture is shown.");
+        writeRecipeUrl(fallbackRecipe.id, "replace");
       });
     return () => controller.abort();
-  }, []);
+  }, [catalogReload]);
+
+  useEffect(() => {
+    function selectRecipeFromHistory(): void {
+      const requestedRecipeId = recipeIdFromUrl();
+      const requestedRecipe = profession.recipes.find(
+        ({ id }) => id === requestedRecipeId,
+      );
+      if (!requestedRecipe) return;
+      setRecipeId(requestedRecipe.id);
+      setWorkspaceView("calculator");
+      scrollToWorkspaceOnMobile();
+    }
+    window.addEventListener("popstate", selectRecipeFromHistory);
+    return () => window.removeEventListener("popstate", selectRecipeFromHistory);
+  }, [profession]);
+
+  useEffect(() => {
+    document.title = `${recipe.name} · Forever Professions`;
+  }, [recipe.name]);
 
   useEffect(() => {
     function focusSearch(event: KeyboardEvent): void {
@@ -293,13 +477,42 @@ export function App() {
     };
   }, [calculation.probability, prices, recipe.reagents]);
 
-  const filteredRecipes = profession.recipes.filter(({ name }) =>
-    name.toLowerCase().includes(search.trim().toLowerCase()),
-  );
+  const filteredRecipes = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const matches = profession.recipes.filter((candidate) =>
+      query.length === 0 ||
+      candidate.name.toLowerCase().includes(query) ||
+      candidate.id.toLowerCase().includes(query) ||
+      candidate.reagents.some(({ name }) => name.toLowerCase().includes(query)) ||
+      candidate.outputs.some(({ name }) => name.toLowerCase().includes(query)),
+    );
+    return [...matches].sort((left, right) =>
+      recipeListView === "guide"
+        ? left.thresholds.orange - right.thresholds.orange ||
+          left.name.localeCompare(right.name)
+        : left.name.localeCompare(right.name),
+    );
+  }, [profession.recipes, recipeListView, search]);
+  const selectedRecipeIndex = filteredRecipes.findIndex(({ id }) => id === recipe.id);
+  const knownRecipeSet = useMemo(() => new Set(knownRecipeIds), [knownRecipeIds]);
+  const filteredKnownRecipes = useMemo(() => {
+    const query = knownRecipeSearch.trim().toLowerCase();
+    return profession.recipes.filter(
+      ({ id, name }) =>
+        query.length === 0 ||
+        name.toLowerCase().includes(query) ||
+        id.toLowerCase().includes(query),
+    );
+  }, [knownRecipeSearch, profession.recipes]);
+  const selectedKnownResults = filteredKnownRecipes.filter(({ id }) =>
+    knownRecipeSet.has(id),
+  ).length;
 
-  function selectRecipe(nextRecipe: Recipe): void {
+  function selectRecipe(nextRecipe: Recipe, historyMode: "push" | "replace" = "push"): void {
     setRecipeId(nextRecipe.id);
     setWorkspaceView("calculator");
+    writeRecipeUrl(nextRecipe.id, historyMode);
+    scrollToWorkspaceOnMobile();
   }
 
   function nudgeSkill(amount: number): void {
@@ -309,11 +522,23 @@ export function App() {
   }
 
   function toggleKnownRecipe(nextRecipeId: string): void {
-    setKnownRecipeIds((current) =>
-      current.includes(nextRecipeId)
-        ? current.filter((id) => id !== nextRecipeId)
-        : [...current, nextRecipeId],
-    );
+    setKnownRecipeIds((current) => {
+      const next = new Set(current);
+      if (next.has(nextRecipeId)) next.delete(nextRecipeId);
+      else next.add(nextRecipeId);
+      return [...next];
+    });
+  }
+
+  function setKnownResults(selected: boolean): void {
+    setKnownRecipeIds((current) => {
+      const next = new Set(current);
+      for (const candidate of filteredKnownRecipes) {
+        if (selected) next.add(candidate.id);
+        else next.delete(candidate.id);
+      }
+      return [...next];
+    });
   }
 
   async function submitRoute(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -379,6 +604,7 @@ export function App() {
     setRecipeId(nextRecipe.id);
     setSkill(Math.min(MAX_PROFESSION_SKILL, Math.max(MIN_PROFESSION_SKILL, routeSkill)));
     setWorkspaceView("calculator");
+    writeRecipeUrl(nextRecipe.id, "push");
   }
 
   return (
@@ -390,7 +616,7 @@ export function App() {
         </a>
         <label className="global-search">
           <span className="search-icon" aria-hidden="true">⌕</span>
-          <input aria-label="Search recipes" onChange={(event) => setSearch(event.target.value)} placeholder="Search recipes…" ref={searchRef} type="search" value={search} />
+          <input aria-label="Search recipes" onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${profession.recipes.length} recipes…`} ref={searchRef} type="search" value={search} />
           <kbd>shift + f</kbd>
         </label>
         <button className="market-picker" type="button">
@@ -406,6 +632,26 @@ export function App() {
             <span className="profession-icon" aria-hidden="true">LW</span>
             <span><small>Profession</small>{profession.name}</span>
             <span aria-hidden="true">⌄</span>
+          </div>
+
+          <div
+            aria-live="polite"
+            className={`catalog-state catalog-${catalogState}`}
+          >
+            <span className="catalog-state-dot" aria-hidden="true" />
+            <span>
+              <strong>{catalogHeadline(catalogState, profession.recipes.length)}</strong>
+              <small>
+                {catalogState === "fallback" || catalogState === "fixture"
+                  ? catalogError
+                  : `Forever build ${profession.build}`}
+              </small>
+            </span>
+            {catalogState === "fallback" ? (
+              <button onClick={() => setCatalogReload((value) => value + 1)} type="button">
+                Retry
+              </button>
+            ) : null}
           </div>
 
           <div className="rail-skill">
@@ -431,11 +677,19 @@ export function App() {
             <button aria-selected={recipeListView === "recipes"} className={recipeListView === "recipes" ? "active" : ""} onClick={() => setRecipeListView("recipes")} role="tab" type="button">All recipes</button>
           </div>
 
-          <nav className="recipe-list" aria-label="Recipes">
-            {filteredRecipes.length === 0 ? (
-              <p className="empty-recipes">No recipes match “{search}”.</p>
-            ) : filteredRecipes.map((candidate, index) => (
-              <div className="recipe-group" key={candidate.id}>
+          <div className="recipe-list-summary">
+            <span>{filteredRecipes.length} {filteredRecipes.length === 1 ? "result" : "results"}</span>
+            {search ? <button onClick={() => setSearch("")} type="button">Clear search</button> : null}
+          </div>
+
+          <VirtualList
+            ariaLabel="Recipes"
+            className="recipe-list"
+            empty={<p className="empty-recipes">No recipes match “{search}”.</p>}
+            getKey={({ id }) => id}
+            items={filteredRecipes}
+            renderItem={(candidate, index) => (
+              <div className="recipe-group">
                 {recipeListView === "guide" ? <div className="level-band"><span>Skill {candidate.thresholds.orange}</span><span aria-hidden="true">→</span><span>{candidate.thresholds.gray}</span></div> : null}
                 <button aria-current={candidate.id === recipe.id ? "true" : undefined} className={candidate.id === recipe.id ? "recipe active" : "recipe"} onClick={() => selectRecipe(candidate)} type="button">
                   <span className={`recipe-stripe stripe-${index}`} aria-hidden="true" />
@@ -446,8 +700,11 @@ export function App() {
                   </span>
                 </button>
               </div>
-            ))}
-          </nav>
+            )}
+            resetKey={`${recipeListView}:${search}`}
+            rowHeight={recipeListView === "guide" ? GUIDE_ROW_HEIGHT : RECIPE_ROW_HEIGHT}
+            selectedIndex={selectedRecipeIndex}
+          />
 
           <div className="rail-footer"><span>Forever build</span><strong>{profession.build}</strong></div>
         </aside>
@@ -523,7 +780,6 @@ export function App() {
                 {pricing.attribution ? <a className="attribution" href={pricing.attribution.url} rel="noreferrer" target="_blank">{pricing.attribution.text}</a> : null}
               </section>
 
-              {catalogError ? <p className="price-status">{catalogError}</p> : null}
               <DataQualityNotice build={profession.build} recipe={recipe} />
             </>
           ) : (
@@ -549,9 +805,63 @@ export function App() {
                 </div>
                 <fieldset className="known-recipes">
                   <legend>Recipes you know</legend>
-                  {profession.recipes.map((candidate) => <label key={candidate.id}><input checked={knownRecipeIds.includes(candidate.id)} onChange={() => toggleKnownRecipe(candidate.id)} type="checkbox" /><span>{candidate.name}</span></label>)}
-                  <label><input checked={trainerOnly} onChange={(event) => setTrainerOnly(event.target.checked)} type="checkbox" /><span>Trainer recipes only</span></label>
-                  <small>Acquisition sources are not yet verified for Forever.</small>
+                  <div className="known-recipes-toolbar">
+                    <label className="known-recipes-search">
+                      <span className="search-icon" aria-hidden="true">⌕</span>
+                      <input
+                        aria-label="Filter known recipes"
+                        onChange={(event) => setKnownRecipeSearch(event.target.value)}
+                        placeholder="Filter by recipe name or spell ID…"
+                        type="search"
+                        value={knownRecipeSearch}
+                      />
+                    </label>
+                    <div className="known-recipes-count" aria-live="polite">
+                      <strong>{knownRecipeIds.length}</strong>
+                      <span>of {profession.recipes.length} selected</span>
+                    </div>
+                  </div>
+                  <div className="known-recipes-actions">
+                    <span>{filteredKnownRecipes.length} matching recipes</span>
+                    <button
+                      disabled={selectedKnownResults === filteredKnownRecipes.length}
+                      onClick={() => setKnownResults(true)}
+                      type="button"
+                    >
+                      Select results
+                    </button>
+                    <button
+                      disabled={selectedKnownResults === 0}
+                      onClick={() => setKnownResults(false)}
+                      type="button"
+                    >
+                      Clear results
+                    </button>
+                  </div>
+                  <VirtualList
+                    ariaLabel="Known recipe selection"
+                    className="known-recipes-list"
+                    empty={<p className="empty-recipes">No recipes match “{knownRecipeSearch}”.</p>}
+                    getKey={({ id }) => id}
+                    items={filteredKnownRecipes}
+                    renderItem={(candidate) => (
+                      <label className="known-recipe-row">
+                        <input
+                          checked={knownRecipeSet.has(candidate.id)}
+                          onChange={() => toggleKnownRecipe(candidate.id)}
+                          type="checkbox"
+                        />
+                        <span>
+                          <strong>{candidate.name}</strong>
+                          <small>{candidate.id} · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>
+                        </span>
+                      </label>
+                    )}
+                    resetKey={knownRecipeSearch}
+                    rowHeight={KNOWN_RECIPE_ROW_HEIGHT}
+                  />
+                  <label className="trainer-option"><input checked={trainerOnly} onChange={(event) => setTrainerOnly(event.target.checked)} type="checkbox" /><span>Trainer recipes only</span></label>
+                  <small className="known-recipes-note">Acquisition sources are not yet verified for Forever.</small>
                 </fieldset>
                 <button className="primary-action" disabled={routeLoading} type="submit">{routeLoading ? "Calculating…" : "Build my route"}</button>
               </form>
