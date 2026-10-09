@@ -241,7 +241,15 @@ describe("shared contracts", () => {
         startSkill: 150,
         targetSkill: 180,
         objective: "cost",
-        constraints: { knownRecipeIds: ["heavy-armor-kit"] },
+        constraints: {
+          faction: "horde",
+          specializationSpellIds: [10656],
+          professionBranchId: "dragonscale",
+          knownRecipeIds: ["heavy-armor-kit"],
+          allowUnknownAvailability: true,
+          allowUnknownFaction: true,
+          allowCooldowns: false,
+        },
       }),
     ).toBeDefined();
     expect(() =>

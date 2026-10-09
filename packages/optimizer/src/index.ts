@@ -1,44 +1,33 @@
 import {
-  getExpectedCraftsForSkillUp,
-  getSkillUpProbability,
-  type SkillThresholds,
+  evaluateRecipeAtSkill,
+  validateLevelingRecipe,
+  type LevelingRecipe,
+  type PlayerFaction,
+  type RecipeEvaluationContext,
 } from "@forever-professions/domain";
 
 export type RouteObjective = "cost" | "crafts" | "materials";
 
-export type RecipeAcquisition =
-  | "automatic"
-  | "trainer"
-  | "vendor"
-  | "drop"
-  | "quest"
-  | "reputation"
-  | "unknown";
-
-export interface RouteReagent {
-  readonly itemId: string;
-  readonly quantity: number;
-  readonly unitPriceCopper?: number;
-}
-
-export interface RouteRecipe {
-  readonly id: string;
+export interface RouteRecipe extends LevelingRecipe {
   readonly name: string;
-  readonly learnSkill: number | null;
-  readonly availability: "available" | "unavailable" | "unknown";
-  readonly thresholds: SkillThresholds;
-  readonly reagents: readonly RouteReagent[];
-  readonly acquisition: RecipeAcquisition;
 }
 
 export interface RouteConstraints {
+  readonly faction?: PlayerFaction;
+  readonly specializationSpellIds?: readonly number[];
+  readonly professionBranchId?: string;
   readonly knownRecipeIds?: readonly string[];
   readonly trainerOnly?: boolean;
   readonly excludedRecipeIds?: readonly string[];
   readonly excludedItemIds?: readonly string[];
+  readonly allowUnknownAvailability?: boolean;
+  readonly allowUnknownFaction?: boolean;
+  readonly allowCooldowns?: boolean;
 }
 
 export interface OptimizeRouteInput {
+  readonly professionId: string;
+  readonly buildId: string;
   readonly startSkill: number;
   readonly targetSkill: number;
   readonly objective: RouteObjective;
@@ -118,79 +107,68 @@ function validateRecipes(recipes: readonly RouteRecipe[]): void {
     }
     if (ids.has(recipe.id)) throw new Error(`Duplicate route recipe ID: ${recipe.id}.`);
     ids.add(recipe.id);
-
-    for (const reagent of recipe.reagents) {
-      if (reagent.itemId.length === 0) {
-        throw new Error(`Recipe ${recipe.id} has a reagent without an item ID.`);
-      }
-      if (!Number.isFinite(reagent.quantity) || reagent.quantity <= 0) {
-        throw new RangeError(`Recipe ${recipe.id} reagent quantities must be positive.`);
-      }
-      if (
-        reagent.unitPriceCopper !== undefined &&
-        (!Number.isSafeInteger(reagent.unitPriceCopper) || reagent.unitPriceCopper <= 0)
-      ) {
-        throw new RangeError(
-          `Recipe ${recipe.id} reagent prices must be positive integer copper values.`,
-        );
-      }
-    }
+    validateLevelingRecipe(recipe);
   }
 }
 
-function eligibleRecipes(
-  recipes: readonly RouteRecipe[],
-  constraints: RouteConstraints,
-): readonly RouteRecipe[] {
-  const known =
-    constraints.knownRecipeIds === undefined
-      ? undefined
-      : new Set(constraints.knownRecipeIds);
-  const excludedRecipes = new Set(constraints.excludedRecipeIds ?? []);
-  const excludedItems = new Set(constraints.excludedItemIds ?? []);
-
-  return recipes.filter((recipe) => {
-    if (recipe.availability === "unavailable") return false;
-    if (known !== undefined && !known.has(recipe.id)) return false;
-    if (constraints.trainerOnly === true && recipe.acquisition !== "trainer") {
-      return false;
-    }
-    if (excludedRecipes.has(recipe.id)) return false;
-    return recipe.reagents.every(({ itemId }) => !excludedItems.has(itemId));
-  });
+function evaluationContext(
+  input: OptimizeRouteInput,
+  skill: number,
+): RecipeEvaluationContext {
+  const constraints = input.constraints;
+  return {
+    professionId: input.professionId,
+    buildId: input.buildId,
+    skill,
+    ...(constraints?.faction === undefined ? {} : { faction: constraints.faction }),
+    ...(constraints?.specializationSpellIds === undefined
+      ? {}
+      : { specializationSpellIds: constraints.specializationSpellIds }),
+    ...(constraints?.professionBranchId === undefined
+      ? {}
+      : { professionBranchId: constraints.professionBranchId }),
+    ...(constraints?.knownRecipeIds === undefined
+      ? {}
+      : { knownRecipeIds: constraints.knownRecipeIds }),
+    ...(constraints?.trainerOnly === undefined
+      ? {}
+      : { trainerOnly: constraints.trainerOnly }),
+    ...(constraints?.excludedRecipeIds === undefined
+      ? {}
+      : { excludedRecipeIds: constraints.excludedRecipeIds }),
+    ...(constraints?.excludedItemIds === undefined
+      ? {}
+      : { excludedItemIds: constraints.excludedItemIds }),
+    ...(constraints?.allowUnknownAvailability === undefined
+      ? {}
+      : { allowUnknownAvailability: constraints.allowUnknownAvailability }),
+    ...(constraints?.allowUnknownFaction === undefined
+      ? {}
+      : { allowUnknownFaction: constraints.allowUnknownFaction }),
+    ...(constraints?.allowCooldowns === undefined
+      ? {}
+      : { allowCooldowns: constraints.allowCooldowns }),
+  };
 }
 
-function createStep(recipe: RouteRecipe, skill: number): RouteSkillStep | undefined {
-  if (recipe.learnSkill === null || skill < recipe.learnSkill) return undefined;
-  const skillUpProbability = getSkillUpProbability(skill, recipe.thresholds);
-  if (skillUpProbability === 0) return undefined;
-
-  const expectedCrafts = getExpectedCraftsForSkillUp(skillUpProbability);
-  const materialsPerCraft = recipe.reagents.reduce(
-    (total, { quantity }) => total + quantity,
-    0,
-  );
-  const allPricesAvailable = recipe.reagents.every(
-    ({ unitPriceCopper }) => unitPriceCopper !== undefined,
-  );
-  const costPerCraft = allPricesAvailable
-    ? recipe.reagents.reduce(
-        (total, { quantity, unitPriceCopper }) =>
-          total + quantity * unitPriceCopper!,
-        0,
-      )
-    : undefined;
+function createStep(
+  recipe: RouteRecipe,
+  input: OptimizeRouteInput,
+  skill: number,
+): RouteSkillStep | undefined {
+  const evaluation = evaluateRecipeAtSkill(recipe, evaluationContext(input, skill));
+  if (evaluation.status === "ineligible") return undefined;
 
   return {
     skill,
     recipeId: recipe.id,
     recipeName: recipe.name,
-    skillUpProbability,
-    expectedCrafts,
-    expectedMaterials: expectedCrafts * materialsPerCraft,
-    ...(costPerCraft === undefined
+    skillUpProbability: evaluation.skillUpProbability,
+    expectedCrafts: evaluation.expectedCrafts,
+    expectedMaterials: evaluation.expectedMaterials,
+    ...(evaluation.expectedCostCopper === undefined
       ? {}
-      : { expectedCostCopper: expectedCrafts * costPerCraft }),
+      : { expectedCostCopper: evaluation.expectedCostCopper }),
   };
 }
 
@@ -274,12 +252,11 @@ export function optimizeLevelingRoute(
 ): RouteOptimizationResult {
   assertSkillRange(input.startSkill, input.targetSkill);
   validateRecipes(input.recipes);
-  const constrainedRecipes = eligibleRecipes(input.recipes, input.constraints ?? {});
   const steps: RouteSkillStep[] = [];
 
   for (let skill = input.startSkill; skill < input.targetSkill; skill += 1) {
-    const possibleSteps = constrainedRecipes
-      .map((recipe) => ({ recipe, step: createStep(recipe, skill) }))
+    const possibleSteps = input.recipes
+      .map((recipe) => ({ recipe, step: createStep(recipe, input, skill) }))
       .filter(
         (candidate): candidate is { recipe: RouteRecipe; step: RouteSkillStep } =>
           candidate.step !== undefined,

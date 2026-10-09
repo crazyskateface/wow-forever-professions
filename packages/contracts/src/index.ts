@@ -305,10 +305,16 @@ export const routeObjectiveSchema = z.enum(["cost", "crafts", "materials"]);
 const recipeIdSelectionSchema = z.array(z.string().min(1)).max(3_000);
 
 export const routeConstraintsSchema = z.object({
+  faction: z.enum(["alliance", "horde"]).optional(),
+  specializationSpellIds: z.array(z.number().int().positive()).max(100).optional(),
+  professionBranchId: z.string().min(1).optional(),
   knownRecipeIds: recipeIdSelectionSchema.optional(),
   trainerOnly: z.boolean().optional(),
   excludedRecipeIds: recipeIdSelectionSchema.optional(),
   excludedItemIds: recipeIdSelectionSchema.optional(),
+  allowUnknownAvailability: z.boolean().optional(),
+  allowUnknownFaction: z.boolean().optional(),
+  allowCooldowns: z.boolean().optional(),
 });
 
 export const routeOptimizationRequestSchema = z

@@ -62,10 +62,15 @@ export async function optimizeFixtureRoute(
   const recipes: RouteRecipe[] = profession.recipes.map((recipe) => ({
     id: recipe.id,
     name: recipe.name,
+    professionId: recipe.professionId,
+    buildId: recipe.buildId,
     learnSkill: recipe.learnSkill,
     availability: recipe.availability,
     thresholds: recipe.thresholds,
     acquisition: recipe.acquisition,
+    faction: recipe.faction,
+    specializationSpellId: recipe.specializationSpellId,
+    cooldownSeconds: recipe.cooldownSeconds,
     reagents: recipe.reagents.map((reagent) => {
       const price =
         reagent.gameItemId === undefined
@@ -82,6 +87,18 @@ export async function optimizeFixtureRoute(
     request.constraints === undefined
       ? undefined
       : {
+          ...(request.constraints.faction === undefined
+            ? {}
+            : { faction: request.constraints.faction }),
+          ...(request.constraints.specializationSpellIds === undefined
+            ? {}
+            : {
+                specializationSpellIds:
+                  request.constraints.specializationSpellIds,
+              }),
+          ...(request.constraints.professionBranchId === undefined
+            ? {}
+            : { professionBranchId: request.constraints.professionBranchId }),
           ...(request.constraints.knownRecipeIds === undefined
             ? {}
             : { knownRecipeIds: request.constraints.knownRecipeIds }),
@@ -94,6 +111,18 @@ export async function optimizeFixtureRoute(
           ...(request.constraints.excludedItemIds === undefined
             ? {}
             : { excludedItemIds: request.constraints.excludedItemIds }),
+          ...(request.constraints.allowUnknownAvailability === undefined
+            ? {}
+            : {
+                allowUnknownAvailability:
+                  request.constraints.allowUnknownAvailability,
+              }),
+          ...(request.constraints.allowUnknownFaction === undefined
+            ? {}
+            : { allowUnknownFaction: request.constraints.allowUnknownFaction }),
+          ...(request.constraints.allowCooldowns === undefined
+            ? {}
+            : { allowCooldowns: request.constraints.allowCooldowns }),
         };
 
   return routeOptimizationResponseSchema.parse({
@@ -101,6 +130,8 @@ export async function optimizeFixtureRoute(
     ...(request.marketId === undefined ? {} : { marketId: request.marketId }),
     ...(attribution === undefined ? {} : { attribution }),
     result: optimizeLevelingRoute({
+      professionId: profession.id,
+      buildId: profession.build,
       startSkill: request.startSkill,
       targetSkill: request.targetSkill,
       objective: request.objective,

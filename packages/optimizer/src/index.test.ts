@@ -7,16 +7,27 @@ import {
 const changingChanceRecipe: RouteRecipe = {
   id: "changing-chance",
   name: "Changing Chance",
+  professionId: "leatherworking",
+  buildId: "1.60.1.69977",
   learnSkill: 1,
   availability: "available",
   acquisition: "trainer",
+  faction: "both",
+  specializationSpellId: null,
+  cooldownSeconds: null,
   thresholds: { orange: 1, yellow: 2, green: 4, gray: 6 },
   reagents: [{ itemId: "cloth", quantity: 2, unitPriceCopper: 10 }],
 };
 
+const routeDataset = {
+  professionId: "leatherworking",
+  buildId: "1.60.1.69977",
+} as const;
+
 describe("leveling route optimizer", () => {
   it("recalculates expected crafts and cost at every skill", () => {
     const result = optimizeLevelingRoute({
+      ...routeDataset,
       startSkill: 2,
       targetSkill: 4,
       objective: "cost",
@@ -36,19 +47,16 @@ describe("leveling route optimizer", () => {
 
   it("chooses different recipes for cost and craft-count objectives", () => {
     const fast: RouteRecipe = {
+      ...changingChanceRecipe,
       id: "fast",
       name: "Fast",
-      learnSkill: 1,
-      availability: "available",
-      acquisition: "trainer",
       thresholds: { orange: 1, yellow: 5, green: 6, gray: 7 },
       reagents: [{ itemId: "expensive", quantity: 1, unitPriceCopper: 100 }],
     };
     const cheap: RouteRecipe = {
+      ...changingChanceRecipe,
       id: "cheap",
       name: "Cheap",
-      learnSkill: 1,
-      availability: "available",
       acquisition: "vendor",
       thresholds: { orange: 0, yellow: 0, green: 1, gray: 2 },
       reagents: [{ itemId: "cheap", quantity: 1, unitPriceCopper: 10 }],
@@ -56,6 +64,7 @@ describe("leveling route optimizer", () => {
 
     expect(
       optimizeLevelingRoute({
+        ...routeDataset,
         startSkill: 1,
         targetSkill: 2,
         objective: "crafts",
@@ -64,6 +73,7 @@ describe("leveling route optimizer", () => {
     ).toBe("fast");
     expect(
       optimizeLevelingRoute({
+        ...routeDataset,
         startSkill: 1,
         targetSkill: 2,
         objective: "cost",
@@ -74,25 +84,22 @@ describe("leveling route optimizer", () => {
 
   it("can minimize material units even when that requires more crafts", () => {
     const fast: RouteRecipe = {
+      ...changingChanceRecipe,
       id: "material-heavy",
       name: "Material Heavy",
-      learnSkill: 1,
-      availability: "available",
-      acquisition: "trainer",
       thresholds: { orange: 1, yellow: 5, green: 6, gray: 7 },
       reagents: [{ itemId: "cloth", quantity: 5 }],
     };
     const lean: RouteRecipe = {
+      ...changingChanceRecipe,
       id: "material-lean",
       name: "Material Lean",
-      learnSkill: 1,
-      availability: "available",
-      acquisition: "trainer",
       thresholds: { orange: 0, yellow: 0, green: 1, gray: 2 },
       reagents: [{ itemId: "thread", quantity: 1 }],
     };
 
     const result = optimizeLevelingRoute({
+      ...routeDataset,
       startSkill: 1,
       targetSkill: 2,
       objective: "materials",
@@ -118,6 +125,7 @@ describe("leveling route optimizer", () => {
     ];
 
     const trainerOnly = optimizeLevelingRoute({
+      ...routeDataset,
       startSkill: 2,
       targetSkill: 3,
       objective: "cost",
@@ -127,6 +135,7 @@ describe("leveling route optimizer", () => {
     expect(trainerOnly.segments[0]?.recipeId).toBe("changing-chance");
 
     const excluded = optimizeLevelingRoute({
+      ...routeDataset,
       startSkill: 2,
       targetSkill: 3,
       objective: "cost",
@@ -148,6 +157,7 @@ describe("leveling route optimizer", () => {
     };
     expect(
       optimizeLevelingRoute({
+        ...routeDataset,
         startSkill: 2,
         targetSkill: 3,
         objective: "cost",
@@ -157,6 +167,7 @@ describe("leveling route optimizer", () => {
 
     expect(
       optimizeLevelingRoute({
+        ...routeDataset,
         startSkill: 7,
         targetSkill: 8,
         objective: "crafts",
@@ -175,6 +186,7 @@ describe("leveling route optimizer", () => {
       id: "eligible",
     };
     const result = optimizeLevelingRoute({
+      ...routeDataset,
       startSkill: 2,
       targetSkill: 3,
       objective: "crafts",
@@ -189,9 +201,57 @@ describe("leveling route optimizer", () => {
     expect(result.segments[0]?.recipeId).toBe("eligible");
   });
 
+  it("honors faction, specialization, branch, cooldown, profession, and build eligibility", () => {
+    const generic: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "generic",
+      reagents: [{ itemId: "cloth", quantity: 2 }],
+    };
+    const restricted: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "restricted",
+      faction: "horde",
+      specializationSpellId: 10656,
+      professionBranchId: "dragonscale",
+      cooldownSeconds: 86_400,
+      reagents: [{ itemId: "leather", quantity: 1 }],
+    };
+    const wrongDatasetRecipes: RouteRecipe[] = [
+      { ...restricted, id: "wrong-profession", professionId: "alchemy" },
+      { ...restricted, id: "wrong-build", buildId: "other-build" },
+    ];
+
+    expect(
+      optimizeLevelingRoute({
+        ...routeDataset,
+        startSkill: 2,
+        targetSkill: 3,
+        objective: "materials",
+        recipes: [generic, restricted, ...wrongDatasetRecipes],
+      }).segments[0]?.recipeId,
+    ).toBe("generic");
+
+    expect(
+      optimizeLevelingRoute({
+        ...routeDataset,
+        startSkill: 2,
+        targetSkill: 3,
+        objective: "materials",
+        recipes: [generic, restricted, ...wrongDatasetRecipes],
+        constraints: {
+          faction: "horde",
+          specializationSpellIds: [10656],
+          professionBranchId: "dragonscale",
+          allowCooldowns: true,
+        },
+      }).segments[0]?.recipeId,
+    ).toBe("restricted");
+  });
+
   it("returns an empty complete route when no skill gain is requested", () => {
     expect(
       optimizeLevelingRoute({
+        ...routeDataset,
         startSkill: 100,
         targetSkill: 100,
         objective: "materials",
