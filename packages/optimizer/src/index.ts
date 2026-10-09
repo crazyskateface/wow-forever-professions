@@ -7,10 +7,12 @@ import {
 export type RouteObjective = "cost" | "crafts" | "materials";
 
 export type RecipeAcquisition =
+  | "automatic"
   | "trainer"
   | "vendor"
   | "drop"
   | "quest"
+  | "reputation"
   | "unknown";
 
 export interface RouteReagent {
@@ -22,6 +24,8 @@ export interface RouteReagent {
 export interface RouteRecipe {
   readonly id: string;
   readonly name: string;
+  readonly learnSkill: number | null;
+  readonly availability: "available" | "unavailable" | "unknown";
   readonly thresholds: SkillThresholds;
   readonly reagents: readonly RouteReagent[];
   readonly acquisition: RecipeAcquisition;
@@ -146,6 +150,7 @@ function eligibleRecipes(
   const excludedItems = new Set(constraints.excludedItemIds ?? []);
 
   return recipes.filter((recipe) => {
+    if (recipe.availability === "unavailable") return false;
     if (known !== undefined && !known.has(recipe.id)) return false;
     if (constraints.trainerOnly === true && recipe.acquisition !== "trainer") {
       return false;
@@ -156,6 +161,7 @@ function eligibleRecipes(
 }
 
 function createStep(recipe: RouteRecipe, skill: number): RouteSkillStep | undefined {
+  if (recipe.learnSkill === null || skill < recipe.learnSkill) return undefined;
   const skillUpProbability = getSkillUpProbability(skill, recipe.thresholds);
   if (skillUpProbability === 0) return undefined;
 

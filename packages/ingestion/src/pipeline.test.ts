@@ -27,6 +27,7 @@ function emptyNormalizedBuild(version = "11.2.7"): NormalizedBuild {
     items: [],
     recipes: [],
     recipeVersions: [],
+    recipeMetadata: [],
     reagents: [],
     outputs: [],
     thresholds: [],
@@ -141,6 +142,15 @@ describe("dataset ingestion ordering", () => {
             {
               id: "recipe",
               name: "Recipe",
+              metadata: {
+                spellId: 1,
+                learnSkill: 1,
+                acquisition: "trainer",
+                faction: "both",
+                specializationSpellId: null,
+                cooldownSeconds: null,
+                availability: "available",
+              },
               thresholds: { orange: 1, yellow: 2, green: 3, gray: 4 },
               reagents: [],
               outputs: [

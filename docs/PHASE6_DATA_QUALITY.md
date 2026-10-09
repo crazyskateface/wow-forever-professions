@@ -22,7 +22,7 @@ Normalized builds already store sources, provenance links, and verification reco
 
 The repository now includes a reproducible Leatherworking transform from LibProfessionDB v1.9.1 and LibItemDB v1.3.0 for Forever build `1.60.1.69977`. It supplies 603 recipes and 760 referenced items. The normalized SQL catalog now drives profession, recipe, optimizer, and shopping API paths when configured; the browser loads the complete profession contract from that API.
 
-The generated quality report intentionally records unresolved facts instead of smoothing them over: all recipes are unverified, 90 recipes touch an unnamed item, 68 Vanilla-borrowed learning ranks are omitted, and 603 output quantities remain provisional. These records are useful client data, not authoritative Forever evidence.
+The generated quality report intentionally records unresolved facts instead of smoothing them over: all recipes are unverified, 90 recipes touch an unnamed item, 126 learning ranks are unknown (including 68 Vanilla-borrowed ranks that remain omitted), 597 acquisition and availability states are unknown, and 603 output quantities remain provisional. The supported learning-rank subset still covers every skill point from 1 through 299, which makes a constrained optimizer experiment possible without pretending the eligibility evidence is complete. These records are useful client data, not authoritative Forever evidence.
 
 The review transition rules are:
 
@@ -31,7 +31,7 @@ The review transition rules are:
 - `classic-fallback` remains non-authoritative even after review because its source does not establish Forever behavior.
 - `unverified` may be served only with visible uncertainty and must not include reviewer metadata that implies completed review.
 
-`pnpm data:audit <dataset.json> [report.md]` finds incomplete review metadata, rejected records, fallback sources, unverified records, missing item names, omitted borrowed ranks, and provisional outputs.
+`pnpm data:audit <dataset.json> [report.md]` finds incomplete review metadata, rejected records, fallback sources, unverified records, missing route-eligibility fields, impossible learning ranks, non-leveling recipes, missing item names, omitted borrowed ranks, provisional outputs, and `1 → 300` candidate coverage gaps.
 
 ## Remaining work
 

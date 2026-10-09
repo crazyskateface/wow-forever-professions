@@ -17,6 +17,15 @@ describe("imported build data-quality reporting", () => {
             {
               id: "spell-1",
               name: "Test recipe",
+              metadata: {
+                spellId: 1,
+                learnSkill: null,
+                acquisition: "unknown",
+                faction: "unknown",
+                specializationSpellId: null,
+                cooldownSeconds: null,
+                availability: "unknown",
+              },
               thresholds: { orange: 1, yellow: 10, green: 20, gray: 30 },
               reagents: [
                 {
@@ -48,9 +57,19 @@ describe("imported build data-quality reporting", () => {
       items: 2,
       sourceKinds: { "client-data": 1 },
       verificationStatuses: { unverified: 1 },
+      canonicalMetadata: {
+        knownLearnSkillRecipes: 0,
+        knownAcquisitionRecipes: 0,
+        knownAvailabilityRecipes: 0,
+        specializationRecipes: 0,
+      },
     });
     expect(report.findings.map(({ code }) => code)).toEqual([
       "unverified-recipe",
+      "missing-learn-skill",
+      "unknown-acquisition",
+      "unknown-availability",
+      "unknown-faction",
       "missing-item-name",
       "borrowed-required-skill-omitted",
       "provisional-output-quantity",
@@ -63,6 +82,15 @@ describe("imported build data-quality reporting", () => {
   it("enforces review metadata conventions in the audit", () => {
     const recipe = {
       name: "Test recipe",
+      metadata: {
+        spellId: 1,
+        learnSkill: 1,
+        acquisition: "trainer",
+        faction: "both",
+        specializationSpellId: null,
+        cooldownSeconds: null,
+        availability: "available",
+      },
       thresholds: { orange: 1, yellow: 10, green: 20, gray: 30 },
       reagents: [
         { item: { id: "item-2", gameId: 2, name: "Reagent" }, quantity: 1 },

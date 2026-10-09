@@ -220,6 +220,12 @@ function DataQualityNotice({ build, recipe }: { build: string; recipe: Recipe })
         <div><dt>Source</dt><dd>{recipe.provenance.sourceLabel}</dd></div>
         <div><dt>Verification</dt><dd>{recipe.provenance.verification.status}</dd></div>
         <div><dt>Build</dt><dd>{build}</dd></div>
+        <div><dt>Spell</dt><dd>{recipe.spellId === null ? "Unknown" : `#${recipe.spellId}`}</dd></div>
+        <div><dt>Learn at</dt><dd>{recipe.learnSkill ?? "Unknown"}</dd></div>
+        <div><dt>Acquisition</dt><dd>{recipe.acquisition}</dd></div>
+        <div><dt>Availability</dt><dd>{recipe.availability}</dd></div>
+        <div><dt>Faction</dt><dd>{recipe.faction}</dd></div>
+        <div><dt>Specialization</dt><dd>{recipe.specializationSpellId === null ? "None recorded" : `Spell #${recipe.specializationSpellId}`}</dd></div>
       </dl>
       <div className="data-quality-copy">
         <p>{assessment.explanation}</p>

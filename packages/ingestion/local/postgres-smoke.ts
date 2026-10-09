@@ -46,6 +46,15 @@ function sampleDataset(): ImportedBuildDataset {
           {
             id: "heavy-armor-kit",
             name: "Heavy Armor Kit",
+            metadata: {
+              spellId: 3780,
+              learnSkill: 150,
+              acquisition: "trainer",
+              faction: "both",
+              specializationSpellId: null,
+              cooldownSeconds: null,
+              availability: "available",
+            },
             thresholds: { orange: 150, yellow: 170, green: 180, gray: 190 },
             reagents: [
               {
@@ -70,6 +79,15 @@ function sampleDataset(): ImportedBuildDataset {
           {
             id: "nightscape-headband",
             name: "Nightscape Headband",
+            metadata: {
+              spellId: 10507,
+              learnSkill: 205,
+              acquisition: "trainer",
+              faction: "both",
+              specializationSpellId: null,
+              cooldownSeconds: null,
+              availability: "available",
+            },
             thresholds: { orange: 205, yellow: 225, green: 235, gray: 245 },
             reagents: [
               {
@@ -136,6 +154,7 @@ async function clearLocalRows(pool: Pool): Promise<void> {
     await client.query("DELETE FROM recipe_output");
     await client.query("DELETE FROM recipe_reagent");
     await client.query("DELETE FROM recipe_threshold");
+    await client.query("DELETE FROM recipe_metadata");
     await client.query("DELETE FROM provenance");
     await client.query("DELETE FROM recipe_version");
     await client.query("DELETE FROM verification");
@@ -192,8 +211,9 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     recipe_versions: string;
     reagents: string;
     outputs: string;
+    recipe_metadata: string;
   }>(
-    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs",
+    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs",
   );
   const row = counts.rows[0]!;
 
@@ -201,6 +221,7 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     "SELECT COUNT(*) AS count FROM recipe_version rv LEFT JOIN recipe r ON r.recipe_id = rv.recipe_id LEFT JOIN wow_build b ON b.build_id = rv.build_id WHERE r.recipe_id IS NULL OR b.build_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_reagent rr LEFT JOIN recipe_version rv ON rv.recipe_version_id = rr.recipe_version_id LEFT JOIN item i ON i.item_id = rr.item_id WHERE rv.recipe_version_id IS NULL OR i.item_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_output ro LEFT JOIN recipe_version rv ON rv.recipe_version_id = ro.recipe_version_id LEFT JOIN item i ON i.item_id = ro.item_id WHERE rv.recipe_version_id IS NULL OR i.item_id IS NULL",
+    "SELECT COUNT(*) AS count FROM recipe_metadata rm LEFT JOIN recipe_version rv ON rv.recipe_version_id = rm.recipe_version_id WHERE rv.recipe_version_id IS NULL",
     "SELECT COUNT(*) AS count FROM provenance p LEFT JOIN recipe_version rv ON rv.recipe_version_id = p.recipe_version_id LEFT JOIN data_source s ON s.source_id = p.source_id LEFT JOIN verification v ON v.verification_id = p.verification_id WHERE rv.recipe_version_id IS NULL OR s.source_id IS NULL OR v.verification_id IS NULL",
   ] as const;
   let orphanCount = 0;
@@ -214,6 +235,7 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     builds: Number(row.builds),
     items: Number(row.items),
     recipeVersions: Number(row.recipe_versions),
+    recipeMetadata: Number(row.recipe_metadata),
     reagents: Number(row.reagents),
     outputs: Number(row.outputs),
     orphans: orphanCount,

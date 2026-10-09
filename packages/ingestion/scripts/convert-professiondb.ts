@@ -12,20 +12,22 @@ if (!professionDbRoot || !itemDbRoot || !outputPath) {
   );
 }
 
-const resolvedProfessionDbRoot = resolve(professionDbRoot);
-const resolvedItemDbRoot = resolve(itemDbRoot);
 const invocationDirectory = process.env.INIT_CWD
   ? resolve(process.env.INIT_CWD)
   : process.cwd();
+const resolvedProfessionDbRoot = resolve(invocationDirectory, professionDbRoot);
+const resolvedItemDbRoot = resolve(invocationDirectory, itemDbRoot);
 const resolvedOutputPath = resolve(invocationDirectory, outputPath);
-const [coreLua, recipeNamesLua, itemNamesLua] = await Promise.all([
+const [coreLua, acquireMethodsLua, recipeNamesLua, itemNamesLua] = await Promise.all([
   readFile(join(resolvedProfessionDbRoot, "Data", "Forever", "_core", "Leatherworking.lua"), "utf8"),
+  readFile(join(resolvedProfessionDbRoot, "Data", "Forever", "_core", "AcquireMethods.lua"), "utf8"),
   readFile(join(resolvedProfessionDbRoot, "Data", "Forever", "enUS", "Leatherworking.lua"), "utf8"),
   readFile(join(resolvedItemDbRoot, "Data", "Forever", "enUS", "Names.lua"), "utf8"),
 ]);
 
 const converted = convertProfessionDbSnapshot({
   coreLua,
+  acquireMethodsLua,
   recipeNamesLua,
   itemNamesLua,
   profession: { id: "leatherworking", name: "Leatherworking", skillLineId: 165 },

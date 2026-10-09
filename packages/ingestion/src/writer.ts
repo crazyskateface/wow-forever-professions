@@ -274,6 +274,47 @@ export async function writeNormalizedBuild(
     batchOptions,
   );
 
+  batches.recipeMetadata = await writeBatches(
+    runner,
+    build.recipeMetadata,
+    {
+      label: (row) => `recipe metadata ${row.recipeVersionId}`,
+      insertSql:
+        "INSERT INTO recipe_metadata (recipe_version_id, spell_id, learn_skill, acquisition, faction, specialization_spell_id, cooldown_seconds, availability) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING",
+      insertValues: (row) => [
+        row.recipeVersionId,
+        row.spellId,
+        row.learnSkill,
+        row.acquisition,
+        row.faction,
+        row.specializationSpellId,
+        row.cooldownSeconds,
+        row.availability,
+      ],
+      selectSql:
+        "SELECT recipe_version_id, spell_id, learn_skill, acquisition, faction, specialization_spell_id, cooldown_seconds, availability FROM recipe_metadata WHERE recipe_version_id = $1",
+      selectValues: (row) => [row.recipeVersionId],
+      expected: (row) => ({
+        recipe_version_id: row.recipeVersionId,
+        spell_id: row.spellId,
+        learn_skill: row.learnSkill,
+        acquisition: row.acquisition,
+        faction: row.faction,
+        specialization_spell_id: row.specializationSpellId,
+        cooldown_seconds: row.cooldownSeconds,
+        availability: row.availability,
+      }),
+      assertReferences: (database, row) =>
+        assertExists(
+          database,
+          "SELECT 1 AS found FROM recipe_version WHERE recipe_version_id = $1",
+          [row.recipeVersionId],
+          `Missing recipe version ${row.recipeVersionId}.`,
+        ),
+    },
+    batchOptions,
+  );
+
   batches.thresholds = await writeBatches(
     runner,
     build.thresholds,

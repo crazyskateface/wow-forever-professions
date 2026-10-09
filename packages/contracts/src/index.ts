@@ -59,6 +59,39 @@ export const verificationSchema = z.object({
   notes: z.string().min(1).optional(),
 });
 
+export const recipeAcquisitionSchema = z.enum([
+  "automatic",
+  "trainer",
+  "vendor",
+  "quest",
+  "drop",
+  "reputation",
+  "unknown",
+]);
+
+export const recipeFactionSchema = z.enum([
+  "alliance",
+  "horde",
+  "both",
+  "unknown",
+]);
+
+export const recipeAvailabilitySchema = z.enum([
+  "available",
+  "unavailable",
+  "unknown",
+]);
+
+export const canonicalRecipeMetadataSchema = z.object({
+  spellId: z.number().int().positive(),
+  learnSkill: z.number().int().nonnegative().nullable(),
+  acquisition: recipeAcquisitionSchema,
+  faction: recipeFactionSchema,
+  specializationSpellId: z.number().int().positive().nullable(),
+  cooldownSeconds: z.number().int().positive().nullable(),
+  availability: recipeAvailabilitySchema,
+});
+
 export const provenanceSchema = z.object({
   source: dataSourceKindSchema,
   sourceLabel: z.string().min(1),
@@ -88,6 +121,10 @@ export const recipeVersionSchema = z.object({
   recipeId: z.string().min(1),
   buildId: z.string().min(1),
   name: z.string().min(1),
+});
+
+export const recipeMetadataSchema = canonicalRecipeMetadataSchema.extend({
+  recipeVersionId: z.string().min(1),
 });
 
 export const recipeReagentSchema = z.object({
@@ -121,34 +158,45 @@ export const provenanceRecordSchema = z.object({
 
 export const importedItemSchema = itemModelSchema;
 
-export const importedRecipeSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  thresholds: skillThresholdsSchema,
-  reagents: z.array(
-    z.object({
-      item: importedItemSchema,
-      quantity: z.number().int().positive(),
-    }),
-  ),
-  outputs: z
-    .array(
-      z
-        .object({
-          item: importedItemSchema,
-          minimumQuantity: z.number().int().positive(),
-          maximumQuantity: z.number().int().positive(),
-        })
-        .refine(
-          ({ minimumQuantity, maximumQuantity }) => minimumQuantity <= maximumQuantity,
-          { message: "Output quantities must be ordered minimum <= maximum." },
-        ),
-    )
-    .min(1),
-  sourceId: z.string().min(1),
-  verification: verificationSchema.omit({ id: true }),
-  provenanceNotes: z.string().min(1).optional(),
-});
+export const importedRecipeSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    metadata: canonicalRecipeMetadataSchema,
+    thresholds: skillThresholdsSchema,
+    reagents: z.array(
+      z.object({
+        item: importedItemSchema,
+        quantity: z.number().int().positive(),
+      }),
+    ),
+    outputs: z
+      .array(
+        z
+          .object({
+            item: importedItemSchema,
+            minimumQuantity: z.number().int().positive(),
+            maximumQuantity: z.number().int().positive(),
+          })
+          .refine(
+            ({ minimumQuantity, maximumQuantity }) => minimumQuantity <= maximumQuantity,
+            { message: "Output quantities must be ordered minimum <= maximum." },
+          ),
+      )
+      .min(1),
+    sourceId: z.string().min(1),
+    verification: verificationSchema.omit({ id: true }),
+    provenanceNotes: z.string().min(1).optional(),
+  })
+  .superRefine(({ id, metadata }, context) => {
+    if (id.startsWith("spell-") && id !== `spell-${metadata.spellId}`) {
+      context.addIssue({
+        code: "custom",
+        path: ["metadata", "spellId"],
+        message: "Canonical recipe spellId must match its spell-based recipe ID.",
+      });
+    }
+  });
 
 export const importedProfessionSchema = professionModelSchema.extend({
   recipes: z.array(importedRecipeSchema),
@@ -167,6 +215,7 @@ export const normalizedBuildSchema = z.object({
   items: z.array(itemModelSchema),
   recipes: z.array(recipeModelSchema),
   recipeVersions: z.array(recipeVersionSchema),
+  recipeMetadata: z.array(recipeMetadataSchema),
   reagents: z.array(recipeReagentSchema),
   outputs: z.array(recipeOutputSchema),
   thresholds: z.array(recipeThresholdSchema),
@@ -457,8 +506,16 @@ export const fixtureRecipeOutputSchema = z.object({
 
 export const recipeSchema = z.object({
   id: z.string().min(1),
+  spellId: z.number().int().positive().nullable(),
   name: z.string().min(1),
   professionId: z.string().min(1),
+  buildId: z.string().min(1),
+  learnSkill: z.number().int().nonnegative().nullable(),
+  acquisition: recipeAcquisitionSchema,
+  faction: recipeFactionSchema,
+  specializationSpellId: z.number().int().positive().nullable(),
+  cooldownSeconds: z.number().int().positive().nullable(),
+  availability: recipeAvailabilitySchema,
   thresholds: skillThresholdsSchema,
   reagents: z.array(reagentSchema),
   outputs: z.array(fixtureRecipeOutputSchema).min(1),
@@ -519,6 +576,9 @@ export type UnavailableAuctionPriceObservation = z.infer<
 >;
 export type DataSource = z.infer<typeof dataSourceSchema>;
 export type DataSourceKind = z.infer<typeof dataSourceKindSchema>;
+export type CanonicalRecipeMetadata = z.infer<
+  typeof canonicalRecipeMetadataSchema
+>;
 export type ImportedBuildDataset = z.infer<typeof importedBuildDatasetSchema>;
 export type ImportedProfession = z.infer<typeof importedProfessionSchema>;
 export type ImportedRecipe = z.infer<typeof importedRecipeSchema>;
@@ -531,6 +591,10 @@ export type ProfessionFixture = z.infer<typeof professionFixtureSchema>;
 export type ProfessionSummary = z.infer<typeof professionSummarySchema>;
 export type Recipe = z.infer<typeof recipeSchema>;
 export type RecipeModel = z.infer<typeof recipeModelSchema>;
+export type RecipeMetadata = z.infer<typeof recipeMetadataSchema>;
+export type RecipeAcquisition = z.infer<typeof recipeAcquisitionSchema>;
+export type RecipeAvailability = z.infer<typeof recipeAvailabilitySchema>;
+export type RecipeFaction = z.infer<typeof recipeFactionSchema>;
 export type RecipeOutput = z.infer<typeof recipeOutputSchema>;
 export type RecipeReagent = z.infer<typeof recipeReagentSchema>;
 export type RecipeThreshold = z.infer<typeof recipeThresholdSchema>;

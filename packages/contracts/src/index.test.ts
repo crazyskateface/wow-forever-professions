@@ -45,8 +45,16 @@ describe("shared contracts", () => {
         recipes: [
           {
             id: "heavy-armor-kit",
+            spellId: null,
             name: "Heavy Armor Kit",
             professionId: "leatherworking",
+            buildId: "fixture-0",
+            learnSkill: 150,
+            acquisition: "trainer",
+            faction: "both",
+            specializationSpellId: null,
+            cooldownSeconds: null,
+            availability: "available",
             thresholds: { orange: 150, yellow: 170, green: 180, gray: 190 },
             reagents: [],
             outputs: [
@@ -83,6 +91,15 @@ describe("shared contracts", () => {
               {
                 id: "heavy-armor-kit",
                 name: "Heavy Armor Kit",
+                metadata: {
+                  spellId: 3780,
+                  learnSkill: 150,
+                  acquisition: "trainer",
+                  faction: "both",
+                  specializationSpellId: null,
+                  cooldownSeconds: null,
+                  availability: "available",
+                },
                 thresholds: { orange: 150, yellow: 170, green: 180, gray: 190 },
                 reagents: [
                   {
@@ -105,6 +122,48 @@ describe("shared contracts", () => {
         ],
       }),
     ).toBeDefined();
+  });
+
+  it("keeps spell-based recipe identity consistent with canonical metadata", () => {
+    const parsed = importedBuildDatasetSchema.safeParse({
+      build: { id: "1.60.1.69977", version: "1.60.1" },
+      sources: [{ id: "client", kind: "client-data", label: "Client" }],
+      professions: [
+        {
+          id: "leatherworking",
+          slug: "leatherworking",
+          name: "Leatherworking",
+          recipes: [
+            {
+              id: "spell-1",
+              name: "Mismatched recipe",
+              metadata: {
+                spellId: 2,
+                learnSkill: 1,
+                acquisition: "trainer",
+                faction: "both",
+                specializationSpellId: null,
+                cooldownSeconds: null,
+                availability: "available",
+              },
+              thresholds: { orange: 1, yellow: 2, green: 3, gray: 4 },
+              reagents: [],
+              outputs: [
+                {
+                  item: { id: "output", name: "Output" },
+                  minimumQuantity: 1,
+                  maximumQuantity: 1,
+                },
+              ],
+              sourceId: "client",
+              verification: { status: "unverified" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(parsed.success).toBe(false);
   });
 
   it("rejects inverted recipe output ranges", () => {

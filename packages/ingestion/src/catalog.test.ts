@@ -21,6 +21,13 @@ describe("SQL recipe catalog", () => {
               recipe_id: "spell-3780",
               recipe_version_id: "spell-3780@1.60.1.69977",
               name: "Heavy Armor Kit",
+              spell_id: 3780,
+              learn_skill: null,
+              acquisition: "unknown",
+              faction: "unknown",
+              specialization_spell_id: null,
+              cooldown_seconds: null,
+              availability: "unknown",
               orange: 1,
               yellow: 73,
               green: 145,
@@ -70,6 +77,10 @@ describe("SQL recipe catalog", () => {
       recipes: [
         {
           id: "spell-3780",
+          spellId: 3780,
+          buildId: "1.60.1.69977",
+          learnSkill: null,
+          availability: "unknown",
           provenance: {
             source: "client-data",
             verification: { status: "unverified" },

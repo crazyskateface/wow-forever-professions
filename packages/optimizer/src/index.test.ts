@@ -7,6 +7,8 @@ import {
 const changingChanceRecipe: RouteRecipe = {
   id: "changing-chance",
   name: "Changing Chance",
+  learnSkill: 1,
+  availability: "available",
   acquisition: "trainer",
   thresholds: { orange: 1, yellow: 2, green: 4, gray: 6 },
   reagents: [{ itemId: "cloth", quantity: 2, unitPriceCopper: 10 }],
@@ -36,6 +38,8 @@ describe("leveling route optimizer", () => {
     const fast: RouteRecipe = {
       id: "fast",
       name: "Fast",
+      learnSkill: 1,
+      availability: "available",
       acquisition: "trainer",
       thresholds: { orange: 1, yellow: 5, green: 6, gray: 7 },
       reagents: [{ itemId: "expensive", quantity: 1, unitPriceCopper: 100 }],
@@ -43,6 +47,8 @@ describe("leveling route optimizer", () => {
     const cheap: RouteRecipe = {
       id: "cheap",
       name: "Cheap",
+      learnSkill: 1,
+      availability: "available",
       acquisition: "vendor",
       thresholds: { orange: 0, yellow: 0, green: 1, gray: 2 },
       reagents: [{ itemId: "cheap", quantity: 1, unitPriceCopper: 10 }],
@@ -70,6 +76,8 @@ describe("leveling route optimizer", () => {
     const fast: RouteRecipe = {
       id: "material-heavy",
       name: "Material Heavy",
+      learnSkill: 1,
+      availability: "available",
       acquisition: "trainer",
       thresholds: { orange: 1, yellow: 5, green: 6, gray: 7 },
       reagents: [{ itemId: "cloth", quantity: 5 }],
@@ -77,6 +85,8 @@ describe("leveling route optimizer", () => {
     const lean: RouteRecipe = {
       id: "material-lean",
       name: "Material Lean",
+      learnSkill: 1,
+      availability: "available",
       acquisition: "trainer",
       thresholds: { orange: 0, yellow: 0, green: 1, gray: 2 },
       reagents: [{ itemId: "thread", quantity: 1 }],
@@ -157,6 +167,26 @@ describe("leveling route optimizer", () => {
       blockedAtSkill: 7,
       reason: "no-eligible-recipe",
     });
+  });
+
+  it("excludes recipes that are unavailable, not yet learnable, or lack a learning rank", () => {
+    const eligible: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "eligible",
+    };
+    const result = optimizeLevelingRoute({
+      startSkill: 2,
+      targetSkill: 3,
+      objective: "crafts",
+      recipes: [
+        { ...changingChanceRecipe, id: "unavailable", availability: "unavailable" },
+        { ...changingChanceRecipe, id: "later", learnSkill: 3 },
+        { ...changingChanceRecipe, id: "unknown-rank", learnSkill: null },
+        eligible,
+      ],
+    });
+
+    expect(result.segments[0]?.recipeId).toBe("eligible");
   });
 
   it("returns an empty complete route when no skill gain is requested", () => {

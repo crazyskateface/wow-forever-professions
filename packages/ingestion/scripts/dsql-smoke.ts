@@ -46,6 +46,15 @@ function validationDataset(): ImportedBuildDataset {
           {
             id: "validation-recipe",
             name: "Validation Recipe",
+            metadata: {
+              spellId: 1,
+              learnSkill: 1,
+              acquisition: "trainer",
+              faction: "both",
+              specializationSpellId: null,
+              cooldownSeconds: null,
+              availability: "available",
+            },
             thresholds: { orange: 1, yellow: 2, green: 3, gray: 4 },
             reagents: [
               {

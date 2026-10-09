@@ -1,8 +1,8 @@
 # Forever Professions
 
-A TypeScript monorepo for a modern, application-first World of Warcraft: Forever profession calculator inspired by Professions.gg.
+A TypeScript monorepo for a dynamic World of Warcraft: Forever profession leveling planner inspired by Professions.gg.
 
-The repository contains a database-backed calculator, the Phase 2 versioned-data foundation, the Phase 3 auction-pricing path, the Phase 4 leveling-route optimizer, the Phase 5 shopping planner, and the Phase 6 data-quality workflow. A bundled, reproducible Forever client-data import provides 603 Leatherworking recipes while preserving known gaps as explicit warnings. The full catalog is searchable and virtualized, recipes have shareable URLs, and the planner provides filtered bulk controls for known recipes. Routes recalculate expected crafts, materials, and stored-price cost at each skill; shopping plans aggregate their reagents and safely compare buying with recursive intermediate crafting. Recipe responses retain structured source and verification metadata, and the UI calls out unverified, fallback, or rejected inputs instead of hiding uncertainty. Blizzard pricing remains deferred until a documented Forever API is available.
+The primary product flow is recipe data → skill-up math → route optimizer → leveling guide → recipe calculator → shopping plan → market-aware optimization. The repository already contains the calculator, versioned-data foundation, pricing abstraction, leveling-route prototype, shopping planner, and data-quality workflow. Roadmap v2 starts by making the bundled 603-recipe Leatherworking import safe for route planning: build identity, spell ID, learning rank, acquisition, availability, faction, specialization, cooldown, provenance, and verification are now explicit rather than inferred. The full catalog remains searchable and virtualized as a secondary tool. Blizzard pricing remains deferred until a documented Forever API is available.
 
 ## Requirements
 
@@ -78,4 +78,4 @@ references/professions-gg  Original design-reference screenshots
 .agents/skills             Placeholders for future project-specific Codex skills
 ```
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for phase boundaries, [docs/PHASE2_DATA.md](docs/PHASE2_DATA.md) for ingestion, [docs/PHASE3_PRICING.md](docs/PHASE3_PRICING.md) for pricing, [docs/PHASE4_OPTIMIZER.md](docs/PHASE4_OPTIMIZER.md) for route planning, [docs/PHASE5_SHOPPING.md](docs/PHASE5_SHOPPING.md) for shopping plans, [docs/PHASE6_DATA_QUALITY.md](docs/PHASE6_DATA_QUALITY.md) for verification and uncertainty handling, and [docs/API_TESTING.md](docs/API_TESTING.md) for manual endpoint testing. The managed root [AGENTS.md](AGENTS.md) protects synced project sources; scoped agent guidance lives beside the code it governs.
+See [docs/ROADMAP_2.md](docs/ROADMAP_2.md) for the guide-first product plan, [docs/ROADMAP_2_PHASE1.md](docs/ROADMAP_2_PHASE1.md) for the Leatherworking canonical-data baseline, [docs/ROADMAP.md](docs/ROADMAP.md) for the original phase history, and [docs/API_TESTING.md](docs/API_TESTING.md) for manual endpoint testing. The managed root [AGENTS.md](AGENTS.md) protects synced project sources; scoped agent guidance lives beside the code it governs.

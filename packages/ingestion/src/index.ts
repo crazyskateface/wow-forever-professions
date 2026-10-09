@@ -51,6 +51,7 @@ interface RecipeSnapshot {
   readonly thresholds: string;
   readonly reagents: string;
   readonly outputs: string;
+  readonly metadata: string;
   readonly sourceKind: string;
   readonly verificationStatus: string;
 }
@@ -93,6 +94,7 @@ export function normalizeBuildDataset(input: ImportedBuildDataset): NormalizedBu
   const items = new Map<string, ItemModel>();
   const recipes = [];
   const recipeVersions = [];
+  const recipeMetadata = [];
   const reagents = [];
   const outputs = [];
   const thresholds = [];
@@ -138,6 +140,10 @@ export function normalizeBuildDataset(input: ImportedBuildDataset): NormalizedBu
         buildId: parsed.build.id,
         name: recipe.name,
       });
+      recipeMetadata.push({
+        recipeVersionId,
+        ...recipe.metadata,
+      });
       thresholds.push({ recipeVersionId, ...recipe.thresholds });
       verifications.push({ id: verificationId, ...recipe.verification });
       provenance.push({
@@ -176,6 +182,7 @@ export function normalizeBuildDataset(input: ImportedBuildDataset): NormalizedBu
     items: stableSort([...items.values()], ({ id }) => id),
     recipes: stableSort(recipes, ({ id }) => id),
     recipeVersions: stableSort(recipeVersions, ({ id }) => id),
+    recipeMetadata: stableSort(recipeMetadata, ({ recipeVersionId }) => recipeVersionId),
     reagents: stableSort(reagents, ({ recipeVersionId, itemId }) => `${recipeVersionId}:${itemId}`),
     outputs: stableSort(outputs, ({ recipeVersionId, itemId }) => `${recipeVersionId}:${itemId}`),
     thresholds: stableSort(thresholds, ({ recipeVersionId }) => recipeVersionId),
@@ -194,6 +201,9 @@ function snapshotRecipes(build: NormalizedBuild): Map<string, RecipeSnapshot> {
   const provenanceByVersionId = new Map(
     build.provenance.map((record) => [record.recipeVersionId, record] as const),
   );
+  const metadataByVersionId = new Map(
+    build.recipeMetadata.map((metadata) => [metadata.recipeVersionId, metadata] as const),
+  );
   const verificationById = new Map(
     build.verifications.map((verification) => [verification.id, verification] as const),
   );
@@ -203,12 +213,13 @@ function snapshotRecipes(build: NormalizedBuild): Map<string, RecipeSnapshot> {
     build.recipeVersions.map((version) => {
       const threshold = thresholdsByVersion.get(version.id);
       const provenance = provenanceByVersionId.get(version.id);
+      const metadata = metadataByVersionId.get(version.id);
       const verification = provenance
         ? verificationById.get(provenance.verificationId)
         : undefined;
       const source = provenance ? sourceById.get(provenance.sourceId) : undefined;
 
-      if (!threshold || !provenance || !verification || !source) {
+      if (!threshold || !metadata || !provenance || !verification || !source) {
         throw new Error(`Recipe version ${version.id} is missing normalized detail records.`);
       }
 
@@ -243,6 +254,15 @@ function snapshotRecipes(build: NormalizedBuild): Map<string, RecipeSnapshot> {
               maximumQuantity,
             })),
           ),
+          metadata: JSON.stringify({
+            spellId: metadata.spellId,
+            learnSkill: metadata.learnSkill,
+            acquisition: metadata.acquisition,
+            faction: metadata.faction,
+            specializationSpellId: metadata.specializationSpellId,
+            cooldownSeconds: metadata.cooldownSeconds,
+            availability: metadata.availability,
+          }),
           sourceKind: source.kind,
           verificationStatus: verification.status,
         },
@@ -272,6 +292,7 @@ export function diffBuilds(previous: NormalizedBuild, current: NormalizedBuild):
         "thresholds",
         "reagents",
         "outputs",
+        "metadata",
         "sourceKind",
         "verificationStatus",
       ] as const

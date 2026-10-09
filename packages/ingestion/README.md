@@ -37,10 +37,10 @@ pnpm db:local:up
 pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json
 ```
 
-The local importer stores exact raw bytes under ignored `.local-data/`, applies the same 16 schema migrations, and writes through the production normalization and resumable writer. `SqlRecipeCatalogReader` reconstructs product contracts from those normalized rows. The API selects it when `LOCAL_DATABASE_URL` is set; without that variable, local development retains the illustrative fixture fallback.
+The local importer stores exact raw bytes under ignored `.local-data/`, applies the same 17 schema migrations, and writes through the production normalization and resumable writer. Build-scoped `recipe_metadata` rows preserve spell identity and route eligibility separately from thresholds, reagents, outputs, and provenance. `SqlRecipeCatalogReader` reconstructs product contracts from those normalized rows. The API selects it when `LOCAL_DATABASE_URL` is set; without that variable, local development retains the illustrative fixture fallback.
 
 ## Live AWS validation
 
-The `ForeverProfessionsData` stack has been validated against a real Aurora DSQL cluster. With a short-lived AWS profile active, set `AWS_REGION`, `DSQL_ENDPOINT`, `RAW_DATA_BUCKET`, and `INGESTION_ROLE_ARN` from the stack outputs and run `pnpm db:dsql:test` from the repository root. The command applies all 16 migrations, waits for asynchronous indexes outside a transaction, configures the IAM-to-database-role mapping, assumes the scoped ingestion role, and imports its non-authoritative validation fixture twice.
+The `ForeverProfessionsData` stack has been validated against a real Aurora DSQL cluster through migration 016. With a short-lived AWS profile active, set `AWS_REGION`, `DSQL_ENDPOINT`, `RAW_DATA_BUCKET`, and `INGESTION_ROLE_ARN` from the stack outputs and run `pnpm db:dsql:test` from the repository root. The command now applies all 17 migrations, waits for asynchronous indexes outside a transaction, configures the IAM-to-database-role mapping, assumes the scoped ingestion role, and imports its non-authoritative validation fixture twice. Migration 017 still requires live DSQL revalidation before a production deployment.
 
 To ingest a transformed client export into Aurora DSQL, use `pnpm data:import <path-to-json>`. The file must satisfy the imported-build contract and contain at least one `client-data` source. The bundled LibProfessionDB-derived Leatherworking build is real client data, but it remains unverified rather than being misrepresented as authoritative.

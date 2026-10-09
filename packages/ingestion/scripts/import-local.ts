@@ -115,7 +115,7 @@ try {
     transactionRunner: createLocalTransactionRunner(pool),
   });
   const counts = await pool.query(
-    "SELECT (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM provenance) AS provenance_records",
+    "SELECT (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM provenance) AS provenance_records",
   );
   process.stdout.write(
     `${JSON.stringify(

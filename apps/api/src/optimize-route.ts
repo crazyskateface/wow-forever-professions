@@ -62,8 +62,10 @@ export async function optimizeFixtureRoute(
   const recipes: RouteRecipe[] = profession.recipes.map((recipe) => ({
     id: recipe.id,
     name: recipe.name,
+    learnSkill: recipe.learnSkill,
+    availability: recipe.availability,
     thresholds: recipe.thresholds,
-    acquisition: "unknown",
+    acquisition: recipe.acquisition,
     reagents: recipe.reagents.map((reagent) => {
       const price =
         reagent.gameItemId === undefined

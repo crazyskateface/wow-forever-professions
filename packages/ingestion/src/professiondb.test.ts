@@ -20,6 +20,12 @@ lib:LoadNames(165, {
 })
 `;
 
+const acquireMethodsLua = `
+lib:LoadAcquireMethods({
+  [3780] = 1,
+})
+`;
+
 const itemNamesLua = `
 lib:LoadNames({
   [2321]="Fine Thread",
@@ -32,6 +38,7 @@ describe("ProfessionDB conversion", () => {
   it("converts client-backed recipe records and reports borrowed omissions", () => {
     const converted = convertProfessionDbSnapshot({
       coreLua,
+      acquireMethodsLua,
       recipeNamesLua,
       itemNamesLua,
       profession: { id: "leatherworking", name: "Leatherworking", skillLineId: 165 },
@@ -45,12 +52,24 @@ describe("ProfessionDB conversion", () => {
       recipes: 1,
       items: 3,
       missingItemNames: 0,
+      knownLearnSkillRecipes: 0,
       borrowedRequiredSkillRecipes: 1,
+      automaticRecipes: 1,
+      specializationRecipes: 0,
       provisionalOutputQuantityRecipes: 1,
     });
     expect(converted.dataset.professions[0]?.recipes[0]).toMatchObject({
       id: "spell-3780",
       name: "Heavy Armor Kit",
+      metadata: {
+        spellId: 3780,
+        learnSkill: null,
+        acquisition: "automatic",
+        faction: "unknown",
+        specializationSpellId: null,
+        cooldownSeconds: null,
+        availability: "available",
+      },
       thresholds: { orange: 1, yellow: 73, green: 145, gray: 165 },
       reagents: [
         { item: { gameId: 2321, name: "Fine Thread" }, quantity: 1 },
@@ -69,6 +88,7 @@ describe("ProfessionDB conversion", () => {
   it("keeps incomplete item-name evidence explicit", () => {
     const converted = convertProfessionDbSnapshot({
       coreLua,
+      acquireMethodsLua,
       recipeNamesLua,
       itemNamesLua: 'lib:LoadNames({ [4265]="Heavy Armor Kit" })',
       profession: { id: "leatherworking", name: "Leatherworking", skillLineId: 165 },
@@ -81,5 +101,39 @@ describe("ProfessionDB conversion", () => {
     expect(converted.dataset.professions[0]?.recipes[0]?.reagents[0]?.item.name).toBe(
       "Unknown item #2321",
     );
+  });
+
+  it("imports supported learning ranks and specialization gates", () => {
+    const supportedCoreLua = coreLua
+      .replace(
+        '["requiredSkill"] = 150,',
+        '["requiredSkill"] = 150,\n    ["requiredSpec"] = 10656,',
+      )
+      .replace('lib:LoadBorrowed("requiredSkill", "Vanilla", {3780})', "");
+    const converted = convertProfessionDbSnapshot({
+      coreLua: supportedCoreLua,
+      recipeNamesLua,
+      itemNamesLua,
+      profession: { id: "leatherworking", name: "Leatherworking", skillLineId: 165 },
+      professionDbVersion: "v1.9.1",
+      itemDbVersion: "v1.3.0",
+      sourceUrl: "https://example.invalid/source",
+    });
+
+    expect(converted.dataset.professions[0]?.recipes[0]?.metadata).toEqual({
+      spellId: 3780,
+      learnSkill: 150,
+      acquisition: "unknown",
+      faction: "unknown",
+      specializationSpellId: 10656,
+      cooldownSeconds: null,
+      availability: "unknown",
+    });
+    expect(converted.report).toMatchObject({
+      knownLearnSkillRecipes: 1,
+      borrowedRequiredSkillRecipes: 0,
+      automaticRecipes: 0,
+      specializationRecipes: 1,
+    });
   });
 });

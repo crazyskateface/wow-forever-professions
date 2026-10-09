@@ -28,6 +28,14 @@ function requiredNumber(row: Readonly<Record<string, unknown>>, key: string): nu
   return value;
 }
 
+function optionalNumber(
+  row: Readonly<Record<string, unknown>>,
+  key: string,
+): number | undefined {
+  if (row[key] === null || row[key] === undefined) return undefined;
+  return requiredNumber(row, key);
+}
+
 function optionalString(
   row: Readonly<Record<string, unknown>>,
   key: string,
@@ -77,7 +85,7 @@ export class SqlRecipeCatalogReader implements RecipeCatalogReader {
 
     const [recipeResult, reagentResult, outputResult] = await Promise.all([
       this.database.query(
-        "SELECT r.recipe_id, rv.recipe_version_id, rv.name, t.orange, t.yellow, t.green, t.gray, s.source_kind, s.label AS source_label, v.status AS verification_status, v.verified_at, v.verified_by, v.notes AS verification_notes, p.notes AS provenance_notes FROM recipe r JOIN recipe_version rv ON rv.recipe_id = r.recipe_id JOIN recipe_threshold t ON t.recipe_version_id = rv.recipe_version_id JOIN provenance p ON p.recipe_version_id = rv.recipe_version_id JOIN data_source s ON s.source_id = p.source_id JOIN verification v ON v.verification_id = p.verification_id WHERE r.profession_id = $1 AND rv.build_id = $2 AND v.status <> 'rejected' ORDER BY rv.name, r.recipe_id",
+        "SELECT r.recipe_id, rv.recipe_version_id, rv.name, rm.spell_id, rm.learn_skill, rm.acquisition, rm.faction, rm.specialization_spell_id, rm.cooldown_seconds, rm.availability, t.orange, t.yellow, t.green, t.gray, s.source_kind, s.label AS source_label, v.status AS verification_status, v.verified_at, v.verified_by, v.notes AS verification_notes, p.notes AS provenance_notes FROM recipe r JOIN recipe_version rv ON rv.recipe_id = r.recipe_id JOIN recipe_metadata rm ON rm.recipe_version_id = rv.recipe_version_id JOIN recipe_threshold t ON t.recipe_version_id = rv.recipe_version_id JOIN provenance p ON p.recipe_version_id = rv.recipe_version_id JOIN data_source s ON s.source_id = p.source_id JOIN verification v ON v.verification_id = p.verification_id WHERE r.profession_id = $1 AND rv.build_id = $2 AND v.status <> 'rejected' ORDER BY rv.name, r.recipe_id",
         [professionId, buildId],
       ),
       this.database.query(
@@ -131,10 +139,21 @@ export class SqlRecipeCatalogReader implements RecipeCatalogReader {
       const verifiedBy = optionalString(row, "verified_by");
       const verificationNotes = optionalString(row, "verification_notes");
       const provenanceNotes = optionalString(row, "provenance_notes");
+      const learnSkill = optionalNumber(row, "learn_skill");
+      const specializationSpellId = optionalNumber(row, "specialization_spell_id");
+      const cooldownSeconds = optionalNumber(row, "cooldown_seconds");
       return recipeSchema.parse({
         id: requiredString(row, "recipe_id"),
+        spellId: requiredNumber(row, "spell_id"),
         name: requiredString(row, "name"),
         professionId,
+        buildId,
+        learnSkill: learnSkill ?? null,
+        acquisition: requiredString(row, "acquisition"),
+        faction: requiredString(row, "faction"),
+        specializationSpellId: specializationSpellId ?? null,
+        cooldownSeconds: cooldownSeconds ?? null,
+        availability: requiredString(row, "availability"),
         thresholds: {
           orange: requiredNumber(row, "orange"),
           yellow: requiredNumber(row, "yellow"),

@@ -5,8 +5,16 @@
   "recipes": [
     {
       "id": "heavy-armor-kit",
+      "spellId": null,
       "name": "Heavy Armor Kit",
       "professionId": "leatherworking",
+      "buildId": "fixture-0",
+      "learnSkill": 150,
+      "acquisition": "trainer",
+      "faction": "both",
+      "specializationSpellId": null,
+      "cooldownSeconds": null,
+      "availability": "available",
       "thresholds": {
         "orange": 150,
         "yellow": 170,
@@ -45,8 +53,16 @@
     },
     {
       "id": "nightscape-headband",
+      "spellId": null,
       "name": "Nightscape Headband",
       "professionId": "leatherworking",
+      "buildId": "fixture-0",
+      "learnSkill": 205,
+      "acquisition": "trainer",
+      "faction": "both",
+      "specializationSpellId": null,
+      "cooldownSeconds": null,
+      "availability": "available",
       "thresholds": {
         "orange": 205,
         "yellow": 225,

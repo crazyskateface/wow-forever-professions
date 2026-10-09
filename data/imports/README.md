@@ -6,10 +6,12 @@ The dataset contains 603 Leatherworking recipes for client build `1.60.1.69977`.
 
 - every recipe remains `unverified` until Forever-specific evidence is reviewed;
 - 98 referenced item IDs have no English name in the item-name snapshot, affecting 90 recipes;
-- 68 learning ranks marked by the source as borrowed from Vanilla were omitted;
+- 477 recipes expose a supported Forever learning rank; 126 remain unknown, including 68 values marked by the source as borrowed from Vanilla and deliberately omitted;
+- 6 recipes expose a client-defined automatic acquisition method; the other 597 acquisition and availability states remain explicitly unknown;
+- 60 recipes carry a specialization requirement;
 - the source does not encode crafted stack sizes, so all 603 output quantities are provisionally one.
 
-The generated JSON SHA-256 is `6247c552fd9dfe797b7c930cb4eb2395349045f7f3bd1a28c0daf8aaf68d13fe`.
+The known-learning-rank subset has no candidate coverage gaps from skill 1 through 299. That is enough to begin optimizer experiments, but it does not establish that every selected recipe is obtainable. The generated JSON SHA-256 is `3d849bcc70d21218d4b2b4d9efd53fc3c9e15aaf603dbf65096f8000b6835481`.
 
 See `forever-1.60.1.69977-leatherworking.quality.md` for the generated audit. Regenerate both artifacts from extracted source archives with:
 

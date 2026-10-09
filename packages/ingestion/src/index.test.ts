@@ -21,6 +21,15 @@ function buildDataset(buildId: string): ImportedBuildDataset {
           {
             id: "heavy-armor-kit",
             name: "Heavy Armor Kit",
+            metadata: {
+              spellId: 3780,
+              learnSkill: 150,
+              acquisition: "trainer",
+              faction: "both",
+              specializationSpellId: null,
+              cooldownSeconds: null,
+              availability: "available",
+            },
             thresholds: { orange: 150, yellow: 170, green: 180, gray: 190 },
             reagents: [
               {
@@ -52,6 +61,11 @@ describe("build normalization", () => {
     expect(normalized.recipes[0]).toEqual({
       id: "heavy-armor-kit",
       professionId: "leatherworking",
+    });
+    expect(normalized.recipeMetadata[0]).toMatchObject({
+      recipeVersionId: "heavy-armor-kit@11.2.7.65000",
+      spellId: 3780,
+      learnSkill: 150,
     });
     expect(normalized.items.map(({ id }) => id)).toEqual([
       "heavy-armor-kit-item",

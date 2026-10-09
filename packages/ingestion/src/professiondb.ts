@@ -9,6 +9,7 @@ type LuaTable = Map<LuaKey, LuaValue>;
 
 export interface ProfessionDbSnapshotInput {
   readonly coreLua: string;
+  readonly acquireMethodsLua?: string;
   readonly recipeNamesLua: string;
   readonly itemNamesLua: string;
   readonly profession: {
@@ -28,7 +29,10 @@ export interface ProfessionDbConversionResult {
     readonly recipes: number;
     readonly items: number;
     readonly missingItemNames: number;
+    readonly knownLearnSkillRecipes: number;
     readonly borrowedRequiredSkillRecipes: number;
+    readonly automaticRecipes: number;
+    readonly specializationRecipes: number;
     readonly provisionalOutputQuantityRecipes: number;
   };
 }
@@ -232,9 +236,15 @@ export function convertProfessionDbSnapshot(
     `lib:LoadNames(${input.profession.skillLineId},`,
   );
   const itemNames = parseCallTable(input.itemNamesLua, "lib:LoadNames(");
+  const acquireMethods = input.acquireMethodsLua
+    ? parseCallTable(input.acquireMethodsLua, "lib:LoadAcquireMethods(")
+    : new Map<LuaKey, LuaValue>();
   const borrowedRequiredSkills = parseBorrowedRequiredSkills(input.coreLua);
   const registeredItemIds = new Set<number>();
   const missingItemNameIds = new Set<number>();
+  let knownLearnSkillRecipes = 0;
+  let automaticRecipes = 0;
+  let specializationRecipes = 0;
   const recipes = [...core.entries()].map(([recipeKey, rawRecipe]) => {
     const spellId = requireNumber(recipeKey, "Recipe spell ID");
     const recipe = requireTable(rawRecipe, `Recipe ${spellId}`);
@@ -246,6 +256,22 @@ export function convertProfessionDbSnapshot(
       recipe.get("craftedItemId"),
       `Recipe ${spellId} crafted item ID`,
     );
+    const rawRequiredSkill = recipe.get("requiredSkill");
+    const learnSkill = borrowedRequiredSkills.has(spellId)
+      ? null
+      : rawRequiredSkill === undefined
+        ? null
+        : requireNumber(rawRequiredSkill, `Recipe ${spellId} required skill`);
+    if (learnSkill !== null) knownLearnSkillRecipes += 1;
+    const rawRequiredSpec = recipe.get("requiredSpec");
+    const specializationSpellId =
+      rawRequiredSpec === undefined
+        ? null
+        : requireNumber(rawRequiredSpec, `Recipe ${spellId} required specialization`);
+    if (specializationSpellId !== null) specializationRecipes += 1;
+    const acquisitionMethod = acquireMethods.get(spellId);
+    const acquisition = acquisitionMethod === 1 ? ("automatic" as const) : ("unknown" as const);
+    if (acquisition === "automatic") automaticRecipes += 1;
 
     const thresholds = {
       orange: requireNumber(difficulty.get(1), `Recipe ${spellId} orange threshold`),
@@ -274,6 +300,15 @@ export function convertProfessionDbSnapshot(
     return {
       id: `spell-${spellId}`,
       name,
+      metadata: {
+        spellId,
+        learnSkill,
+        acquisition,
+        faction: "unknown" as const,
+        specializationSpellId,
+        cooldownSeconds: null,
+        availability: acquisition === "automatic" ? ("available" as const) : ("unknown" as const),
+      },
       thresholds,
       reagents,
       outputs: [
@@ -326,7 +361,10 @@ export function convertProfessionDbSnapshot(
       recipes: recipes.length,
       items: registeredItemIds.size,
       missingItemNames: missingItemNameIds.size,
+      knownLearnSkillRecipes,
       borrowedRequiredSkillRecipes: borrowedRequiredSkills.size,
+      automaticRecipes,
+      specializationRecipes,
       provisionalOutputQuantityRecipes: recipes.length,
     },
   };
