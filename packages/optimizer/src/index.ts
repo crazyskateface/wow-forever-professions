@@ -87,7 +87,17 @@ export type RouteOptimizationResult = CompleteRouteResult | BlockedRouteResult;
 interface Candidate {
   readonly recipe: RouteRecipe;
   readonly step: RouteSkillStep;
-  readonly score: number;
+  readonly stepScore: number;
+}
+
+interface PathCandidate extends Candidate {
+  readonly totalScore: number;
+}
+
+interface EvaluatedSkill {
+  readonly skill: number;
+  readonly possibleSteps: readonly RouteSkillStep[];
+  readonly candidates: readonly Candidate[];
 }
 
 function assertSkillRange(startSkill: number, targetSkill: number): void {
@@ -178,12 +188,74 @@ function scoreFor(step: RouteSkillStep, objective: RouteObjective): number | und
   return step.expectedCostCopper;
 }
 
-function compareCandidates(left: Candidate, right: Candidate): number {
+function comparePathCandidates(left: PathCandidate, right: PathCandidate): number {
   return (
-    left.score - right.score ||
+    left.totalScore - right.totalScore ||
     left.step.expectedCrafts - right.step.expectedCrafts ||
     left.recipe.id.localeCompare(right.recipe.id)
   );
+}
+
+function evaluateSkill(input: OptimizeRouteInput, skill: number): EvaluatedSkill {
+  const possible = input.recipes
+    .map((recipe) => ({ recipe, step: createStep(recipe, input, skill) }))
+    .filter(
+      (candidate): candidate is { recipe: RouteRecipe; step: RouteSkillStep } =>
+        candidate.step !== undefined,
+    );
+
+  return {
+    skill,
+    possibleSteps: possible.map(({ step }) => step),
+    candidates: possible.flatMap(({ recipe, step }) => {
+      const stepScore = scoreFor(step, input.objective);
+      return stepScore === undefined ? [] : [{ recipe, step, stepScore }];
+    }),
+  };
+}
+
+function reconstructOptimalSteps(
+  input: OptimizeRouteInput,
+  evaluatedSkills: readonly EvaluatedSkill[],
+  effectiveTargetSkill: number,
+): readonly RouteSkillStep[] {
+  const bestScoreFromSkill = new Map<number, number>([[effectiveTargetSkill, 0]]);
+  const decisionAtSkill = new Map<number, Candidate>();
+
+  for (
+    let skill = effectiveTargetSkill - 1;
+    skill >= input.startSkill;
+    skill -= 1
+  ) {
+    const evaluated = evaluatedSkills[skill - input.startSkill];
+    const futureScore = bestScoreFromSkill.get(skill + 1);
+    if (evaluated === undefined || futureScore === undefined) {
+      throw new Error(`Route optimizer could not resolve state at skill ${skill}.`);
+    }
+
+    const selected = evaluated.candidates
+      .map((candidate): PathCandidate => ({
+        ...candidate,
+        totalScore: candidate.stepScore + futureScore,
+      }))
+      .sort(comparePathCandidates)[0];
+    if (selected === undefined) {
+      throw new Error(`Route optimizer found an unexpected gap at skill ${skill}.`);
+    }
+
+    decisionAtSkill.set(skill, selected);
+    bestScoreFromSkill.set(skill, selected.totalScore);
+  }
+
+  const steps: RouteSkillStep[] = [];
+  for (let skill = input.startSkill; skill < effectiveTargetSkill; skill += 1) {
+    const selected = decisionAtSkill.get(skill);
+    if (selected === undefined) {
+      throw new Error(`Route optimizer could not reconstruct skill ${skill}.`);
+    }
+    steps.push(selected.step);
+  }
+  return steps;
 }
 
 function totalsFor(steps: readonly RouteSkillStep[]): RouteTotals {
@@ -252,41 +324,36 @@ export function optimizeLevelingRoute(
 ): RouteOptimizationResult {
   assertSkillRange(input.startSkill, input.targetSkill);
   validateRecipes(input.recipes);
-  const steps: RouteSkillStep[] = [];
-
+  const evaluatedSkills: EvaluatedSkill[] = [];
   for (let skill = input.startSkill; skill < input.targetSkill; skill += 1) {
-    const possibleSteps = input.recipes
-      .map((recipe) => ({ recipe, step: createStep(recipe, input, skill) }))
-      .filter(
-        (candidate): candidate is { recipe: RouteRecipe; step: RouteSkillStep } =>
-          candidate.step !== undefined,
-      );
-    const candidates = possibleSteps
-      .map(({ recipe, step }) => {
-        const score = scoreFor(step, input.objective);
-        return score === undefined ? undefined : { recipe, step, score };
-      })
-      .filter((candidate): candidate is Candidate => candidate !== undefined)
-      .sort(compareCandidates);
+    evaluatedSkills.push(evaluateSkill(input, skill));
+  }
 
-    const selected = candidates[0];
-    if (selected === undefined) {
-      return {
-        status: "blocked",
-        objective: input.objective,
-        startSkill: input.startSkill,
-        targetSkill: input.targetSkill,
-        blockedAtSkill: skill,
-        reason:
-          possibleSteps.length > 0 && input.objective === "cost"
-            ? "missing-price-data"
-            : "no-eligible-recipe",
-        steps,
-        segments: segmentsFor(steps),
-        totals: totalsFor(steps),
-      };
-    }
-    steps.push(selected.step);
+  const firstBlocked = evaluatedSkills.find(
+    ({ candidates }) => candidates.length === 0,
+  );
+  const effectiveTargetSkill = firstBlocked?.skill ?? input.targetSkill;
+  const steps = reconstructOptimalSteps(
+    input,
+    evaluatedSkills,
+    effectiveTargetSkill,
+  );
+
+  if (firstBlocked !== undefined) {
+    return {
+      status: "blocked",
+      objective: input.objective,
+      startSkill: input.startSkill,
+      targetSkill: input.targetSkill,
+      blockedAtSkill: firstBlocked.skill,
+      reason:
+        firstBlocked.possibleSteps.length > 0 && input.objective === "cost"
+          ? "missing-price-data"
+          : "no-eligible-recipe",
+      steps,
+      segments: segmentsFor(steps),
+      totals: totalsFor(steps),
+    };
   }
 
   return {
