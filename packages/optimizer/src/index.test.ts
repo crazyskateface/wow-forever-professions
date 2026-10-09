@@ -403,3 +403,165 @@ describe("global route optimization", () => {
     });
   });
 });
+
+describe("human-friendly route policy", () => {
+  it("keeps the current recipe when a switch saves less than the configured threshold", () => {
+    const steady: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "steady",
+      name: "Steady Recipe",
+      thresholds: { orange: 1, yellow: 5, green: 6, gray: 7 },
+      reagents: [{ itemId: "leather", quantity: 100 }],
+    };
+    const slightlyCheaper: RouteRecipe = {
+      ...steady,
+      id: "slightly-cheaper",
+      name: "Slightly Cheaper Recipe",
+      learnSkill: 2,
+      thresholds: { orange: 2, yellow: 5, green: 6, gray: 7 },
+      reagents: [{ itemId: "leather", quantity: 95 }],
+    };
+
+    const stable = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 1,
+      targetSkill: 3,
+      objective: "materials",
+      recipes: [steady, slightlyCheaper],
+    });
+    const noResistance = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 1,
+      targetSkill: 3,
+      objective: "materials",
+      recipes: [steady, slightlyCheaper],
+      policy: { switchPenaltyRatio: 0 },
+    });
+
+    expect(stable.steps.map(({ recipeId }) => recipeId)).toEqual([
+      "steady",
+      "steady",
+    ]);
+    expect(stable.segments).toHaveLength(1);
+    expect(noResistance.steps.map(({ recipeId }) => recipeId)).toEqual([
+      "steady",
+      "slightly-cheaper",
+    ]);
+    expect(noResistance.segments).toHaveLength(2);
+  });
+
+  it("still switches when the route savings exceed the stability penalty", () => {
+    const steady: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "steady",
+      thresholds: { orange: 1, yellow: 5, green: 6, gray: 7 },
+      reagents: [{ itemId: "leather", quantity: 100 }],
+    };
+    const meaningfullyCheaper: RouteRecipe = {
+      ...steady,
+      id: "meaningfully-cheaper",
+      learnSkill: 2,
+      thresholds: { orange: 2, yellow: 5, green: 6, gray: 7 },
+      reagents: [{ itemId: "leather", quantity: 80 }],
+    };
+
+    const result = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 1,
+      targetSkill: 3,
+      objective: "materials",
+      recipes: [steady, meaningfullyCheaper],
+    });
+
+    expect(result.steps.map(({ recipeId }) => recipeId)).toEqual([
+      "steady",
+      "meaningfully-cheaper",
+    ]);
+  });
+
+  it("applies configurable recipe-source acquisition friction", () => {
+    const trainerRecipe: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "trainer-recipe",
+      reagents: [{ itemId: "leather", quantity: 100 }],
+    };
+    const dropRecipe: RouteRecipe = {
+      ...trainerRecipe,
+      id: "drop-recipe",
+      acquisition: "drop",
+      reagents: [{ itemId: "leather", quantity: 90 }],
+    };
+
+    const practical = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 2,
+      targetSkill: 3,
+      objective: "materials",
+      recipes: [trainerRecipe, dropRecipe],
+    });
+    const ignoreAcquisition = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 2,
+      targetSkill: 3,
+      objective: "materials",
+      recipes: [trainerRecipe, dropRecipe],
+      policy: { acquisitionPenaltyRatios: { drop: 0 } },
+    });
+
+    expect(practical.steps[0]?.recipeId).toBe("trainer-recipe");
+    expect(ignoreAcquisition.steps[0]?.recipeId).toBe("drop-recipe");
+  });
+
+  it("accounts for specialization and cooldown friction when they are allowed", () => {
+    const generic: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "generic",
+      reagents: [{ itemId: "leather", quantity: 100 }],
+    };
+    const gated: RouteRecipe = {
+      ...generic,
+      id: "gated",
+      specializationSpellId: 10656,
+      cooldownSeconds: 86_400,
+      reagents: [{ itemId: "leather", quantity: 80 }],
+    };
+    const constraints = {
+      specializationSpellIds: [10656],
+      allowCooldowns: true,
+    } as const;
+
+    const practical = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 2,
+      targetSkill: 3,
+      objective: "materials",
+      recipes: [generic, gated],
+      constraints,
+    });
+    const ignoreGatingFriction = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 2,
+      targetSkill: 3,
+      objective: "materials",
+      recipes: [generic, gated],
+      constraints,
+      policy: { specializationPenaltyRatio: 0, cooldownPenaltyRatio: 0 },
+    });
+
+    expect(practical.steps[0]?.recipeId).toBe("generic");
+    expect(ignoreGatingFriction.steps[0]?.recipeId).toBe("gated");
+  });
+
+  it("rejects invalid penalty ratios", () => {
+    expect(() =>
+      optimizeLevelingRoute({
+        ...routeDataset,
+        startSkill: 1,
+        targetSkill: 2,
+        objective: "crafts",
+        recipes: [changingChanceRecipe],
+        policy: { switchPenaltyRatio: 1.01 },
+      }),
+    ).toThrow("switchPenaltyRatio");
+  });
+});

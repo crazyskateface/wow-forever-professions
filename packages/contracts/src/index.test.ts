@@ -250,6 +250,17 @@ describe("shared contracts", () => {
           allowUnknownFaction: true,
           allowCooldowns: false,
         },
+        policy: {
+          switchPenaltyRatio: 0.075,
+          acquisitionPenaltyRatios: {
+            vendor: 0.05,
+            quest: 0.1,
+            drop: 0.2,
+            reputation: 0.2,
+          },
+          specializationPenaltyRatio: 0.1,
+          cooldownPenaltyRatio: 0.25,
+        },
       }),
     ).toBeDefined();
     expect(() =>
@@ -260,6 +271,15 @@ describe("shared contracts", () => {
         objective: "cost",
       }),
     ).toThrow("marketId");
+    expect(
+      routeOptimizationRequestSchema.safeParse({
+        professionId: "leatherworking",
+        startSkill: 150,
+        targetSkill: 180,
+        objective: "crafts",
+        policy: { switchPenaltyRatio: 1.01 },
+      }).success,
+    ).toBe(false);
   });
 
   it("accepts a complete imported profession recipe selection", () => {

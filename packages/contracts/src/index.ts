@@ -317,6 +317,25 @@ export const routeConstraintsSchema = z.object({
   allowCooldowns: z.boolean().optional(),
 });
 
+const routePenaltyRatioSchema = z.number().min(0).max(1);
+
+export const routeAcquisitionPenaltyRatiosSchema = z.object({
+  automatic: routePenaltyRatioSchema.optional(),
+  trainer: routePenaltyRatioSchema.optional(),
+  vendor: routePenaltyRatioSchema.optional(),
+  quest: routePenaltyRatioSchema.optional(),
+  drop: routePenaltyRatioSchema.optional(),
+  reputation: routePenaltyRatioSchema.optional(),
+  unknown: routePenaltyRatioSchema.optional(),
+});
+
+export const routeOptimizationPolicySchema = z.object({
+  switchPenaltyRatio: routePenaltyRatioSchema.optional(),
+  acquisitionPenaltyRatios: routeAcquisitionPenaltyRatiosSchema.optional(),
+  specializationPenaltyRatio: routePenaltyRatioSchema.optional(),
+  cooldownPenaltyRatio: routePenaltyRatioSchema.optional(),
+});
+
 export const routeOptimizationRequestSchema = z
   .object({
     professionId: z.string().min(1),
@@ -325,6 +344,7 @@ export const routeOptimizationRequestSchema = z
     targetSkill: z.number().int().nonnegative(),
     objective: routeObjectiveSchema,
     constraints: routeConstraintsSchema.optional(),
+    policy: routeOptimizationPolicySchema.optional(),
   })
   .superRefine(({ startSkill, targetSkill, objective, marketId }, context) => {
     if (targetSkill < startSkill) {
@@ -559,6 +579,9 @@ export type AuctionPriceRequest = z.infer<typeof auctionPriceRequestSchema>;
 export type AuctionPricesResponse = z.infer<typeof auctionPricesResponseSchema>;
 export type RouteConstraints = z.infer<typeof routeConstraintsSchema>;
 export type RouteObjective = z.infer<typeof routeObjectiveSchema>;
+export type RouteOptimizationPolicy = z.infer<
+  typeof routeOptimizationPolicySchema
+>;
 export type RouteOptimizationRequest = z.infer<
   typeof routeOptimizationRequestSchema
 >;

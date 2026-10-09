@@ -137,6 +137,7 @@ export async function optimizeFixtureRoute(
       objective: request.objective,
       recipes,
       ...(constraints === undefined ? {} : { constraints }),
+      ...(request.policy === undefined ? {} : { policy: request.policy }),
     }),
   });
 }
