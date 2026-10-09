@@ -2,11 +2,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   auditImportedBuildDataset,
+  normalizeScriptArguments,
   parseRawDatasetBytes,
   renderDataQualityMarkdown,
 } from "../src/index.js";
 
-const [inputPath, outputPath] = process.argv.slice(2);
+const [inputPath, outputPath] = normalizeScriptArguments(process.argv.slice(2));
 if (!inputPath) throw new Error("Usage: audit-build <input JSON path> [output Markdown path]");
 const invocationDirectory = process.env.INIT_CWD
   ? resolve(process.env.INIT_CWD)

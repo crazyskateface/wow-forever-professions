@@ -49,7 +49,7 @@ The smoke command uses admin access only to apply schema and role grants. It ass
 Once an authoritative client export has been transformed into the imported-build JSON contract, load it with:
 
 ```text
-pnpm data:import -- C:\path\to\forever-build.json
+pnpm data:import C:\path\to\forever-build.json
 ```
 
 The input must declare at least one source with `kind: "client-data"`. The importer preserves its exact bytes before normalization. No authoritative Forever client export has been loaded yet; the deployed validation record is explicitly marked as a non-authoritative fixture.

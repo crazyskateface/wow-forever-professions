@@ -12,6 +12,7 @@ export {
   type DsqlBatchOptions,
 } from "./batching.js";
 export * from "./catalog.js";
+export * from "./cli.js";
 export * from "./dsql.js";
 export * from "./data-quality.js";
 export * from "./import.js";

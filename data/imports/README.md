@@ -14,15 +14,15 @@ The generated JSON SHA-256 is `6247c552fd9dfe797b7c930cb4eb2395349045f7f3bd1a28c
 See `forever-1.60.1.69977-leatherworking.quality.md` for the generated audit. Regenerate both artifacts from extracted source archives with:
 
 ```text
-pnpm data:convert:professiondb -- <ProfessionDB-root> <ItemDB-root> data/imports/forever-1.60.1.69977-leatherworking.json
-pnpm data:audit -- data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
+pnpm data:convert:professiondb <ProfessionDB-root> <ItemDB-root> data/imports/forever-1.60.1.69977-leatherworking.json
+pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
 ```
 
 To load the build into disposable local PostgreSQL:
 
 ```text
 pnpm db:local:up
-pnpm data:import:local -- data/imports/forever-1.60.1.69977-leatherworking.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json
 ```
 
 The importer preserves the raw bytes under ignored `.local-data/`, applies all schema migrations, and is safe to rerun. Set `LOCAL_DATABASE_URL` to the same loopback connection before `pnpm dev:api` to serve this catalog.

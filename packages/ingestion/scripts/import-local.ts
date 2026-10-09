@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
 import {
   ingestBuildDataset,
+  normalizeScriptArguments,
   type RawDatasetPutInput,
   type RawDatasetPutStatus,
   type RawDatasetStore,
@@ -97,7 +98,7 @@ class FileRawDatasetStore implements RawDatasetStore {
   }
 }
 
-const inputPath = process.argv[2];
+const [inputPath] = normalizeScriptArguments(process.argv.slice(2));
 if (!inputPath) throw new Error("Usage: import-local <input JSON path>");
 const invocationDirectory = process.env.INIT_CWD
   ? resolve(process.env.INIT_CWD)

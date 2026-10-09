@@ -23,8 +23,20 @@ The API uses its small illustrative fixture by default. To run it with the bundl
 
 ```text
 pnpm db:local:up
-pnpm data:import:local -- data/imports/forever-1.60.1.69977-leatherworking.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json
+```
+
+Then start the API with the local database selected. In PowerShell:
+
+```powershell
 $env:LOCAL_DATABASE_URL = "postgresql://forever_professions:local-only@127.0.0.1:55432/forever_professions_local"
+pnpm dev:api
+```
+
+Or in Git Bash:
+
+```bash
+export LOCAL_DATABASE_URL='postgresql://forever_professions:local-only@127.0.0.1:55432/forever_professions_local'
 pnpm dev:api
 ```
 

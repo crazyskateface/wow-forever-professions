@@ -31,10 +31,10 @@ From the repository root, run `pnpm db:local:up`, `pnpm db:local:test`, and `pnp
 The narrow Lua-literal converter reads generated Forever Leatherworking tables from extracted LibProfessionDB and LibItemDB archives. It does not execute Lua. From the repository root:
 
 ```text
-pnpm data:convert:professiondb -- <ProfessionDB-root> <ItemDB-root> data/imports/forever-1.60.1.69977-leatherworking.json
-pnpm data:audit -- data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
+pnpm data:convert:professiondb <ProfessionDB-root> <ItemDB-root> data/imports/forever-1.60.1.69977-leatherworking.json
+pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
 pnpm db:local:up
-pnpm data:import:local -- data/imports/forever-1.60.1.69977-leatherworking.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json
 ```
 
 The local importer stores exact raw bytes under ignored `.local-data/`, applies the same 16 schema migrations, and writes through the production normalization and resumable writer. `SqlRecipeCatalogReader` reconstructs product contracts from those normalized rows. The API selects it when `LOCAL_DATABASE_URL` is set; without that variable, local development retains the illustrative fixture fallback.
@@ -43,4 +43,4 @@ The local importer stores exact raw bytes under ignored `.local-data/`, applies 
 
 The `ForeverProfessionsData` stack has been validated against a real Aurora DSQL cluster. With a short-lived AWS profile active, set `AWS_REGION`, `DSQL_ENDPOINT`, `RAW_DATA_BUCKET`, and `INGESTION_ROLE_ARN` from the stack outputs and run `pnpm db:dsql:test` from the repository root. The command applies all 16 migrations, waits for asynchronous indexes outside a transaction, configures the IAM-to-database-role mapping, assumes the scoped ingestion role, and imports its non-authoritative validation fixture twice.
 
-To ingest a transformed client export into Aurora DSQL, use `pnpm data:import -- <path-to-json>`. The file must satisfy the imported-build contract and contain at least one `client-data` source. The bundled LibProfessionDB-derived Leatherworking build is real client data, but it remains unverified rather than being misrepresented as authoritative.
+To ingest a transformed client export into Aurora DSQL, use `pnpm data:import <path-to-json>`. The file must satisfy the imported-build contract and contain at least one `client-data` source. The bundled LibProfessionDB-derived Leatherworking build is real client data, but it remains unverified rather than being misrepresented as authoritative.

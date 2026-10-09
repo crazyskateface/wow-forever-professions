@@ -5,6 +5,7 @@ import {
   createAuroraDsqlTransactionRunner,
   createS3RawDatasetStore,
   ingestBuildDataset,
+  normalizeScriptArguments,
   parseRawDatasetBytes,
 } from "../src/index.js";
 
@@ -18,7 +19,7 @@ function requiredEnvironment(name: string): string {
 }
 
 async function main(): Promise<void> {
-  const inputPath = process.argv[2];
+  const [inputPath] = normalizeScriptArguments(process.argv.slice(2));
   if (!inputPath) {
     throw new Error("Pass the path to an imported client-data JSON file.");
   }

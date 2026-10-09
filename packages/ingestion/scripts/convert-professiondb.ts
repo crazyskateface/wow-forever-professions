@@ -1,9 +1,11 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { mkdir } from "node:fs/promises";
-import { convertProfessionDbSnapshot } from "../src/index.js";
+import { convertProfessionDbSnapshot, normalizeScriptArguments } from "../src/index.js";
 
-const [professionDbRoot, itemDbRoot, outputPath] = process.argv.slice(2);
+const [professionDbRoot, itemDbRoot, outputPath] = normalizeScriptArguments(
+  process.argv.slice(2),
+);
 if (!professionDbRoot || !itemDbRoot || !outputPath) {
   throw new Error(
     "Usage: convert-professiondb <ProfessionDB root> <ItemDB root> <output JSON path>",

@@ -31,7 +31,7 @@ The review transition rules are:
 - `classic-fallback` remains non-authoritative even after review because its source does not establish Forever behavior.
 - `unverified` may be served only with visible uncertainty and must not include reviewer metadata that implies completed review.
 
-`pnpm data:audit -- <dataset.json> [report.md]` finds incomplete review metadata, rejected records, fallback sources, unverified records, missing item names, omitted borrowed ranks, and provisional outputs.
+`pnpm data:audit <dataset.json> [report.md]` finds incomplete review metadata, rejected records, fallback sources, unverified records, missing item names, omitted borrowed ranks, and provisional outputs.
 
 ## Remaining work
 
