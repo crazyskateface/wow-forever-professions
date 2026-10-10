@@ -162,6 +162,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .rail-skill { padding: 2px 18px 18px; border-bottom: 1px solid var(--line-soft); }
 .rail-label-row { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; font-weight: 700; }
 .rail-label-row span:last-child { color: #d7d9de; }
+.guide-range-overview { min-height: 82px; padding: 13px 18px 15px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line-soft); background: linear-gradient(135deg, rgba(200, 240, 0, .06), transparent 62%); }
+.guide-range-overview > div > span { display: block; margin-bottom: 6px; color: var(--muted); font-size: 9px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.guide-range-overview strong { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 22px; letter-spacing: -.04em; }
+.guide-range-overview strong i { color: var(--lime); font-size: 15px; font-style: normal; }
+.guide-range-overview button { padding: 7px 9px; color: var(--lime); border: 1px solid #4d5632; border-radius: 7px; background: rgba(200, 240, 0, .06); font-size: 10px; font-weight: 900; cursor: pointer; }
+.guide-range-overview button:hover { border-color: var(--lime-soft); background: rgba(200, 240, 0, .1); }
 input[type="range"] {
   width: 100%;
   height: 4px;
@@ -181,6 +187,37 @@ input[type="range"] {
 .recipe-list-summary { min-height: 34px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted-2); border-bottom: 1px solid var(--line-soft); background: #1b1d23; font-size: 10px; font-weight: 800; }
 .recipe-list-summary button { padding: 0; color: var(--lime); border: 0; background: transparent; font-size: 10px; font-weight: 800; cursor: pointer; }
 .recipe-list { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.guide-list { min-height: 0; flex: 1; padding: 10px; overflow-y: auto; overscroll-behavior: contain; background: #191b21; scrollbar-gutter: stable; }
+.guide-step { position: relative; width: 100%; margin: 0 0 9px; padding: 13px 13px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "range number" "title title" "metrics metrics" "materials materials"; gap: 9px 12px; overflow: hidden; color: var(--text); text-align: left; border: 1px solid #353942; border-radius: 10px; background: #24272e; cursor: pointer; box-shadow: 0 5px 14px rgba(0, 0, 0, .08); }
+.guide-step::before { position: absolute; top: 0; bottom: 0; left: 0; width: 3px; content: ""; background: #535862; }
+.guide-step:hover { border-color: #4d525d; background: #2a2d35; transform: translateY(-1px); }
+.guide-step.active { border-color: #627431; background: #2c302d; box-shadow: inset 0 0 0 1px rgba(200, 240, 0, .34), 0 7px 18px rgba(0, 0, 0, .14); }
+.guide-step.active::before { background: var(--lime); box-shadow: 0 0 12px rgba(200, 240, 0, .36); }
+.guide-step-number { grid-area: number; min-width: 23px; height: 23px; display: grid; place-items: center; color: var(--muted-2); border: 1px solid #3c4049; border-radius: 50%; background: #1b1d23; font-size: 9px; font-weight: 900; }
+.guide-step-range { grid-area: range; display: flex; align-items: center; gap: 8px; color: var(--lime); }
+.guide-step-range strong { font-size: 15px; letter-spacing: -.02em; }
+.guide-step-range i { color: #656a74; font-size: 11px; font-style: normal; }
+.guide-step-title { grid-area: title; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.guide-step-title > span:last-child { min-width: 0; }
+.guide-step-title > span:last-child > strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.guide-item-icon { width: 35px; height: 35px; flex: 0 0 auto; display: grid; place-items: center; color: #e4ecff; border: 1px solid #44506a; border-radius: 7px; background: radial-gradient(circle at 35% 25%, #6684c5, #1b2445 55%, #111626 84%); font-size: 8px; font-weight: 950; box-shadow: inset 0 0 10px rgba(115, 153, 255, .3); }
+.guide-source { width: max-content; max-width: 100%; margin-top: 4px; padding: 3px 6px; overflow: hidden; color: #aeb2bc; border: 1px solid #414650; border-radius: 999px; background: #1c1f25; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; font-weight: 850; letter-spacing: .03em; }
+.guide-source.source-trainer, .guide-source.source-automatic { color: #9de0b8; border-color: #355846; }
+.guide-source.source-vendor, .guide-source.source-quest { color: #f4d48a; border-color: #645432; }
+.guide-source.source-drop, .guide-source.source-reputation { color: #efb18e; border-color: #684636; }
+.guide-step-metrics { grid-area: metrics; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.guide-step-metrics > span { min-width: 0; padding: 7px 8px; overflow: hidden; color: var(--muted); border: 1px solid #363a43; border-radius: 6px; background: #1c1e24; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+.guide-step-metrics > span:last-child { text-align: right; }
+.guide-step-metrics strong { color: #e7e9ed; font-size: 10px; }
+.guide-materials { grid-area: materials; overflow: hidden; color: #8f939e; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+.guide-loading, .guide-message { min-height: 190px; padding: 24px 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); text-align: center; }
+.guide-loading > span { width: 26px; height: 26px; margin-bottom: 13px; border: 2px solid #454a52; border-top-color: var(--lime); border-radius: 50%; animation: guide-spin .8s linear infinite; }
+.guide-loading strong, .guide-message strong { color: #e2e4e8; font-size: 12px; }
+.guide-loading small, .guide-message small { max-width: 250px; margin-top: 6px; font-size: 10px; line-height: 1.5; }
+.guide-message button { margin-top: 12px; padding: 7px 9px; color: var(--lime); border: 1px solid #4d5632; border-radius: 6px; background: rgba(200, 240, 0, .06); font-size: 9px; font-weight: 900; cursor: pointer; }
+.guide-message-error strong { color: #f4c09c; }
+.guide-blocked { margin: 0 0 9px; padding: 10px; color: #e9b48d; border: 1px solid #5b4033; border-radius: 8px; background: #271d18; font-size: 9px; line-height: 1.45; }
+@keyframes guide-spin { to { transform: rotate(360deg); } }
 .virtual-list-space { position: relative; min-width: 0; }
 .virtual-list-row { position: absolute; right: 0; left: 0; overflow: hidden; }
 .recipe-group { height: 100%; border-bottom: 1px solid #2b2e35; }
@@ -433,6 +470,7 @@ h1, h2, h3, p { margin-top: 0; }
   .rail-label-row, .rail-skill > input { grid-column: 1; }
   .skill-stepper { grid-column: 2; grid-row: 1 / span 2; }
   .recipe-list { height: 420px; min-height: 420px; flex: none; overflow-y: auto; }
+  .guide-list { height: 540px; min-height: 540px; flex: none; }
   .recipe-group { border-bottom: 1px solid #2b2e35; }
   .rail-footer { display: none; }
   .main-workspace { padding-bottom: 50px; }
@@ -486,9 +524,10 @@ h1, h2, h3, p { margin-top: 0; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .recipe, .hero-actions button, .primary-action { transition: transform .15s ease, background .15s ease, border-color .15s ease; }
+  .recipe, .guide-step, .hero-actions button, .primary-action { transition: transform .15s ease, background .15s ease, border-color .15s ease; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .catalog-loading .catalog-state-dot { animation: none; }
+  .guide-loading > span { animation: none; }
 }
