@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "id": "endgame-tools-2026-10-14-leatherworking",
+  "title": "Endgame Tools WoW Forever Leatherworking 1 to 300",
+  "professionId": "leatherworking",
+  "startSkill": 1,
+  "targetSkill": 300,
+  "optimizationIntent": "material-cost-proxy",
+  "source": {
+    "publisher": "Endgame Tools",
+    "url": "https://endgametools.com/en/wow-forever/leveling/leatherworking",
+    "capturedAt": "2026-10-14T23:04:47.0908481Z",
+    "sourceBuildId": "1.60.1.70374",
+    "notes": "Complete 22-step public route captured for comparative review. It is external evidence, not canonical recipe data."
+  },
+  "assumptions": [
+    "The source computes from 284 recipes in the WoW Forever beta client build 1.60.1.70374.",
+    "Yellow-to-gray skill-up probability is assumed to decline linearly using the Classic rule.",
+    "Trainer recipes are counted from the yellow threshold because the client does not expose trainer teaching skill.",
+    "Reagents are weighted by vendor price or proxy values rather than live auction-house prices.",
+    "Cooldown recipes, many reputation or holiday recipes, and specialization or non-trainer recipes are excluded.",
+    "Recipe items are used only where no ordinary recipe gives at least a one-in-three skill-up chance by default.",
+    "Skill points gained while crafting intermediate reagents are not counted."
+  ],
+  "steps": [
+    {
+      "startSkill": 1,
+      "endSkill": 55,
+      "recipeName": "Light Armor Kit",
+      "expectedCrafts": 81,
+      "reagents": [{ "name": "Light Leather", "quantity": 81 }]
+    },
+    {
+      "startSkill": 55,
+      "endSkill": 70,
+      "recipeName": "Small Leather Ammo Pouch",
+      "expectedCrafts": 21,
+      "reagents": [
+        { "name": "Light Leather", "quantity": 63 },
+        { "name": "Coarse Thread", "quantity": 84 }
+      ]
+    },
+    {
+      "startSkill": 70,
+      "endSkill": 85,
+      "recipeName": "Embossed Leather Gloves",
+      "expectedCrafts": 21,
+      "reagents": [
+        { "name": "Light Leather", "quantity": 63 },
+        { "name": "Coarse Thread", "quantity": 42 }
+      ]
+    },
+    {
+      "startSkill": 85,
+      "endSkill": 105,
+      "recipeName": "Fine Leather Belt",
+      "expectedCrafts": 32,
+      "reagents": [
+        { "name": "Light Leather", "quantity": 192 },
+        { "name": "Coarse Thread", "quantity": 64 }
+      ]
+    },
+    {
+      "startSkill": 105,
+      "endSkill": 120,
+      "recipeName": "Light Leather Pants",
+      "expectedCrafts": 27,
+      "reagents": [
+        { "name": "Light Leather", "quantity": 270 },
+        { "name": "Cured Light Hide", "quantity": 27 },
+        { "name": "Fine Thread", "quantity": 27 }
+      ]
+    },
+    {
+      "startSkill": 120,
+      "endSkill": 125,
+      "recipeName": "Nimble Leather Gloves",
+      "expectedCrafts": 6,
+      "reagents": [
+        { "name": "Elixir of Minor Agility", "quantity": 6 },
+        { "name": "Medium Leather", "quantity": 36 },
+        { "name": "Fine Thread", "quantity": 6 }
+      ]
+    },
+    {
+      "startSkill": 125,
+      "endSkill": 130,
+      "recipeName": "Heavy Leather",
+      "expectedCrafts": 7,
+      "reagents": [{ "name": "Medium Leather", "quantity": 35 }]
+    },
+    {
+      "startSkill": 130,
+      "endSkill": 145,
+      "recipeName": "Hillman's Shoulders",
+      "expectedCrafts": 23,
+      "reagents": [
+        { "name": "Cured Medium Hide", "quantity": 23 },
+        { "name": "Medium Leather", "quantity": 92 },
+        { "name": "Fine Thread", "quantity": 23 }
+      ]
+    },
+    {
+      "startSkill": 145,
+      "endSkill": 155,
+      "recipeName": "Hillman's Leather Gloves",
+      "expectedCrafts": 13,
+      "reagents": [
+        { "name": "Medium Leather", "quantity": 182 },
+        { "name": "Fine Thread", "quantity": 52 }
+      ]
+    },
+    {
+      "startSkill": 155,
+      "endSkill": 170,
+      "recipeName": "Green Leather Belt",
+      "expectedCrafts": 27,
+      "reagents": [
+        { "name": "Cured Heavy Hide", "quantity": 27 },
+        { "name": "Heavy Leather", "quantity": 135 },
+        { "name": "Fine Thread", "quantity": 27 },
+        { "name": "Green Dye", "quantity": 27 },
+        { "name": "Iron Buckle", "quantity": 27 }
+      ]
+    },
+    {
+      "startSkill": 170,
+      "endSkill": 175,
+      "recipeName": "Barbaric Shoulders",
+      "expectedCrafts": 6,
+      "reagents": [
+        { "name": "Heavy Leather", "quantity": 48 },
+        { "name": "Cured Heavy Hide", "quantity": 6 },
+        { "name": "Fine Thread", "quantity": 12 }
+      ]
+    },
+    {
+      "startSkill": 175,
+      "endSkill": 185,
+      "recipeName": "Green Leather Bracers",
+      "expectedCrafts": 14,
+      "reagents": [
+        { "name": "Cured Heavy Hide", "quantity": 28 },
+        { "name": "Heavy Leather", "quantity": 84 },
+        { "name": "Green Dye", "quantity": 14 },
+        { "name": "Fine Thread", "quantity": 14 }
+      ]
+    },
+    {
+      "startSkill": 185,
+      "endSkill": 200,
+      "recipeName": "Guardian Gloves",
+      "expectedCrafts": 27,
+      "reagents": [
+        { "name": "Heavy Leather", "quantity": 108 },
+        { "name": "Cured Heavy Hide", "quantity": 27 },
+        { "name": "Silken Thread", "quantity": 27 }
+      ]
+    },
+    {
+      "startSkill": 200,
+      "endSkill": 215,
+      "recipeName": "Nightscape Headband",
+      "expectedCrafts": 27,
+      "reagents": [
+        { "name": "Thick Leather", "quantity": 135 },
+        { "name": "Silken Thread", "quantity": 54 }
+      ]
+    },
+    {
+      "startSkill": 215,
+      "endSkill": 220,
+      "recipeName": "Turtle Scale Breastplate",
+      "expectedCrafts": 13,
+      "reagents": [
+        { "name": "Thick Leather", "quantity": 78 },
+        { "name": "Turtle Scale", "quantity": 156 },
+        { "name": "Heavy Silken Thread", "quantity": 13 }
+      ]
+    },
+    {
+      "startSkill": 220,
+      "endSkill": 225,
+      "recipeName": "Thick Leather Ammo Pouch",
+      "expectedCrafts": 6,
+      "reagents": [
+        { "name": "Thick Leather", "quantity": 60 },
+        { "name": "Cured Thick Hide", "quantity": 6 },
+        { "name": "Elixir of Defense", "quantity": 6 },
+        { "name": "Silken Thread", "quantity": 36 }
+      ]
+    },
+    {
+      "startSkill": 225,
+      "endSkill": 231,
+      "recipeName": "Cured Rugged Hide",
+      "expectedCrafts": 9,
+      "reagents": [
+        { "name": "Rugged Hide", "quantity": 9 },
+        { "name": "Refined Deeprock Salt", "quantity": 9 }
+      ]
+    },
+    {
+      "startSkill": 231,
+      "endSkill": 244,
+      "recipeName": "Rugged Armor Kit",
+      "expectedCrafts": 46,
+      "reagents": [{ "name": "Rugged Leather", "quantity": 230 }]
+    },
+    {
+      "startSkill": 244,
+      "endSkill": 245,
+      "recipeName": "Blue Suede Shoes",
+      "expectedCrafts": 1,
+      "reagents": [
+        { "name": "Rugged Leather", "quantity": 8 },
+        { "name": "Rune Thread", "quantity": 1 },
+        { "name": "Blue Dye", "quantity": 1 }
+      ]
+    },
+    {
+      "startSkill": 245,
+      "endSkill": 259,
+      "recipeName": "Helm of Fire",
+      "expectedCrafts": 23,
+      "reagents": [
+        { "name": "Thick Leather", "quantity": 920 },
+        { "name": "Heart of Fire", "quantity": 184 },
+        { "name": "Core of Earth", "quantity": 92 },
+        { "name": "Cured Thick Hide", "quantity": 46 },
+        { "name": "Heavy Silken Thread", "quantity": 92 }
+      ]
+    },
+    {
+      "startSkill": 259,
+      "endSkill": 279,
+      "recipeName": "Charged Scorpid Bracers",
+      "expectedCrafts": 21,
+      "reagents": [
+        { "name": "Rugged Leather", "quantity": 42 },
+        { "name": "Heavy Scorpid Scale", "quantity": 84 },
+        { "name": "Rune Thread", "quantity": 21 },
+        { "name": "Elemental Air", "quantity": 42 }
+      ]
+    },
+    {
+      "startSkill": 279,
+      "endSkill": 300,
+      "recipeName": "Blue Suede Bracers",
+      "expectedCrafts": 22,
+      "reagents": [
+        { "name": "Rugged Leather", "quantity": 220 },
+        { "name": "Rune Thread", "quantity": 22 },
+        { "name": "Blue Dye", "quantity": 22 }
+      ]
+    }
+  ]
+}

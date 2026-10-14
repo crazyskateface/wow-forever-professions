@@ -69,6 +69,13 @@ For Forever build `1.60.1.69977`:
 
 Uninterrupted skill coverage proves that the known-rank subset can support a `1 → 300` optimizer experiment. It does not yet prove that the resulting route is obtainable or trustworthy: acquisition, faction, cooldown, output quantity, and overall Forever verification remain open.
 
+The first guide-quality comparison is now reproducible through `pnpm guide:validate`.
+Against a build-labeled external route, the current generated route has no matching
+skill decisions and claims exactly 299 expected crafts. All 13 selected recipes remain
+unverified, and eight have unknown acquisition and availability. This does not prove
+the reference route is correct; it prioritizes threshold and eligibility questions
+that most strongly affect the product route. See `docs/GUIDE_VALIDATION.md`.
+
 ## Trust rules
 
 - Presence in client data does not prove that a recipe is obtainable.

@@ -37,3 +37,14 @@ Run the focused tests with:
 ```text
 pnpm --filter @forever-professions/optimizer test
 ```
+
+## Guide validation
+
+The package also owns pure route-comparison and Markdown-reporting logic. It compares
+a complete generated route with a contiguous, source-attributed reference guide,
+groups skill-level disagreements into ranges, aggregates reagent differences, and
+surfaces evidence risks without modifying recipe data.
+
+With the PostgreSQL-backed local API running, execute `pnpm guide:validate` from the
+repository root. Reference inputs live under `data/guide-references/`; generated
+build-stamped baselines and reports live under `data/guide-validation/`.

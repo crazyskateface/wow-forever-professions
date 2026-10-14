@@ -147,6 +147,19 @@ The shared current-skill slider powers change availability tags and the filters 
 recipes above current skill or with unknown requirements. Item-type filtering prefers
 LibItemDB class/subclass metadata and uses name heuristics only as a display fallback.
 
+## Browser-local personalization
+
+The web client owns a versioned local profile in `apps/web/src/personalization.ts`.
+It persists skill range, route and shopping preferences, region, market, faction, the
+Legacy profession-bonus input, and Forever Changes filters. The profile contains no
+credentials or imported game data. Keep its parser defensive and migrate by adding a
+new storage version rather than changing the meaning of an existing version.
+
+Market and faction selections are functional request inputs. The Legacy profession
+bonus is storage-only until its Forever behavior is verified and explicitly modeled;
+do not silently add it to thresholds. Known recipes remain session-only. See
+`docs/PERSONALIZATION.md` for the field and failure-behavior contract.
+
 ## Verification expectations
 
 Run checks in proportion to the change. The complete gate is:
@@ -170,6 +183,12 @@ pnpm db:local:test
 After data or SQL changes, also import both real snapshots into disposable PostgreSQL,
 query the affected API, and regenerate the quality report. A typecheck alone does not
 prove migration ordering, catalog reconstruction, or comparison persistence.
+
+After optimizer, eligibility, threshold, or route-policy changes, run
+`pnpm guide:validate` against the PostgreSQL-backed API and review the generated
+baseline/report under `data/guide-validation/`. Reference guides are diagnostic
+evidence only and must not be promoted into recipe overrides without a supported
+source.
 
 On some Windows sandboxed runs, parallel Vitest workers can lose transformed files
 from the sandbox temp directory and report `ENOENT` before tests execute. Re-run the

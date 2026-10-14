@@ -7,12 +7,14 @@ import {
   type ReactNode,
 } from "react";
 import {
+  auctionMarketsResponseSchema,
   auctionPricesResponseSchema,
   professionFixtureSchema,
   recipeChangesResponseSchema,
   recipeChangesSummaryResponseSchema,
   routeOptimizationResponseSchema,
   shoppingListResponseSchema,
+  type AuctionMarket,
   type AuctionPriceObservation,
   type ProfessionFixture,
   type Recipe,
@@ -34,6 +36,14 @@ import {
 import { leatherworkingFixture } from "@forever-professions/fixtures";
 import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
+import {
+  DEFAULT_PERSONALIZATION,
+  clearPersonalization,
+  readPersonalization,
+  writePersonalization,
+  type ForeverChangeFilters,
+  type PlayerFaction,
+} from "./personalization.js";
 
 type WorkspaceView = "calculator" | "planner";
 type RecipeListView = "guide" | "recipes" | "changes";
@@ -41,8 +51,6 @@ type CatalogState = "loading" | "ready" | "fixture" | "fallback";
 
 const MIN_PROFESSION_SKILL = 0;
 const MAX_PROFESSION_SKILL = 300;
-const DEFAULT_GUIDE_START_SKILL = 1;
-const DEFAULT_GUIDE_TARGET_SKILL = 300;
 const RECIPE_ROW_HEIGHT = 78;
 const KNOWN_RECIPE_ROW_HEIGHT = 48;
 const VIRTUAL_OVERSCAN = 5;
@@ -191,6 +199,8 @@ function acquisitionLabel(recipe: Recipe): string {
 }
 
 interface RouteRequestOptions {
+  readonly faction: PlayerFaction;
+  readonly marketId: string;
   readonly professionId: string;
   readonly startSkill: number;
   readonly targetSkill: number;
@@ -201,6 +211,8 @@ interface RouteRequestOptions {
 }
 
 async function requestOptimizedRoute({
+  faction,
+  marketId,
   professionId,
   startSkill,
   targetSkill,
@@ -214,11 +226,11 @@ async function requestOptimizedRoute({
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       professionId,
-      marketId: "forever.pvp.horde.us",
+      marketId,
       startSkill,
       targetSkill,
       objective,
-      constraints: { knownRecipeIds, trainerOnly },
+      constraints: { faction, knownRecipeIds, trainerOnly },
     }),
     ...(signal === undefined ? {} : { signal }),
   });
@@ -333,6 +345,7 @@ function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
 }
 
 export function App() {
+  const [initialPreferences] = useState(readPersonalization);
   const [profession, setProfession] = useState<ProfessionFixture>(leatherworkingFixture);
   const [catalogState, setCatalogState] = useState<CatalogState>("loading");
   const [recipeId, setRecipeId] = useState(leatherworkingFixture.recipes[0]!.id);
@@ -349,7 +362,7 @@ export function App() {
         candidate.provenance.verification.status,
       ).authoritative,
   ).length;
-  const [skill, setSkill] = useState(DEFAULT_GUIDE_START_SKILL);
+  const [skill, setSkill] = useState(initialPreferences.currentSkill);
   const [prices, setPrices] = useState<readonly AuctionPriceObservation[]>([]);
   const [priceError, setPriceError] = useState<string>();
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("calculator");
@@ -362,23 +375,102 @@ export function App() {
   const [changesLoading, setChangesLoading] = useState(true);
   const [changesError, setChangesError] = useState<string>();
   const [changesReload, setChangesReload] = useState(0);
-  const [knownRecipeSearch, setKnownRecipeSearch] = useState("");
-  const [routeStartSkill, setRouteStartSkill] = useState(DEFAULT_GUIDE_START_SKILL);
-  const [routeTargetSkill, setRouteTargetSkill] = useState(
-    DEFAULT_GUIDE_TARGET_SKILL,
+  const [changeFilters, setChangeFilters] = useState<ForeverChangeFilters>(
+    initialPreferences.changeFilters,
   );
-  const [routeObjective, setRouteObjective] = useState<RouteObjective>("crafts");
+  const [knownRecipeSearch, setKnownRecipeSearch] = useState("");
+  const [routeStartSkill, setRouteStartSkill] = useState(
+    initialPreferences.routeStartSkill,
+  );
+  const [routeTargetSkill, setRouteTargetSkill] = useState(
+    initialPreferences.targetSkill,
+  );
+  const [routeObjective, setRouteObjective] = useState<RouteObjective>(
+    initialPreferences.routeObjective,
+  );
   const [knownRecipeIds, setKnownRecipeIds] = useState<readonly string[]>(
     leatherworkingFixture.recipes.map(({ id }) => id),
   );
-  const [trainerOnly, setTrainerOnly] = useState(false);
+  const [trainerOnly, setTrainerOnly] = useState(initialPreferences.trainerOnly);
   const [routeResponse, setRouteResponse] = useState<RouteOptimizationResponse>();
   const [routeError, setRouteError] = useState<string>();
   const [routeLoading, setRouteLoading] = useState(false);
-  const [shoppingStrategy, setShoppingStrategy] = useState<ShoppingStrategy>("cheapest");
+  const [shoppingStrategy, setShoppingStrategy] = useState<ShoppingStrategy>(
+    initialPreferences.shoppingStrategy,
+  );
   const [shoppingResponse, setShoppingResponse] = useState<ShoppingListResponse>();
   const [shoppingError, setShoppingError] = useState<string>();
   const [shoppingLoading, setShoppingLoading] = useState(false);
+  const [markets, setMarkets] = useState<readonly AuctionMarket[]>([]);
+  const [marketsLoading, setMarketsLoading] = useState(true);
+  const [marketsError, setMarketsError] = useState<string>();
+  const [region, setRegion] = useState(initialPreferences.region);
+  const [marketId, setMarketId] = useState(initialPreferences.marketId);
+  const [faction, setFaction] = useState<PlayerFaction>(initialPreferences.faction);
+  const [legacyProfessionSkillBonus, setLegacyProfessionSkillBonus] = useState(
+    initialPreferences.legacyProfessionSkillBonus,
+  );
+  const [preferencesStorageAvailable, setPreferencesStorageAvailable] = useState(true);
+
+  useEffect(() => {
+    setPreferencesStorageAvailable(writePersonalization({
+      version: 1,
+      currentSkill: skill,
+      routeStartSkill,
+      targetSkill: routeTargetSkill,
+      routeObjective,
+      shoppingStrategy,
+      trainerOnly,
+      region,
+      marketId,
+      faction,
+      legacyProfessionSkillBonus,
+      changeFilters,
+    }));
+  }, [
+    changeFilters,
+    faction,
+    legacyProfessionSkillBonus,
+    marketId,
+    region,
+    routeObjective,
+    routeStartSkill,
+    routeTargetSkill,
+    shoppingStrategy,
+    skill,
+    trainerOnly,
+  ]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setMarketsLoading(true);
+    setMarketsError(undefined);
+    fetch("/api/auction/markets", { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return auctionMarketsResponseSchema.parse(await response.json()).markets;
+      })
+      .then((loadedMarkets) => {
+        setMarkets(loadedMarkets);
+        if (loadedMarkets.length === 0) return;
+        const selected = loadedMarkets.find(({ id }) => id === marketId) ??
+          loadedMarkets.find((market) =>
+            market.region.toLowerCase() === region.toLowerCase() &&
+            market.faction.toLowerCase() === faction
+          ) ?? loadedMarkets[0]!;
+        setMarketId(selected.id);
+        setRegion(selected.region.toLowerCase());
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setMarkets([]);
+        setMarketsError("Market choices are unavailable. Your saved market is still selected.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setMarketsLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -423,17 +515,19 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (catalogState === "loading") return;
+    if (catalogState === "loading" || marketsLoading) return;
     const controller = new AbortController();
     setRouteLoading(true);
     setRouteError(undefined);
     requestOptimizedRoute({
+      faction,
+      marketId,
       professionId: profession.id,
-      startSkill: DEFAULT_GUIDE_START_SKILL,
-      targetSkill: DEFAULT_GUIDE_TARGET_SKILL,
-      objective: "crafts",
+      startSkill: routeStartSkill,
+      targetSkill: routeTargetSkill,
+      objective: routeObjective,
       knownRecipeIds: profession.recipes.map(({ id }) => id),
-      trainerOnly: false,
+      trainerOnly,
       signal: controller.signal,
     })
       .then(setRouteResponse)
@@ -448,7 +542,7 @@ export function App() {
         if (!controller.signal.aborted) setRouteLoading(false);
       });
     return () => controller.abort();
-  }, [catalogState, profession]);
+  }, [catalogState, marketsLoading, profession]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -541,10 +635,11 @@ export function App() {
     );
     const controller = new AbortController();
     setPriceError(undefined);
-    fetch(
-      `/api/auction/prices?marketId=forever.pvp.horde.us&itemIds=${gameItemIds.join(",")}`,
-      { signal: controller.signal },
-    )
+    const query = new URLSearchParams({
+      marketId,
+      itemIds: gameItemIds.join(","),
+    });
+    fetch(`/api/auction/prices?${query}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return auctionPricesResponseSchema.parse(await response.json()).observations;
@@ -556,7 +651,7 @@ export function App() {
         setPriceError("Live auction prices are unavailable. Quantities are still accurate.");
       });
     return () => controller.abort();
-  }, [recipe]);
+  }, [marketId, recipe]);
 
   const calculation = useMemo(() => {
     const probability = getSkillUpProbability(skill, recipe.thresholds);
@@ -707,6 +802,61 @@ export function App() {
   const selectedKnownResults = filteredKnownRecipes.filter(({ id }) =>
     knownRecipeSet.has(id),
   ).length;
+  const availableRegions = useMemo(
+    () => [
+      ...new Set([region, ...markets.map((market) => market.region.toLowerCase())]),
+    ].sort(),
+    [markets, region],
+  );
+  const regionMarkets = useMemo(
+    () => markets.filter((market) => market.region.toLowerCase() === region),
+    [markets, region],
+  );
+  const selectedMarket = markets.find(({ id }) => id === marketId);
+  const marketLabel = selectedMarket?.label ?? marketId;
+
+  function selectRegion(nextRegion: string): void {
+    setRegion(nextRegion);
+    const nextMarket = markets.find((market) =>
+      market.region.toLowerCase() === nextRegion &&
+      market.faction.toLowerCase() === faction
+    ) ?? markets.find((market) => market.region.toLowerCase() === nextRegion);
+    if (nextMarket !== undefined) setMarketId(nextMarket.id);
+  }
+
+  function selectFaction(nextFaction: PlayerFaction): void {
+    setFaction(nextFaction);
+    const nextMarket = markets.find((market) =>
+      market.region.toLowerCase() === region &&
+      market.faction.toLowerCase() === nextFaction
+    );
+    if (nextMarket !== undefined) setMarketId(nextMarket.id);
+  }
+
+  function selectMarket(nextMarketId: string): void {
+    setMarketId(nextMarketId);
+    const nextMarket = markets.find(({ id }) => id === nextMarketId);
+    if (nextMarket === undefined) return;
+    setRegion(nextMarket.region.toLowerCase());
+  }
+
+  function resetPersonalization(): void {
+    clearPersonalization();
+    setSkill(DEFAULT_PERSONALIZATION.currentSkill);
+    setRouteStartSkill(DEFAULT_PERSONALIZATION.routeStartSkill);
+    setRouteTargetSkill(DEFAULT_PERSONALIZATION.targetSkill);
+    setRouteObjective(DEFAULT_PERSONALIZATION.routeObjective);
+    setShoppingStrategy(DEFAULT_PERSONALIZATION.shoppingStrategy);
+    setTrainerOnly(DEFAULT_PERSONALIZATION.trainerOnly);
+    setRegion(DEFAULT_PERSONALIZATION.region);
+    setMarketId(DEFAULT_PERSONALIZATION.marketId);
+    setFaction(DEFAULT_PERSONALIZATION.faction);
+    setLegacyProfessionSkillBonus(
+      DEFAULT_PERSONALIZATION.legacyProfessionSkillBonus,
+    );
+    setChangeFilters(DEFAULT_PERSONALIZATION.changeFilters);
+    setShoppingResponse(undefined);
+  }
 
   function selectRecipe(nextRecipe: Recipe, historyMode: "push" | "replace" = "push"): void {
     setRecipeId(nextRecipe.id);
@@ -750,6 +900,8 @@ export function App() {
     try {
       setRouteResponse(
         await requestOptimizedRoute({
+          faction,
+          marketId,
           professionId: profession.id,
           startSkill: routeStartSkill,
           targetSkill: routeTargetSkill,
@@ -777,7 +929,7 @@ export function App() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           professionId: profession.id,
-          marketId: "forever.pvp.horde.us",
+          marketId,
           route: routeResponse.result.segments.map(
             ({ recipeId: id, expectedCrafts }) => ({ recipeId: id, expectedCrafts }),
           ),
@@ -816,11 +968,86 @@ export function App() {
           <input aria-label="Search recipes" onChange={(event) => setSearch(event.target.value)} placeholder={recipeListView === "changes" ? "Search changed recipes, fields, or spell IDs…" : `Search ${profession.recipes.length} recipes…`} ref={searchRef} type="search" value={search} />
           <kbd>shift + f</kbd>
         </label>
-        <button className="market-picker" type="button">
-          <span className="status-orb" aria-hidden="true" />
-          <span><small>Market</small>Forever · PvP Horde US</span>
-          <span aria-hidden="true">⌄</span>
-        </button>
+        <details className="personalization-menu">
+          <summary className="market-picker">
+            <span
+              className={`status-orb${marketsError === undefined ? "" : " status-orb-warning"}`}
+              aria-hidden="true"
+            />
+            <span><small>Your profile</small>{marketLabel}</span>
+            <span aria-hidden="true">⌄</span>
+          </summary>
+          <div className="personalization-popover">
+            <div className="personalization-heading">
+              <div>
+                <span className="section-kicker">Saved in this browser</span>
+                <strong>Planning preferences</strong>
+              </div>
+              <span aria-hidden="true">◎</span>
+            </div>
+            <div className="personalization-grid">
+              <label>
+                <span>Region</span>
+                <select
+                  onChange={(event) => selectRegion(event.target.value)}
+                  value={region}
+                >
+                  {availableRegions.map((value) => (
+                    <option key={value} value={value}>{value.toUpperCase()}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Faction</span>
+                <select
+                  onChange={(event) => selectFaction(event.target.value as PlayerFaction)}
+                  value={faction}
+                >
+                  <option value="horde">Horde</option>
+                  <option value="alliance">Alliance</option>
+                </select>
+              </label>
+            </div>
+            <label className="personalization-field">
+              <span>Auction market</span>
+              <select
+                disabled={marketsLoading || regionMarkets.length === 0}
+                onChange={(event) => selectMarket(event.target.value)}
+                value={regionMarkets.some(({ id }) => id === marketId) ? marketId : ""}
+              >
+                {regionMarkets.length === 0 ? (
+                  <option value="">{marketsLoading ? "Loading markets…" : "No market available"}</option>
+                ) : null}
+                {regionMarkets.map((market) => (
+                  <option key={market.id} value={market.id}>{market.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="personalization-field">
+              <span>Legacy profession bonus</span>
+              <input
+                max="100"
+                min="0"
+                onChange={(event) => setLegacyProfessionSkillBonus(
+                  Math.min(100, Math.max(0, Math.round(Number(event.target.value)))),
+                )}
+                type="number"
+                value={legacyProfessionSkillBonus}
+              />
+              <small>
+                Saved for future modeling. It is not applied until Forever's modifier behavior is verified.
+              </small>
+            </label>
+            {marketsError ? <p className="personalization-warning">{marketsError}</p> : null}
+            {!preferencesStorageAvailable ? (
+              <p className="personalization-warning">Browser storage is unavailable, so changes will last only for this tab.</p>
+            ) : null}
+            <div className="personalization-footer">
+              <span>Skill, route, shopping, and change filters are saved automatically.</span>
+              <button onClick={resetPersonalization} type="button">Reset preferences</button>
+            </div>
+          </div>
+        </details>
       </header>
 
       <div className="workspace" id="top">
@@ -1044,7 +1271,9 @@ export function App() {
               changes={recipeChanges}
               currentSkill={skill}
               error={changesError}
+              filters={changeFilters}
               loading={changesLoading}
+              onFiltersChange={setChangeFilters}
               onRetry={() => setChangesReload((value) => value + 1)}
               search={search}
               summary={changeSummary}

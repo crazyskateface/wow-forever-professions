@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type {
   RecipeChange,
   RecipeChangeCounts,
@@ -6,9 +6,13 @@ import type {
   RecipeComparisonSnapshot,
 } from "@forever-professions/contracts";
 import { ItemIcon } from "./ItemIcon.js";
+import {
+  DEFAULT_CHANGE_FILTERS,
+  type ChangeFilter,
+  type ForeverChangeFilters,
+  type RecipeItemType,
+} from "./personalization.js";
 
-type ChangeFilter = "CHANGED" | RecipeChangeType;
-type RecipeItemType = "ALL" | "GEAR" | "ARMOR_KIT" | "CONTAINER" | "MATERIAL" | "OTHER";
 type SkillAvailabilityKind = "AVAILABLE" | "ABOVE_SKILL" | "UNKNOWN" | "UNAVAILABLE";
 
 interface SkillAvailability {
@@ -20,7 +24,9 @@ interface ForeverChangesProps {
   readonly changes: readonly RecipeChange[];
   readonly currentSkill: number;
   readonly error: string | undefined;
+  readonly filters: ForeverChangeFilters;
   readonly loading: boolean;
+  readonly onFiltersChange: (filters: ForeverChangeFilters) => void;
   readonly onRetry: () => void;
   readonly search: string;
   readonly summary: RecipeChangeCounts | undefined;
@@ -302,16 +308,20 @@ export function ForeverChanges({
   changes,
   currentSkill,
   error,
+  filters,
   loading,
+  onFiltersChange,
   onRetry,
   search,
   summary,
 }: ForeverChangesProps) {
-  const [professionId, setProfessionId] = useState("");
-  const [changeFilter, setChangeFilter] = useState<ChangeFilter>("CHANGED");
-  const [itemType, setItemType] = useState<RecipeItemType>("ALL");
-  const [showAboveSkill, setShowAboveSkill] = useState(true);
-  const [showUnknownSkill, setShowUnknownSkill] = useState(true);
+  const {
+    changeFilter,
+    itemType,
+    professionId,
+    showAboveSkill,
+    showUnknownSkill,
+  } = filters;
   const professions = useMemo(() => {
     const values = new Map<string, string>();
     for (const change of changes) {
@@ -379,7 +389,7 @@ export function ForeverChanges({
           <button
             className={`summary-${type.toLowerCase()}${changeFilter === type ? " active" : ""}`}
             key={type}
-            onClick={() => setChangeFilter(type)}
+            onClick={() => onFiltersChange({ ...filters, changeFilter: type })}
             type="button"
           >
             <span>{label}</span>
@@ -402,7 +412,7 @@ export function ForeverChanges({
                 aria-pressed={changeFilter === type}
                 className={changeFilter === type ? "active" : ""}
                 key={type}
-                onClick={() => setChangeFilter(type)}
+                onClick={() => onFiltersChange({ ...filters, changeFilter: type })}
                 type="button"
               >
                 {label}
@@ -419,7 +429,11 @@ export function ForeverChanges({
               <label className="changes-filter-field">
                 <span>Item type</span>
                 <select
-                  onChange={(event) => setItemType(event.target.value as RecipeItemType)}
+                  aria-label="Filter changed recipes by item type"
+                  onChange={(event) => onFiltersChange({
+                    ...filters,
+                    itemType: event.target.value as RecipeItemType,
+                  })}
                   value={itemType}
                 >
                   <option value="ALL">All item types ({professionChanges.length})</option>
@@ -436,8 +450,12 @@ export function ForeverChanges({
                   <small>Includes known requirements above skill {currentSkill}.</small>
                 </span>
                 <input
+                  aria-label="Show recipes above current skill"
                   checked={showAboveSkill}
-                  onChange={(event) => setShowAboveSkill(event.target.checked)}
+                  onChange={(event) => onFiltersChange({
+                    ...filters,
+                    showAboveSkill: event.target.checked,
+                  })}
                   type="checkbox"
                 />
               </label>
@@ -447,19 +465,25 @@ export function ForeverChanges({
                   <small>These cannot be verified against the skill slider yet.</small>
                 </span>
                 <input
+                  aria-label="Include unknown skill requirements"
                   checked={showUnknownSkill}
-                  onChange={(event) => setShowUnknownSkill(event.target.checked)}
+                  onChange={(event) => onFiltersChange({
+                    ...filters,
+                    showUnknownSkill: event.target.checked,
+                  })}
                   type="checkbox"
                 />
               </label>
               {activeFilterCount > 0 ? (
                 <button
                   className="changes-filter-reset"
-                  onClick={() => {
-                    setItemType("ALL");
-                    setShowAboveSkill(true);
-                    setShowUnknownSkill(true);
-                  }}
+                  aria-label="Reset Forever Changes filters"
+                  onClick={() => onFiltersChange({
+                    ...filters,
+                    itemType: DEFAULT_CHANGE_FILTERS.itemType,
+                    showAboveSkill: DEFAULT_CHANGE_FILTERS.showAboveSkill,
+                    showUnknownSkill: DEFAULT_CHANGE_FILTERS.showUnknownSkill,
+                  })}
                   type="button"
                 >
                   Reset filters
@@ -470,7 +494,13 @@ export function ForeverChanges({
         </div>
         <label className="profession-filter">
           <span>Profession</span>
-          <select onChange={(event) => setProfessionId(event.target.value)} value={professionId}>
+          <select
+            onChange={(event) => onFiltersChange({
+              ...filters,
+              professionId: event.target.value,
+            })}
+            value={professionId}
+          >
             <option value="">All professions</option>
             {professions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           </select>

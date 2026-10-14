@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export * from "./recipe-changes.js";
+export * from "./guide-validation.js";
 
 export const healthResponseSchema = z.object({
   service: z.literal("forever-professions-api"),
