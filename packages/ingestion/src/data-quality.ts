@@ -26,6 +26,14 @@ export interface DataQualityReport {
     readonly knownAvailabilityRecipes: number;
     readonly specializationRecipes: number;
   };
+  readonly evidenceMetadata: {
+    readonly borrowedLearnSkillRecipes: number;
+    readonly sourceKindRecipes: number;
+    readonly foreverSourceKindRecipes: number;
+    readonly teachingItemRecipes: number;
+    readonly ambiguousOrangeSkillRecipes: number;
+    readonly classifiedOutputRecipes: number;
+  };
   readonly routeCoverage: readonly ProfessionRouteCoverage[];
   readonly findings: readonly DataQualityFinding[];
 }
@@ -143,7 +151,7 @@ export function auditImportedBuildDataset(input: ImportedBuildDataset): DataQual
     ) {
       missingNames.push(recipe.id);
     }
-    if (recipe.provenanceNotes?.includes("required skill was deliberately not imported")) {
+    if (recipe.metadata.borrowedLearnSkill !== undefined && recipe.metadata.borrowedLearnSkill !== null) {
       borrowedRanks.push(recipe.id);
     }
     if (recipe.verification.notes?.includes("Output quantity is provisionally one")) {
@@ -247,9 +255,9 @@ export function auditImportedBuildDataset(input: ImportedBuildDataset): DataQual
       missingNames,
     ),
     finding(
-      "borrowed-required-skill-omitted",
+      "borrowed-required-skill-fallback",
       "warning",
-      "A Vanilla-borrowed learning rank was omitted instead of being presented as Forever data.",
+      "A Vanilla-borrowed learning rank is retained only as an explicitly labeled fallback, not presented as Forever data.",
       borrowedRanks,
     ),
     finding(
@@ -279,6 +287,26 @@ export function auditImportedBuildDataset(input: ImportedBuildDataset): DataQual
         ({ metadata }) => metadata.specializationSpellId !== null,
       ).length,
     },
+    evidenceMetadata: {
+      borrowedLearnSkillRecipes: recipes.filter(
+        ({ metadata }) => metadata.borrowedLearnSkill !== undefined && metadata.borrowedLearnSkill !== null,
+      ).length,
+      sourceKindRecipes: recipes.filter(
+        ({ metadata }) => (metadata.sourceKinds?.length ?? 0) > 0,
+      ).length,
+      foreverSourceKindRecipes: recipes.filter(
+        ({ metadata }) => metadata.sourceDataOrigin === "forever",
+      ).length,
+      teachingItemRecipes: recipes.filter(
+        ({ metadata }) => metadata.teachingItemId !== undefined && metadata.teachingItemId !== null,
+      ).length,
+      ambiguousOrangeSkillRecipes: recipes.filter(
+        ({ metadata }) => metadata.orangeSkillKnown === false,
+      ).length,
+      classifiedOutputRecipes: recipes.filter(({ outputs }) =>
+        outputs.some(({ item }) => item.itemClassId !== undefined),
+      ).length,
+    },
     routeCoverage: dataset.professions.map((profession) => routeCoverageFor(profession)),
     findings,
   };
@@ -306,6 +334,15 @@ export function renderDataQualityMarkdown(report: DataQualityReport): string {
     `- Known acquisition: ${report.canonicalMetadata.knownAcquisitionRecipes}/${report.recipes}`,
     `- Known availability: ${report.canonicalMetadata.knownAvailabilityRecipes}/${report.recipes}`,
     `- Specialization-gated recipes: ${report.canonicalMetadata.specializationRecipes}`,
+    "",
+    "## Supplemental evidence",
+    "",
+    `- Classic learning-rank fallbacks: ${report.evidenceMetadata.borrowedLearnSkillRecipes}`,
+    `- Recipes with source-kind evidence: ${report.evidenceMetadata.sourceKindRecipes}`,
+    `- Recipes with Forever-specific source-kind evidence: ${report.evidenceMetadata.foreverSourceKindRecipes}`,
+    `- Recipes with a teaching item: ${report.evidenceMetadata.teachingItemRecipes}`,
+    `- Recipes with an unanchored orange value: ${report.evidenceMetadata.ambiguousOrangeSkillRecipes}`,
+    `- Recipes with a classified output item: ${report.evidenceMetadata.classifiedOutputRecipes}`,
     "",
     "## Route coverage",
     "",

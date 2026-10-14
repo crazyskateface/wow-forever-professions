@@ -9,11 +9,16 @@ import {
 import {
   auctionPricesResponseSchema,
   professionFixtureSchema,
+  recipeChangesResponseSchema,
+  recipeChangesSummaryResponseSchema,
   routeOptimizationResponseSchema,
   shoppingListResponseSchema,
   type AuctionPriceObservation,
   type ProfessionFixture,
   type Recipe,
+  type RecipeChange,
+  type RecipeChangeCounts,
+  type RecipeChangeType,
   type RouteObjective,
   type RouteOptimizationResponse,
   type ShoppingListResponse,
@@ -27,9 +32,11 @@ import {
   getSkillUpProbability,
 } from "@forever-professions/domain";
 import { leatherworkingFixture } from "@forever-professions/fixtures";
+import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
+import { ItemIcon } from "./ItemIcon.js";
 
 type WorkspaceView = "calculator" | "planner";
-type RecipeListView = "guide" | "recipes";
+type RecipeListView = "guide" | "recipes" | "changes";
 type CatalogState = "loading" | "ready" | "fixture" | "fallback";
 
 const MIN_PROFESSION_SKILL = 0;
@@ -159,19 +166,6 @@ function scrollToWorkspaceOnMobile(): void {
   );
 }
 
-function catalogHeadline(state: CatalogState, recipeCount: number): string {
-  switch (state) {
-    case "loading":
-      return "Loading recipe catalog…";
-    case "fixture":
-      return "Illustrative fixture catalog";
-    case "fallback":
-      return "Using fallback catalog";
-    case "ready":
-      return `${recipeCount} recipes ready`;
-  }
-}
-
 function formatNumber(value: number): string {
   return Number.isFinite(value) ? value.toFixed(2) : "—";
 }
@@ -190,29 +184,10 @@ function unitPrice(observation: AuctionPriceObservation | undefined): number | u
   return observation.minimumBuyoutUnitPriceCopper ?? observation.medianUnitPriceCopper;
 }
 
-function initials(value: string): string {
-  return value
-    .split(/\s+/)
-    .map((word) => word[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
 function acquisitionLabel(recipe: Recipe): string {
   if (recipe.acquisition === "unknown") return "Source unknown";
   if (recipe.acquisition === "automatic") return "Learned automatically";
   return recipe.acquisition[0]!.toUpperCase() + recipe.acquisition.slice(1);
-}
-
-function guideMaterialSummary(recipe: Recipe, expectedCrafts: number): string {
-  if (recipe.reagents.length === 0) return "No reagents recorded";
-  const visible = recipe.reagents.slice(0, 2).map(
-    (reagent) =>
-      `~${Math.ceil(reagent.quantity * expectedCrafts).toLocaleString()} ${reagent.name}`,
-  );
-  const remaining = recipe.reagents.length - visible.length;
-  return `${visible.join(" · ")}${remaining > 0 ? ` · +${remaining} more` : ""}`;
 }
 
 interface RouteRequestOptions {
@@ -360,8 +335,6 @@ function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
 export function App() {
   const [profession, setProfession] = useState<ProfessionFixture>(leatherworkingFixture);
   const [catalogState, setCatalogState] = useState<CatalogState>("loading");
-  const [catalogError, setCatalogError] = useState<string>();
-  const [catalogReload, setCatalogReload] = useState(0);
   const [recipeId, setRecipeId] = useState(leatherworkingFixture.recipes[0]!.id);
   const recipe =
     profession.recipes.find(({ id }) => id === recipeId) ?? profession.recipes[0]!;
@@ -376,13 +349,19 @@ export function App() {
         candidate.provenance.verification.status,
       ).authoritative,
   ).length;
-  const [skill, setSkill] = useState(MIN_PROFESSION_SKILL);
+  const [skill, setSkill] = useState(DEFAULT_GUIDE_START_SKILL);
   const [prices, setPrices] = useState<readonly AuctionPriceObservation[]>([]);
   const [priceError, setPriceError] = useState<string>();
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("calculator");
   const [recipeListView, setRecipeListView] = useState<RecipeListView>("guide");
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const guideListRef = useRef<HTMLElement>(null);
+  const [recipeChanges, setRecipeChanges] = useState<readonly RecipeChange[]>([]);
+  const [changeSummary, setChangeSummary] = useState<RecipeChangeCounts>();
+  const [changesLoading, setChangesLoading] = useState(true);
+  const [changesError, setChangesError] = useState<string>();
+  const [changesReload, setChangesReload] = useState(0);
   const [knownRecipeSearch, setKnownRecipeSearch] = useState("");
   const [routeStartSkill, setRouteStartSkill] = useState(DEFAULT_GUIDE_START_SKILL);
   const [routeTargetSkill, setRouteTargetSkill] = useState(
@@ -404,7 +383,6 @@ export function App() {
   useEffect(() => {
     const controller = new AbortController();
     setCatalogState("loading");
-    setCatalogError(undefined);
     fetch(`/api/professions/${leatherworkingFixture.id}`, {
       signal: controller.signal,
     })
@@ -427,11 +405,6 @@ export function App() {
         setRecipeId(selectedRecipe.id);
         setKnownRecipeIds(loadedProfession.recipes.map(({ id }) => id));
         setCatalogState(usesFixtureCatalog ? "fixture" : "ready");
-        setCatalogError(
-          usesFixtureCatalog
-            ? "The API is serving the illustrative development fixture."
-            : undefined,
-        );
         writeRecipeUrl(selectedRecipe.id, "replace");
         if (requestedRecipeId === selectedRecipe.id) scrollToWorkspaceOnMobile();
       })
@@ -444,11 +417,10 @@ export function App() {
         setRecipeId(fallbackRecipe.id);
         setKnownRecipeIds(leatherworkingFixture.recipes.map(({ id }) => id));
         setCatalogState("fallback");
-        setCatalogError("The API catalog is unavailable, so the illustrative fixture is shown.");
         writeRecipeUrl(fallbackRecipe.id, "replace");
       });
     return () => controller.abort();
-  }, [catalogReload]);
+  }, []);
 
   useEffect(() => {
     if (catalogState === "loading") return;
@@ -479,6 +451,59 @@ export function App() {
   }, [catalogState, profession]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const query = new URLSearchParams({ comparison: "classic-forever" });
+    const unchangedQuery = new URLSearchParams({
+      comparison: "classic-forever",
+      changeType: "unchanged",
+    });
+    setChangesLoading(true);
+    setChangesError(undefined);
+
+    Promise.all([
+      fetch(`/api/recipe-changes?${query}`, { signal: controller.signal }),
+      fetch(`/api/recipe-changes?${unchangedQuery}`, { signal: controller.signal }),
+      fetch(`/api/recipe-changes/summary?${query}`, { signal: controller.signal }),
+    ])
+      .then(async ([changedResponse, unchangedResponse, summaryResponse]) => {
+        if (!changedResponse.ok || !unchangedResponse.ok || !summaryResponse.ok) {
+          const status = [changedResponse, unchangedResponse, summaryResponse]
+            .find((response) => !response.ok)?.status;
+          throw new Error(`HTTP ${status ?? "error"}`);
+        }
+        const [changed, unchanged, summary] = await Promise.all([
+          changedResponse.json().then((value) => recipeChangesResponseSchema.parse(value)),
+          unchangedResponse.json().then((value) => recipeChangesResponseSchema.parse(value)),
+          summaryResponse.json().then((value) =>
+            recipeChangesSummaryResponseSchema.parse(value),
+          ),
+        ]);
+        const changesByIdentity = new Map<string, RecipeChange>();
+        for (const change of [...changed.changes, ...unchanged.changes]) {
+          changesByIdentity.set(
+            `${change.identity.professionId}:${change.identity.spellId}`,
+            change,
+          );
+        }
+        setRecipeChanges([...changesByIdentity.values()]);
+        setChangeSummary(summary.summary);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setRecipeChanges([]);
+        setChangeSummary(undefined);
+        setChangesError(
+          "Import a baseline and target build comparison to populate this view. The rest of the profession tools remain available.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setChangesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [changesReload]);
+
+  useEffect(() => {
     function selectRecipeFromHistory(): void {
       const requestedRecipeId = recipeIdFromUrl();
       const requestedRecipe = profession.recipes.find(
@@ -494,8 +519,10 @@ export function App() {
   }, [profession]);
 
   useEffect(() => {
-    document.title = `${recipe.name} · Forever Professions`;
-  }, [recipe.name]);
+    document.title = recipeListView === "changes"
+      ? "Forever Changes · Forever Professions"
+      : `${recipe.name} · Forever Professions`;
+  }, [recipe.name, recipeListView]);
 
   useEffect(() => {
     function focusSearch(event: KeyboardEvent): void {
@@ -577,20 +604,96 @@ export function App() {
     );
     return [...matches].sort((left, right) => left.name.localeCompare(right.name));
   }, [profession.recipes, search]);
+  const recipeChangeTypes = useMemo(() => {
+    const changes = new Map<string, RecipeChangeType>();
+    for (const change of recipeChanges) {
+      changes.set(
+        `${change.identity.professionId}:${change.identity.spellId}`,
+        change.changeType,
+      );
+    }
+    return changes;
+  }, [recipeChanges]);
+  function getRecipeChangeType(candidate: Recipe): RecipeChangeType | undefined {
+    return candidate.spellId === null
+      ? undefined
+      : recipeChangeTypes.get(`${profession.id}:${candidate.spellId}`);
+  }
   const selectedRecipeIndex = filteredRecipes.findIndex(({ id }) => id === recipe.id);
   const guideRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     return (routeResponse?.result.segments ?? []).flatMap((segment) => {
       const guideRecipe = profession.recipes.find(({ id }) => id === segment.recipeId);
       if (guideRecipe === undefined) return [];
+      const alternatives = segment.alternatives.flatMap((alternative) => {
+        const alternativeRecipe = profession.recipes.find(
+          ({ id }) => id === alternative.recipeId,
+        );
+        return alternativeRecipe === undefined
+          ? []
+          : [{ alternative, recipe: alternativeRecipe }];
+      });
       const matches =
         query.length === 0 ||
         guideRecipe.name.toLowerCase().includes(query) ||
         guideRecipe.id.toLowerCase().includes(query) ||
-        guideRecipe.reagents.some(({ name }) => name.toLowerCase().includes(query));
-      return matches ? [{ segment, recipe: guideRecipe }] : [];
+        guideRecipe.reagents.some(({ name }) => name.toLowerCase().includes(query)) ||
+        alternatives.some(
+          ({ recipe: alternativeRecipe }) =>
+            alternativeRecipe.name.toLowerCase().includes(query) ||
+            alternativeRecipe.id.toLowerCase().includes(query) ||
+            alternativeRecipe.reagents.some(({ name }) =>
+              name.toLowerCase().includes(query),
+            ),
+        );
+      return matches ? [{ alternatives, segment, recipe: guideRecipe }] : [];
     });
   }, [profession.recipes, routeResponse, search]);
+  const guideStartSkill = routeResponse?.result.startSkill ?? routeStartSkill;
+  const guideTargetSkill = routeResponse?.result.targetSkill ?? routeTargetSkill;
+  const currentGuideSkill = Math.min(
+    guideTargetSkill,
+    Math.max(guideStartSkill, skill),
+  );
+  const recipeRequiredSkill = recipe.learnSkill ?? recipe.thresholds.orange;
+  const recipeIsAboveCurrentSkill = skill < recipeRequiredSkill;
+
+  useEffect(() => {
+    if (
+      recipeListView !== "guide" ||
+      guideRows.length === 0 ||
+      search.trim().length > 0
+    ) {
+      return;
+    }
+
+    const containingIndex = guideRows.findIndex(
+      ({ segment }) =>
+        skill >= segment.startSkill && skill < segment.endSkill,
+    );
+    const nextIndex = guideRows.findIndex(
+      ({ segment }) => segment.startSkill > skill,
+    );
+    const selectedIndex =
+      containingIndex >= 0
+        ? containingIndex
+        : nextIndex >= 0
+          ? nextIndex
+          : guideRows.length - 1;
+    const list = guideListRef.current;
+    const entry = list?.querySelector<HTMLElement>(
+      `[data-guide-index="${selectedIndex}"]`,
+    );
+    if (list === null || entry === null || entry === undefined) return;
+
+    const listTop = list.getBoundingClientRect().top;
+    const entryTop = entry.getBoundingClientRect().top;
+    list.scrollTo({
+      top: Math.max(0, list.scrollTop + entryTop - listTop),
+      behavior: "auto",
+    });
+  }, [guideRows, recipeListView, search, skill]);
+
   const knownRecipeSet = useMemo(() => new Set(knownRecipeIds), [knownRecipeIds]);
   const filteredKnownRecipes = useMemo(() => {
     const query = knownRecipeSearch.trim().toLowerCase();
@@ -692,11 +795,10 @@ export function App() {
     }
   }
 
-  function openRouteRecipe(nextRecipeId: string, routeSkill: number): void {
+  function openRouteRecipe(nextRecipeId: string): void {
     const nextRecipe = profession.recipes.find(({ id }) => id === nextRecipeId);
     if (nextRecipe === undefined) return;
     setRecipeId(nextRecipe.id);
-    setSkill(Math.min(MAX_PROFESSION_SKILL, Math.max(MIN_PROFESSION_SKILL, routeSkill)));
     setWorkspaceView("calculator");
     writeRecipeUrl(nextRecipe.id, "push");
     scrollToWorkspaceOnMobile();
@@ -711,7 +813,7 @@ export function App() {
         </a>
         <label className="global-search">
           <span className="search-icon" aria-hidden="true">⌕</span>
-          <input aria-label="Search recipes" onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${profession.recipes.length} recipes…`} ref={searchRef} type="search" value={search} />
+          <input aria-label="Search recipes" onChange={(event) => setSearch(event.target.value)} placeholder={recipeListView === "changes" ? "Search changed recipes, fields, or spell IDs…" : `Search ${profession.recipes.length} recipes…`} ref={searchRef} type="search" value={search} />
           <kbd>shift + f</kbd>
         </label>
         <button className="market-picker" type="button">
@@ -729,41 +831,25 @@ export function App() {
             <span aria-hidden="true">⌄</span>
           </div>
 
-          <div
-            aria-live="polite"
-            className={`catalog-state catalog-${catalogState}`}
-          >
-            <span className="catalog-state-dot" aria-hidden="true" />
-            <span>
-              <strong>{catalogHeadline(catalogState, profession.recipes.length)}</strong>
-              <small>
-                {catalogState === "fallback" || catalogState === "fixture"
-                  ? catalogError
-                  : `Forever build ${profession.build}`}
-              </small>
-            </span>
-            {catalogState === "fallback" ? (
-              <button onClick={() => setCatalogReload((value) => value + 1)} type="button">
-                Retry
-              </button>
-            ) : null}
-          </div>
-
-          {recipeListView === "guide" ? (
-            <div className="guide-range-overview">
-              <div>
-                <span>Active leveling route</span>
-                <strong>
-                  {routeResponse?.result.startSkill ?? routeStartSkill}
-                  <i aria-hidden="true">→</i>
-                  {routeResponse?.result.targetSkill ?? routeTargetSkill}
-                </strong>
+          {recipeListView === "guide" || recipeListView === "changes" ? (
+            <div className="guide-skill-control">
+              <div className="rail-label-row">
+                <span>Current skill</span>
+                <span>
+                  {recipeListView === "guide" ? currentGuideSkill : skill} / {recipeListView === "guide" ? guideTargetSkill : MAX_PROFESSION_SKILL}
+                </span>
               </div>
-              <button onClick={() => setWorkspaceView("planner")} type="button">
-                Adjust
-              </button>
+              <input
+                aria-label={recipeListView === "guide" ? "Current leveling skill" : "Current skill for changed recipes"}
+                max={recipeListView === "guide" ? guideTargetSkill : MAX_PROFESSION_SKILL}
+                min={recipeListView === "guide" ? guideStartSkill : MIN_PROFESSION_SKILL}
+                onChange={(event) => setSkill(Number(event.target.value))}
+                step={1}
+                type="range"
+                value={recipeListView === "guide" ? currentGuideSkill : skill}
+              />
             </div>
-          ) : (
+          ) : recipeListView === "recipes" ? (
             <div className="rail-skill">
               <div className="rail-label-row"><span>Calculator skill</span><span>{skill} / {MAX_PROFESSION_SKILL}</span></div>
               <input
@@ -781,11 +867,12 @@ export function App() {
                 <button aria-label="Increase skill" onClick={() => nudgeSkill(1)} type="button">+</button>
               </div>
             </div>
-          )}
+          ) : null}
 
           <div className="rail-tabs" role="tablist" aria-label="Recipe views">
             <button aria-selected={recipeListView === "guide"} className={recipeListView === "guide" ? "active" : ""} onClick={() => setRecipeListView("guide")} role="tab" type="button">Leveling guide</button>
             <button aria-selected={recipeListView === "recipes"} className={recipeListView === "recipes" ? "active" : ""} onClick={() => setRecipeListView("recipes")} role="tab" type="button">All recipes</button>
+            <button aria-selected={recipeListView === "changes"} className={recipeListView === "changes" ? "active" : ""} onClick={() => setRecipeListView("changes")} role="tab" type="button">Forever Changes</button>
           </div>
 
           <div className="recipe-list-summary">
@@ -794,13 +881,21 @@ export function App() {
                 ? routeLoading && routeResponse === undefined
                   ? "Optimizing route…"
                   : `${guideRows.length} ${guideRows.length === 1 ? "guide step" : "guide steps"}`
-                : `${filteredRecipes.length} ${filteredRecipes.length === 1 ? "recipe" : "recipes"}`}
+                : recipeListView === "recipes"
+                  ? `${filteredRecipes.length} ${filteredRecipes.length === 1 ? "recipe" : "recipes"}`
+                  : changesLoading
+                    ? "Loading comparison…"
+                    : `${recipeChanges.filter(({ changeType }) => changeType !== "UNCHANGED").length} changed recipes`}
             </span>
             {search ? <button onClick={() => setSearch("")} type="button">Clear search</button> : null}
           </div>
 
           {recipeListView === "guide" ? (
-            <nav aria-label="Optimized leveling guide" className="guide-list">
+            <nav
+              aria-label="Optimized leveling guide"
+              className="guide-list"
+              ref={guideListRef}
+            >
               {routeLoading && routeResponse === undefined ? (
                 <div className="guide-loading" role="status">
                   <span aria-hidden="true" />
@@ -826,46 +921,68 @@ export function App() {
                   Route stops at skill {routeResponse.result.blockedAtSkill}. Open the planner to review the missing coverage.
                 </div>
               ) : null}
-              {guideRows.map(({ recipe: guideRecipe, segment }, index) => {
+              {guideRows.map(({ alternatives, recipe: guideRecipe, segment }, index) => {
                 const active =
                   guideRecipe.id === recipe.id &&
                   skill >= segment.startSkill &&
                   skill < segment.endSkill;
                 return (
-                  <button
-                    aria-current={active ? "step" : undefined}
-                    className={active ? "guide-step active" : "guide-step"}
+                  <div
+                    className="guide-entry"
+                    data-guide-index={index}
                     key={`${segment.recipeId}-${segment.startSkill}`}
-                    onClick={() => openRouteRecipe(segment.recipeId, segment.startSkill)}
-                    type="button"
                   >
-                    <span className="guide-step-number">{index + 1}</span>
-                    <span className="guide-step-range">
-                      <strong>{segment.startSkill}</strong>
-                      <i aria-hidden="true">→</i>
-                      <strong>{segment.endSkill}</strong>
-                    </span>
-                    <span className="guide-step-title">
-                      <span className="guide-item-icon" aria-hidden="true">{initials(guideRecipe.name)}</span>
-                      <span>
-                        <strong>{guideRecipe.name}</strong>
-                        <small className={`guide-source source-${guideRecipe.acquisition}`}>
-                          {acquisitionLabel(guideRecipe)}
-                        </small>
+                    <div className="guide-range-divider">
+                      <span>{segment.startSkill} – {segment.endSkill}</span>
+                    </div>
+                    <button
+                      aria-current={active ? "step" : undefined}
+                      className={active ? "guide-step active" : "guide-step"}
+                      onClick={() => openRouteRecipe(segment.recipeId)}
+                      type="button"
+                    >
+                      <span className="guide-step-number">{index + 1}</span>
+                      <span className="guide-step-title">
+                        <ItemIcon className="guide-item-icon" gameItemId={guideRecipe.outputs[0]?.gameItemId} name={guideRecipe.name} />
+                        <span>
+                          <strong>{guideRecipe.name}</strong>
+                          <small className={`guide-source source-${guideRecipe.acquisition}`}>
+                            {acquisitionLabel(guideRecipe)}
+                          </small>
+                          {getRecipeChangeType(guideRecipe) ? (
+                            <RecipeChangeBadge changeType={getRecipeChangeType(guideRecipe)!} />
+                          ) : null}
+                        </span>
                       </span>
-                    </span>
-                    <span className="guide-step-metrics">
-                      <span><strong>~{Math.ceil(segment.expectedCrafts).toLocaleString()}</strong> crafts</span>
-                      <span>{segment.expectedCostCopper === undefined ? "Cost unavailable" : formatCopper(segment.expectedCostCopper)}</span>
-                    </span>
-                    <small className="guide-materials">
-                      {guideMaterialSummary(guideRecipe, segment.expectedCrafts)}
-                    </small>
-                  </button>
+                    </button>
+                    {alternatives.length > 0 ? (
+                      <div className="guide-alternatives">
+                        <span>Alternatives</span>
+                        {alternatives.map(({ alternative, recipe: alternativeRecipe }) => {
+                          const alternativeActive =
+                            alternativeRecipe.id === recipe.id &&
+                            skill >= alternative.startSkill &&
+                            skill < alternative.endSkill;
+                          return (
+                            <button
+                              aria-current={alternativeActive ? "step" : undefined}
+                              className={alternativeActive ? "guide-alternative active" : "guide-alternative"}
+                              key={`${alternative.recipeId}-${alternative.startSkill}`}
+                              onClick={() => openRouteRecipe(alternative.recipeId)}
+                              type="button"
+                            >
+                              <span>{alternativeRecipe.name}</span>
+                              <small>{alternative.startSkill} – {alternative.endSkill}</small>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                 );
               })}
             </nav>
-          ) : (
+          ) : recipeListView === "recipes" ? (
             <VirtualList
               ariaLabel="All recipes"
               className="recipe-list"
@@ -876,8 +993,8 @@ export function App() {
                 <div className="recipe-group">
                   <button aria-current={candidate.id === recipe.id ? "true" : undefined} className={candidate.id === recipe.id ? "recipe active" : "recipe"} onClick={() => selectRecipe(candidate)} type="button">
                     <span className={`recipe-stripe stripe-${index}`} aria-hidden="true" />
-                    <span className={`item-icon item-${index}`} aria-hidden="true">{initials(candidate.name)}</span>
-                    <span className="recipe-copy"><strong>{candidate.name}</strong><small>{candidate.reagents.length} reagents · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small></span>
+                    <ItemIcon className={`item-icon item-${index}`} gameItemId={candidate.outputs[0]?.gameItemId} name={candidate.name} />
+                    <span className="recipe-copy"><strong>{candidate.name}</strong><small>{candidate.reagents.length} reagents · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>{getRecipeChangeType(candidate) ? <RecipeChangeBadge changeType={getRecipeChangeType(candidate)!} /> : null}</span>
                     <span className={`recipe-level ${getRecipeDifficulty(skill, candidate.thresholds)}`}>
                       {candidate.thresholds.orange}
                     </span>
@@ -888,11 +1005,26 @@ export function App() {
               rowHeight={RECIPE_ROW_HEIGHT}
               selectedIndex={selectedRecipeIndex}
             />
+          ) : (
+            <div className="changes-rail-overview">
+              <span className="changes-rail-mark" aria-hidden="true">Δ</span>
+              <strong>Build-level recipe history</strong>
+              <p>Filter and inspect additions, removals, and exact field changes in the workspace.</p>
+              {changeSummary ? (
+                <dl>
+                  <div><dt>New</dt><dd>{changeSummary.new}</dd></div>
+                  <div><dt>Updated</dt><dd>{changeSummary.updated}</dd></div>
+                  <div><dt>Removed</dt><dd>{changeSummary.removed}</dd></div>
+                </dl>
+              ) : null}
+            </div>
           )}
 
           <div className="rail-footer">
             {recipeListView === "guide" && routeResponse ? (
               <><span>~{Math.ceil(routeResponse.result.totals.expectedCrafts).toLocaleString()} crafts</span><strong>{routeResponse.result.segments.length} steps</strong></>
+            ) : recipeListView === "changes" ? (
+              <><span>Comparison data</span><strong>{changesError ? "Not loaded" : "Build generated"}</strong></>
             ) : (
               <><span>Forever build</span><strong>{profession.build}</strong></>
             )}
@@ -900,16 +1032,28 @@ export function App() {
         </aside>
 
         <main className="main-workspace">
-          <nav className="workspace-nav" aria-label="Workspace views">
-            <button className={workspaceView === "calculator" ? "active" : ""} onClick={() => setWorkspaceView("calculator")} type="button">Recipe calculator</button>
-            <button className={workspaceView === "planner" ? "active" : ""} onClick={() => setWorkspaceView("planner")} type="button">Leveling route</button>
-          </nav>
+          {recipeListView === "changes" ? null : (
+            <nav className="workspace-nav" aria-label="Workspace views">
+              <button className={workspaceView === "calculator" ? "active" : ""} onClick={() => setWorkspaceView("calculator")} type="button">Recipe calculator</button>
+              <button className={workspaceView === "planner" ? "active" : ""} onClick={() => setWorkspaceView("planner")} type="button">Leveling route</button>
+            </nav>
+          )}
 
-          {workspaceView === "calculator" ? (
+          {recipeListView === "changes" ? (
+            <ForeverChanges
+              changes={recipeChanges}
+              currentSkill={skill}
+              error={changesError}
+              loading={changesLoading}
+              onRetry={() => setChangesReload((value) => value + 1)}
+              search={search}
+              summary={changeSummary}
+            />
+          ) : workspaceView === "calculator" ? (
             <>
               <section className="recipe-hero" aria-labelledby="recipe-title">
                 <div className="hero-title-row">
-                  <span className="hero-item-icon" aria-hidden="true">{initials(recipe.name)}</span>
+                  <ItemIcon className="hero-item-icon" eager gameItemId={recipe.outputs[0]?.gameItemId} name={recipe.name} />
                   <div><div className="breadcrumb">{profession.name} <span>/</span> Recipe</div><h1 id="recipe-title">{recipe.name}</h1></div>
                 </div>
                 <div className="hero-actions">
@@ -923,6 +1067,19 @@ export function App() {
                   <button onClick={() => setWorkspaceView("planner")} type="button">Use in route</button>
                 </div>
               </section>
+
+              {recipeIsAboveCurrentSkill ? (
+                <div className="skill-requirement-warning" role="status">
+                  <span aria-hidden="true">!</span>
+                  <div>
+                    <strong>Not available at your current skill</strong>
+                    <p>
+                      {recipe.name} requires {profession.name} {recipeRequiredSkill}. Your
+                      current skill is {skill}.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               <section className="calculator-card" aria-labelledby="calculator-title">
                 <div className="section-title-row">
@@ -958,7 +1115,7 @@ export function App() {
                     const expectedQuantity = getExpectedReagentQuantity(reagent.quantity, calculation.probability);
                     return (
                       <div className="material-row" key={reagent.itemId} role="row">
-                        <span className="material-name"><span className={`item-icon reagent-${index}`} aria-hidden="true">{initials(reagent.name)}</span><span><strong>{reagent.name}</strong><small>Item {reagent.gameItemId ?? "—"}</small></span></span>
+                        <span className="material-name"><ItemIcon className={`item-icon reagent-${index}`} gameItemId={reagent.gameItemId} name={reagent.name} /><span><strong>{reagent.name}</strong><small>Item {reagent.gameItemId ?? "—"}</small></span></span>
                         <strong>{formatNumber(expectedQuantity)}</strong>
                         <span className="source-pill"><i aria-hidden="true" /> Auction house</span>
                         <strong className="material-cost">{price === undefined ? "Unavailable" : formatCopper(price * expectedQuantity)}</strong>
@@ -1061,7 +1218,7 @@ export function App() {
                 <div className="route-result" aria-live="polite">
                   <div className="route-summary"><article><span>Expected crafts</span><strong>{formatNumber(routeResponse.result.totals.expectedCrafts)}</strong></article><article><span>Material units</span><strong>{formatNumber(routeResponse.result.totals.expectedMaterials)}</strong></article><article><span>Expected cost</span><strong>{routeResponse.result.totals.expectedCostCopper === undefined ? "—" : formatCopper(routeResponse.result.totals.expectedCostCopper)}</strong></article></div>
                   {routeResponse.result.status === "blocked" ? <p className="route-warning">Route blocked at skill {routeResponse.result.blockedAtSkill}: {routeResponse.result.reason === "missing-price-data" ? "one or more required prices are unavailable." : "no eligible recipe covers this skill."}</p> : null}
-                  <ol className="route-segments">{routeResponse.result.segments.map((segment) => <li key={`${segment.recipeId}-${segment.startSkill}`}><span className="route-range">{segment.startSkill} → {segment.endSkill}</span><div><strong>{segment.recipeName}</strong><small>{formatNumber(segment.expectedCrafts)} crafts · {formatNumber(segment.expectedMaterials)} materials</small></div><button onClick={() => openRouteRecipe(segment.recipeId, segment.startSkill)} type="button">Open recipe</button></li>)}</ol>
+                  <ol className="route-segments">{routeResponse.result.segments.map((segment) => <li key={`${segment.recipeId}-${segment.startSkill}`}><span className="route-range">{segment.startSkill} → {segment.endSkill}</span><div><strong>{segment.recipeName}</strong><small>{formatNumber(segment.expectedCrafts)} crafts · {formatNumber(segment.expectedMaterials)} materials</small></div><button onClick={() => openRouteRecipe(segment.recipeId)} type="button">Open recipe</button></li>)}</ol>
                   {routeResponse.attribution ? <a className="attribution" href={routeResponse.attribution.url} rel="noreferrer" target="_blank">{routeResponse.attribution.text}</a> : null}
 
                   <section className="shopping-list" aria-labelledby="shopping-title">

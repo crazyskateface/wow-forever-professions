@@ -1,8 +1,9 @@
 import { Pool } from "pg";
 import { SqlRecipeCatalogReader, type RecipeCatalogReader } from "./catalog.js";
+import { SqlRecipeChangeReader, type RecipeChangeReader } from "./recipe-change-store.js";
 import type { SqlExecutor, SqlQueryResult } from "./writer.js";
 
-export interface ClosableRecipeCatalogReader extends RecipeCatalogReader {
+export interface ClosableRecipeCatalogReader extends RecipeCatalogReader, RecipeChangeReader {
   end(): Promise<void>;
 }
 
@@ -35,11 +36,14 @@ export function createPostgresRecipeCatalogReader(
     },
   };
   const catalog = new SqlRecipeCatalogReader(database);
+  const changes = new SqlRecipeChangeReader(database);
 
   return {
     listProfessions: () => catalog.listProfessions(),
     getProfession: (professionId) => catalog.getProfession(professionId),
     getRecipe: (recipeId) => catalog.getRecipe(recipeId),
+    listChanges: (filter) => changes.listChanges(filter),
+    getSummary: (filter) => changes.getSummary(filter),
     end: () => pool.end(),
   };
 }

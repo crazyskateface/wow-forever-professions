@@ -35,6 +35,7 @@ const server = createServer(async (request, response) => {
     Object.fromEntries(url.searchParams),
     {
       ...(localCatalog === undefined ? {} : { catalog: localCatalog }),
+      ...(localCatalog === undefined ? {} : { changes: localCatalog }),
       pricing: localPricingReader,
     },
     await readJsonBody(request),

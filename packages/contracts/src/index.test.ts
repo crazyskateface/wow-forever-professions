@@ -103,7 +103,21 @@ describe("shared contracts", () => {
                 thresholds: { orange: 150, yellow: 170, green: 180, gray: 190 },
                 reagents: [
                   {
-                    item: { id: "heavy-leather", gameId: 4234, name: "Heavy Leather" },
+                    item: {
+                      id: "pristine-leather",
+                      gameId: 249427,
+                      name: "Pristine Leather",
+                      classification: {
+                        id: 14483,
+                        label: "Scarce",
+                        color: -7885825,
+                        source: {
+                          product: "wow_classic_beta",
+                          build: "1.60.1.70374",
+                          locale: "enUS",
+                        },
+                      },
+                    },
                     quantity: 5,
                   },
                 ],

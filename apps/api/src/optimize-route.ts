@@ -27,6 +27,24 @@ function unitPrice(observation: PriceObservation | undefined): number | undefine
   return observation.minimumBuyoutUnitPriceCopper ?? observation.medianUnitPriceCopper;
 }
 
+const SCARCE_ITEM_CLASSIFICATION = "scarce";
+
+export function getScarceLevelingReagentItemIds(
+  profession: ProfessionFixture,
+): readonly string[] {
+  return [
+    ...new Set(
+      profession.recipes.flatMap(({ reagents }) =>
+        reagents.flatMap(({ itemId, classification }) =>
+          classification?.label.trim().toLowerCase() === SCARCE_ITEM_CLASSIFICATION
+            ? [itemId]
+            : [],
+        ),
+      ),
+    ),
+  ];
+}
+
 export async function optimizeFixtureRoute(
   request: RouteOptimizationRequest,
   profession: ProfessionFixture,
@@ -136,6 +154,7 @@ export async function optimizeFixtureRoute(
       targetSkill: request.targetSkill,
       objective: request.objective,
       recipes,
+      scarceItemIds: getScarceLevelingReagentItemIds(profession),
       ...(constraints === undefined ? {} : { constraints }),
       ...(request.policy === undefined ? {} : { policy: request.policy }),
     }),

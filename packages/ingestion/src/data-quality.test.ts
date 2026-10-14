@@ -20,6 +20,11 @@ describe("imported build data-quality reporting", () => {
               metadata: {
                 spellId: 1,
                 learnSkill: null,
+                borrowedLearnSkill: 1,
+                sourceKinds: ["trainer"],
+                sourceDataOrigin: "classic-borrowed",
+                teachingItemId: 4,
+                orangeSkillKnown: false,
                 acquisition: "unknown",
                 faction: "unknown",
                 specializationSpellId: null,
@@ -35,7 +40,14 @@ describe("imported build data-quality reporting", () => {
               ],
               outputs: [
                 {
-                  item: { id: "item-3", gameId: 3, name: "Result" },
+                  item: {
+                    id: "item-3",
+                    gameId: 3,
+                    name: "Result",
+                    itemClassId: 4,
+                    itemSubClassId: 2,
+                    inventoryType: "5",
+                  },
                   minimumQuantity: 1,
                   maximumQuantity: 1,
                 },
@@ -63,6 +75,14 @@ describe("imported build data-quality reporting", () => {
         knownAvailabilityRecipes: 0,
         specializationRecipes: 0,
       },
+      evidenceMetadata: {
+        borrowedLearnSkillRecipes: 1,
+        sourceKindRecipes: 1,
+        foreverSourceKindRecipes: 0,
+        teachingItemRecipes: 1,
+        ambiguousOrangeSkillRecipes: 1,
+        classifiedOutputRecipes: 1,
+      },
     });
     expect(report.findings.map(({ code }) => code)).toEqual([
       "unverified-recipe",
@@ -71,7 +91,7 @@ describe("imported build data-quality reporting", () => {
       "unknown-availability",
       "unknown-faction",
       "missing-item-name",
-      "borrowed-required-skill-omitted",
+      "borrowed-required-skill-fallback",
       "provisional-output-quantity",
     ]);
     expect(renderDataQualityMarkdown(report)).toContain(

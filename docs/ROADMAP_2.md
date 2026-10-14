@@ -1,5 +1,11 @@
 # Forever Professions — Roadmap v2
 
+Current implementation note (October 14, 2026): the canonical data slice, per-skill
+cost model, stateful route optimizer, practical route stabilization, guide-first UI,
+shopping planner, data-quality disclosures, and Classic Era → Forever Changes feature
+are implemented for Leatherworking. Use `README.md` and `docs/DEVELOPMENT.md` for the
+current system; this document remains the product-direction roadmap.
+
 ## Product Direction Reset
 
 Forever Professions should not primarily be a searchable list of profession recipes.

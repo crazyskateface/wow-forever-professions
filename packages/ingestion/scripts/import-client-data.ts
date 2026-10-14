@@ -5,7 +5,8 @@ import {
   createAuroraDsqlTransactionRunner,
   createS3RawDatasetStore,
   ingestBuildDataset,
-  normalizeScriptArguments,
+  normalizeBuildDataset,
+  parseBuildImportScriptArguments,
   parseRawDatasetBytes,
 } from "../src/index.js";
 
@@ -19,10 +20,9 @@ function requiredEnvironment(name: string): string {
 }
 
 async function main(): Promise<void> {
-  const [inputPath] = normalizeScriptArguments(process.argv.slice(2));
-  if (!inputPath) {
-    throw new Error("Pass the path to an imported client-data JSON file.");
-  }
+  const { inputPath, compareAgainst } = parseBuildImportScriptArguments(
+    process.argv.slice(2),
+  );
 
   const endpoint = requiredEnvironment("DSQL_ENDPOINT");
   const region = requiredEnvironment("AWS_REGION");
@@ -33,6 +33,11 @@ async function main(): Promise<void> {
 
   const absoluteInputPath = resolve(inputPath);
   const rawBytes = await readFile(absoluteInputPath);
+  const comparisonBase = compareAgainst
+    ? normalizeBuildDataset(
+        parseRawDatasetBytes(await readFile(resolve(compareAgainst.path))),
+      )
+    : undefined;
   const imported = parseRawDatasetBytes(rawBytes);
   if (!imported.sources.some(({ kind }) => kind === "client-data")) {
     throw new Error("A client-data import must declare at least one client-data source.");
@@ -59,7 +64,18 @@ async function main(): Promise<void> {
   });
 
   try {
-    const result = await ingestBuildDataset({ rawBytes, rawStore, transactionRunner: writer });
+    const result = await ingestBuildDataset({
+      rawBytes,
+      rawStore,
+      transactionRunner: writer,
+      ...(comparisonBase === undefined || compareAgainst === undefined
+        ? {}
+        : {
+            compareAgainst: [
+              { build: comparisonBase, comparisonType: compareAgainst.comparisonType },
+            ],
+          }),
+    });
     process.stdout.write(
       `${JSON.stringify(
         {
@@ -68,6 +84,7 @@ async function main(): Promise<void> {
           rawObjectKey: result.rawObjectKey,
           rawObjectStatus: result.rawObjectStatus,
           batches: result.batches,
+          comparisons: result.comparisons,
         },
         null,
         2,

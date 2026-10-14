@@ -5,13 +5,22 @@ import {
   healthResponseSchema,
   professionFixtureSchema,
   professionsResponseSchema,
+  recipeChangesQuerySchema,
+  recipeChangesResponseSchema,
+  recipeChangesSummaryQuerySchema,
+  recipeChangesSummaryResponseSchema,
   recipeSchema,
   recipesResponseSchema,
   routeOptimizationRequestSchema,
   shoppingListRequestSchema,
 } from "@forever-professions/contracts";
 import { professionFixtures } from "@forever-professions/fixtures";
-import type { RecipeCatalogReader } from "@forever-professions/ingestion";
+import type {
+  RecipeCatalogReader,
+  RecipeChangeReader,
+  RecipeChangeType,
+  RecipeComparisonType,
+} from "@forever-professions/ingestion";
 import type { CurrentAuctionPriceReader } from "@forever-professions/pricing";
 import {
   optimizeFixtureRoute,
@@ -42,7 +51,23 @@ function json(statusCode: number, value: unknown): ApiResponse {
 
 export interface ApiDependencies {
   readonly catalog?: RecipeCatalogReader;
+  readonly changes?: RecipeChangeReader;
   readonly pricing?: CurrentAuctionPriceReader;
+}
+
+function optionalQueryValue(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function comparisonType(value: "classic-forever" | "forever-build"): RecipeComparisonType {
+  return value === "classic-forever" ? "CLASSIC_TO_FOREVER" : "FOREVER_BUILD_TO_BUILD";
+}
+
+function changeType(
+  value: "new" | "updated" | "removed" | "unchanged",
+): RecipeChangeType {
+  return value.toUpperCase() as RecipeChangeType;
 }
 
 async function findProfession(
@@ -143,6 +168,62 @@ export async function routeRequest(
       return json(200, professionsResponseSchema.parse(professions));
     } catch {
       return json(503, { error: "Recipe catalog is temporarily unavailable." });
+    }
+  }
+
+  if (normalizedPath === "/recipe-changes") {
+    const request = recipeChangesQuerySchema.safeParse({
+      comparison: optionalQueryValue(query.comparison),
+      profession: optionalQueryValue(query.profession),
+      changeType: optionalQueryValue(query.changeType),
+      search: optionalQueryValue(query.search),
+    });
+    if (!request.success) {
+      return json(400, { error: "Invalid recipe-change filters." });
+    }
+    if (!dependencies.changes) {
+      return json(503, { error: "Recipe changes are not configured." });
+    }
+    try {
+      const response = await dependencies.changes.listChanges({
+        comparisonType: comparisonType(request.data.comparison),
+        ...(request.data.profession === undefined
+          ? {}
+          : { professionId: request.data.profession }),
+        ...(request.data.changeType === undefined
+          ? {}
+          : { changeType: changeType(request.data.changeType) }),
+        ...(request.data.search === undefined ? {} : { search: request.data.search }),
+      });
+      if (!response) return json(404, { error: "Recipe comparison not found." });
+      return json(200, recipeChangesResponseSchema.parse(response));
+    } catch {
+      return json(503, { error: "Recipe changes are temporarily unavailable." });
+    }
+  }
+
+  if (normalizedPath === "/recipe-changes/summary") {
+    const request = recipeChangesSummaryQuerySchema.safeParse({
+      comparison: optionalQueryValue(query.comparison),
+      profession: optionalQueryValue(query.profession),
+    });
+    if (!request.success) {
+      return json(400, { error: "Invalid recipe-change summary filters." });
+    }
+    if (!dependencies.changes) {
+      return json(503, { error: "Recipe changes are not configured." });
+    }
+    try {
+      const response = await dependencies.changes.getSummary({
+        comparisonType: comparisonType(request.data.comparison),
+        ...(request.data.profession === undefined
+          ? {}
+          : { professionId: request.data.profession }),
+      });
+      if (!response) return json(404, { error: "Recipe comparison not found." });
+      return json(200, recipeChangesSummaryResponseSchema.parse(response));
+    } catch {
+      return json(503, { error: "Recipe changes are temporarily unavailable." });
     }
   }
 

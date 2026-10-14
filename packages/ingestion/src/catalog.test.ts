@@ -50,6 +50,12 @@ describe("SQL recipe catalog", () => {
               game_id: 4234,
               name: "Heavy Leather",
               quantity: 5,
+              classification_id: 14483,
+              classification_label: "Scarce",
+              classification_color: -7885825,
+              classification_source_product: "wow_classic_beta",
+              classification_source_build_id: "1.60.1.70374",
+              classification_source_locale: "enUS",
             },
           ]);
         }
@@ -81,6 +87,14 @@ describe("SQL recipe catalog", () => {
           buildId: "1.60.1.69977",
           learnSkill: null,
           availability: "unknown",
+          reagents: [{
+            itemId: "item-4234",
+            classification: {
+              id: 14483,
+              label: "Scarce",
+              source: { build: "1.60.1.70374" },
+            },
+          }],
           provenance: {
             source: "client-data",
             verification: { status: "unverified" },

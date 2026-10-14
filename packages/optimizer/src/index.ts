@@ -78,6 +78,7 @@ export interface OptimizeRouteInput {
   readonly targetSkill: number;
   readonly objective: RouteObjective;
   readonly recipes: readonly RouteRecipe[];
+  readonly scarceItemIds?: readonly string[];
   readonly constraints?: RouteConstraints;
   readonly policy?: RouteOptimizationPolicy;
 }
@@ -92,7 +93,7 @@ export interface RouteSkillStep {
   readonly expectedCostCopper?: number;
 }
 
-export interface RouteSegment {
+export interface RouteAlternative {
   readonly recipeId: string;
   readonly recipeName: string;
   readonly startSkill: number;
@@ -101,6 +102,10 @@ export interface RouteSegment {
   readonly expectedCrafts: number;
   readonly expectedMaterials: number;
   readonly expectedCostCopper?: number;
+}
+
+export interface RouteSegment extends RouteAlternative {
+  readonly alternatives: readonly RouteAlternative[];
 }
 
 export interface RouteTotals {
@@ -135,11 +140,18 @@ interface Candidate {
   readonly recipe: RouteRecipe;
   readonly step: RouteSkillStep;
   readonly stepScore: number;
+  readonly scarceMaterials: number;
 }
 
 interface PathCandidate extends Candidate {
+  readonly totalScarceMaterials: number;
   readonly totalScore: number;
   readonly changesRecipe: boolean;
+}
+
+interface PathScore {
+  readonly scarceMaterials: number;
+  readonly objectiveScore: number;
 }
 
 const NO_ACTIVE_RECIPE: unique symbol = Symbol("no-active-recipe");
@@ -284,11 +296,25 @@ function scoreFor(step: RouteSkillStep, objective: RouteObjective): number | und
 
 function comparePathCandidates(left: PathCandidate, right: PathCandidate): number {
   return (
+    left.totalScarceMaterials - right.totalScarceMaterials ||
     left.totalScore - right.totalScore ||
     Number(left.changesRecipe) - Number(right.changesRecipe) ||
     left.step.expectedCrafts - right.step.expectedCrafts ||
     left.recipe.id.localeCompare(right.recipe.id)
   );
+}
+
+function scarceMaterialsFor(
+  recipe: RouteRecipe,
+  step: RouteSkillStep,
+  scarceItemIds: ReadonlySet<string>,
+): number {
+  const unitsPerCraft = recipe.reagents.reduce(
+    (total, reagent) =>
+      total + (scarceItemIds.has(reagent.itemId) ? reagent.quantity : 0),
+    0,
+  );
+  return unitsPerCraft * step.expectedCrafts;
 }
 
 function acquisitionFrictionRatio(
@@ -306,18 +332,25 @@ function acquisitionFrictionRatio(
 
 function pathCandidate(
   candidate: Candidate,
-  futureScore: number,
+  futureScore: PathScore,
   penaltyRatio: number,
   changesRecipe: boolean,
 ): PathCandidate {
   return {
     ...candidate,
-    totalScore: candidate.stepScore * (1 + penaltyRatio) + futureScore,
+    totalScarceMaterials:
+      candidate.scarceMaterials + futureScore.scarceMaterials,
+    totalScore:
+      candidate.stepScore * (1 + penaltyRatio) + futureScore.objectiveScore,
     changesRecipe,
   };
 }
 
-function evaluateSkill(input: OptimizeRouteInput, skill: number): EvaluatedSkill {
+function evaluateSkill(
+  input: OptimizeRouteInput,
+  skill: number,
+  scarceItemIds: ReadonlySet<string>,
+): EvaluatedSkill {
   const possible = input.recipes
     .map((recipe) => ({ recipe, step: createStep(recipe, input, skill) }))
     .filter(
@@ -330,7 +363,20 @@ function evaluateSkill(input: OptimizeRouteInput, skill: number): EvaluatedSkill
     possibleSteps: possible.map(({ step }) => step),
     candidates: possible.flatMap(({ recipe, step }) => {
       const stepScore = scoreFor(step, input.objective);
-      return stepScore === undefined ? [] : [{ recipe, step, stepScore }];
+      return stepScore === undefined
+        ? []
+        : [
+            {
+              recipe,
+              step,
+              stepScore,
+              scarceMaterials: scarceMaterialsFor(
+                recipe,
+                step,
+                scarceItemIds,
+              ),
+            },
+          ];
     }),
   };
 }
@@ -352,8 +398,11 @@ function reconstructOptimalSteps(
     NO_ACTIVE_RECIPE,
     ...activeRecipeIds,
   ];
-  let bestScoreAtNextSkill = new Map<ActiveRecipeState, number>(
-    routeStates.map((state) => [state, 0]),
+  let bestScoreAtNextSkill = new Map<ActiveRecipeState, PathScore>(
+    routeStates.map((state) => [
+      state,
+      { scarceMaterials: 0, objectiveScore: 0 },
+    ]),
   );
   const decisionsBySkill: Map<ActiveRecipeState, Candidate>[] = [];
 
@@ -407,14 +456,17 @@ function reconstructOptimalSteps(
       ]),
     );
     const decisions = new Map<ActiveRecipeState, Candidate>();
-    const scores = new Map<ActiveRecipeState, number>();
+    const scores = new Map<ActiveRecipeState, PathScore>();
 
     const initial = initialCandidates[0];
     if (initial === undefined) {
       throw new Error(`Route optimizer could not initialize skill ${skill}.`);
     }
     decisions.set(NO_ACTIVE_RECIPE, initial);
-    scores.set(NO_ACTIVE_RECIPE, initial.totalScore);
+    scores.set(NO_ACTIVE_RECIPE, {
+      scarceMaterials: initial.totalScarceMaterials,
+      objectiveScore: initial.totalScore,
+    });
 
     for (const previousRecipeId of activeRecipeIds) {
       const continuing = continuingCandidates.get(previousRecipeId);
@@ -431,7 +483,10 @@ function reconstructOptimalSteps(
         );
       }
       decisions.set(previousRecipeId, selected);
-      scores.set(previousRecipeId, selected.totalScore);
+      scores.set(previousRecipeId, {
+        scarceMaterials: selected.totalScarceMaterials,
+        objectiveScore: selected.totalScore,
+      });
     }
 
     decisionsBySkill[skill - input.startSkill] = decisions;
@@ -474,7 +529,140 @@ function totalsFor(steps: readonly RouteSkillStep[]): RouteTotals {
   };
 }
 
-function segmentsFor(steps: readonly RouteSkillStep[]): readonly RouteSegment[] {
+function scoreForAlternative(
+  alternative: RouteAlternative,
+  objective: RouteObjective,
+): number {
+  const skillUps = alternative.expectedSkillUps;
+  if (objective === "crafts") return alternative.expectedCrafts / skillUps;
+  if (objective === "materials") return alternative.expectedMaterials / skillUps;
+  return alternative.expectedCostCopper! / skillUps;
+}
+
+function aggregateAlternativeSteps(
+  steps: readonly RouteSkillStep[],
+): RouteAlternative {
+  const first = steps[0];
+  const last = steps.at(-1);
+  if (first === undefined || last === undefined) {
+    throw new Error("Route alternatives require at least one skill step.");
+  }
+  const allCostsAvailable = steps.every(
+    ({ expectedCostCopper }) => expectedCostCopper !== undefined,
+  );
+  return {
+    recipeId: first.recipeId,
+    recipeName: first.recipeName,
+    startSkill: first.skill,
+    endSkill: last.skill + 1,
+    expectedSkillUps: steps.length,
+    expectedCrafts: steps.reduce((total, step) => total + step.expectedCrafts, 0),
+    expectedMaterials: steps.reduce(
+      (total, step) => total + step.expectedMaterials,
+      0,
+    ),
+    ...(allCostsAvailable
+      ? {
+          expectedCostCopper: steps.reduce(
+            (total, step) => total + step.expectedCostCopper!,
+            0,
+          ),
+        }
+      : {}),
+  };
+}
+
+function alternativeRunsFor(
+  segment: RouteAlternative,
+  evaluatedSkills: readonly EvaluatedSkill[],
+  routeStartSkill: number,
+): readonly RouteAlternative[] {
+  const recipeIds = [
+    ...new Set(
+      evaluatedSkills
+        .slice(
+          segment.startSkill - routeStartSkill,
+          segment.endSkill - routeStartSkill,
+        )
+        .flatMap(({ candidates }) =>
+          candidates
+            .filter(({ recipe }) => recipe.id !== segment.recipeId)
+            .map(({ recipe }) => recipe.id),
+        ),
+    ),
+  ];
+  const alternatives: RouteAlternative[] = [];
+
+  for (const recipeId of recipeIds) {
+    let run: RouteSkillStep[] = [];
+    for (let skill = segment.startSkill; skill < segment.endSkill; skill += 1) {
+      const step = evaluatedSkills[skill - routeStartSkill]?.candidates.find(
+        ({ recipe }) => recipe.id === recipeId,
+      )?.step;
+      if (step !== undefined) {
+        run.push(step);
+      } else if (run.length > 0) {
+        alternatives.push(aggregateAlternativeSteps(run));
+        run = [];
+      }
+    }
+    if (run.length > 0) alternatives.push(aggregateAlternativeSteps(run));
+  }
+
+  return alternatives;
+}
+
+function compareAlternatives(
+  objective: RouteObjective,
+  segmentSkillUps: number,
+): (left: RouteAlternative, right: RouteAlternative) => number {
+  return (left, right) =>
+    scoreForAlternative(left, objective) *
+      (segmentSkillUps / left.expectedSkillUps) -
+      scoreForAlternative(right, objective) *
+        (segmentSkillUps / right.expectedSkillUps) ||
+    right.expectedSkillUps - left.expectedSkillUps ||
+    left.expectedCrafts / left.expectedSkillUps -
+      right.expectedCrafts / right.expectedSkillUps ||
+    left.recipeId.localeCompare(right.recipeId);
+}
+
+function selectAlternatives(
+  segment: RouteAlternative,
+  evaluatedSkills: readonly EvaluatedSkill[],
+  input: OptimizeRouteInput,
+  scarceRecipeIds: ReadonlySet<string>,
+): readonly RouteAlternative[] {
+  const runs = alternativeRunsFor(segment, evaluatedSkills, input.startSkill);
+  const eligibleRuns = scarceRecipeIds.has(segment.recipeId)
+    ? runs
+    : runs.filter(({ recipeId }) => !scarceRecipeIds.has(recipeId));
+  const objectiveLeaders = [...eligibleRuns]
+    .sort(compareAlternatives(input.objective, segment.expectedSkillUps))
+    .slice(0, 2);
+  const materialLeaders = [...eligibleRuns]
+    .sort(compareAlternatives("materials", segment.expectedSkillUps))
+    .slice(0, 4);
+  return [...objectiveLeaders, ...materialLeaders]
+    .filter((alternative): alternative is RouteAlternative => alternative !== undefined)
+    .filter(
+      (alternative, index, selected) =>
+        selected.findIndex(
+          (candidate) =>
+            candidate.recipeId === alternative.recipeId &&
+            candidate.startSkill === alternative.startSkill &&
+            candidate.endSkill === alternative.endSkill,
+        ) === index,
+    )
+    .slice(0, 6);
+}
+
+function segmentsFor(
+  steps: readonly RouteSkillStep[],
+  evaluatedSkills: readonly EvaluatedSkill[],
+  input: OptimizeRouteInput,
+  scarceRecipeIds: ReadonlySet<string>,
+): readonly RouteSegment[] {
   const segments: RouteSegment[] = [];
   for (const step of steps) {
     const previous = segments.at(-1);
@@ -488,6 +676,7 @@ function segmentsFor(steps: readonly RouteSkillStep[]): readonly RouteSegment[] 
         expectedSkillUps: previous.expectedSkillUps + 1,
         expectedCrafts: previous.expectedCrafts + step.expectedCrafts,
         expectedMaterials: previous.expectedMaterials + step.expectedMaterials,
+        alternatives: [],
         ...(costAvailable
           ? {
               expectedCostCopper: previousCost + step.expectedCostCopper,
@@ -505,12 +694,21 @@ function segmentsFor(steps: readonly RouteSkillStep[]): readonly RouteSegment[] 
       expectedSkillUps: 1,
       expectedCrafts: step.expectedCrafts,
       expectedMaterials: step.expectedMaterials,
+      alternatives: [],
       ...(step.expectedCostCopper === undefined
         ? {}
         : { expectedCostCopper: step.expectedCostCopper }),
     });
   }
-  return segments;
+  return segments.map((segment) => ({
+    ...segment,
+    alternatives: selectAlternatives(
+      segment,
+      evaluatedSkills,
+      input,
+      scarceRecipeIds,
+    ),
+  }));
 }
 
 export function optimizeLevelingRoute(
@@ -519,9 +717,17 @@ export function optimizeLevelingRoute(
   assertSkillRange(input.startSkill, input.targetSkill);
   validateRecipes(input.recipes);
   const policy = resolvePolicy(input.policy);
+  const scarceItemIds = new Set(input.scarceItemIds ?? []);
+  const scarceRecipeIds = new Set(
+    input.recipes
+      .filter((recipe) =>
+        recipe.reagents.some(({ itemId }) => scarceItemIds.has(itemId)),
+      )
+      .map(({ id }) => id),
+  );
   const evaluatedSkills: EvaluatedSkill[] = [];
   for (let skill = input.startSkill; skill < input.targetSkill; skill += 1) {
-    evaluatedSkills.push(evaluateSkill(input, skill));
+    evaluatedSkills.push(evaluateSkill(input, skill, scarceItemIds));
   }
 
   const firstBlocked = evaluatedSkills.find(
@@ -547,7 +753,7 @@ export function optimizeLevelingRoute(
           ? "missing-price-data"
           : "no-eligible-recipe",
       steps,
-      segments: segmentsFor(steps),
+      segments: segmentsFor(steps, evaluatedSkills, input, scarceRecipeIds),
       totals: totalsFor(steps),
     };
   }
@@ -558,7 +764,7 @@ export function optimizeLevelingRoute(
     startSkill: input.startSkill,
     targetSkill: input.targetSkill,
     steps,
-    segments: segmentsFor(steps),
+    segments: segmentsFor(steps, evaluatedSkills, input, scarceRecipeIds),
     totals: totalsFor(steps),
   };
 }

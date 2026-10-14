@@ -189,6 +189,63 @@ export async function writeNormalizedBuild(
     batchOptions,
   );
 
+  const itemClassifications = build.items.flatMap((item) =>
+    item.classification === undefined
+      ? []
+      : [{
+          itemId: item.id,
+          recipeBuildId: build.build.id,
+          ...item.classification,
+        }],
+  );
+  batches.itemClassifications = await writeBatches(
+    runner,
+    itemClassifications,
+    {
+      label: (row) => `item classification ${row.itemId}@${row.recipeBuildId}`,
+      insertSql:
+        "INSERT INTO item_classification (item_id, recipe_build_id, classification_id, classification_label, color, source_product, source_build_id, source_locale) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING",
+      insertValues: (row) => [
+        row.itemId,
+        row.recipeBuildId,
+        row.id,
+        row.label,
+        row.color,
+        row.source.product,
+        row.source.build,
+        row.source.locale,
+      ],
+      selectSql:
+        "SELECT item_id, recipe_build_id, classification_id, classification_label, color, source_product, source_build_id, source_locale FROM item_classification WHERE item_id = $1 AND recipe_build_id = $2",
+      selectValues: (row) => [row.itemId, row.recipeBuildId],
+      expected: (row) => ({
+        item_id: row.itemId,
+        recipe_build_id: row.recipeBuildId,
+        classification_id: row.id,
+        classification_label: row.label,
+        color: row.color,
+        source_product: row.source.product,
+        source_build_id: row.source.build,
+        source_locale: row.source.locale,
+      }),
+      assertReferences: async (database, row) => {
+        await assertExists(
+          database,
+          "SELECT 1 AS found FROM item WHERE item_id = $1",
+          [row.itemId],
+          `Missing item ${row.itemId}.`,
+        );
+        await assertExists(
+          database,
+          "SELECT 1 AS found FROM wow_build WHERE build_id = $1",
+          [row.recipeBuildId],
+          `Missing build ${row.recipeBuildId}.`,
+        );
+      },
+    },
+    batchOptions,
+  );
+
   batches.recipes = await writeBatches(
     runner,
     build.recipes,

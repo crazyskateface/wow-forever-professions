@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   healthResponseSchema,
   professionFixtureSchema,
+  recipeChangesResponseSchema,
+  recipeChangesSummaryResponseSchema,
   recipesResponseSchema,
   routeOptimizationResponseSchema,
   shoppingListResponseSchema,
@@ -90,6 +92,102 @@ describe("fixture API router", () => {
 
   it("returns 404 for an unknown recipe", async () => {
     expect((await routeRequest("GET", "/recipes/not-real")).statusCode).toBe(404);
+  });
+
+  it("serves filtered precomputed recipe changes", async () => {
+    let receivedFilter: unknown;
+    const comparison = {
+      id: "comparison-test",
+      baseBuildId: "classic-era",
+      targetBuildId: "forever-current",
+      comparisonType: "CLASSIC_TO_FOREVER" as const,
+      createdAt: "2026-10-12T12:00:00.000Z",
+    };
+    const response = await routeRequest(
+      "GET",
+      "/api/recipe-changes",
+      {
+        comparison: "classic-forever",
+        profession: "leatherworking",
+        changeType: "updated",
+        search: "armor kit",
+      },
+      {
+        changes: {
+          async listChanges(filter) {
+            receivedFilter = filter;
+            return {
+              comparison,
+              changes: [
+                {
+                  identity: { professionId: "leatherworking", spellId: 3780 },
+                  professionName: "Leatherworking",
+                  name: "Heavy Armor Kit",
+                  changeType: "UPDATED",
+                  changedFields: { learnSkill: { before: 150, after: 145 } },
+                },
+              ],
+            };
+          },
+          async getSummary() {
+            return undefined;
+          },
+        },
+      },
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(receivedFilter).toEqual({
+      comparisonType: "CLASSIC_TO_FOREVER",
+      professionId: "leatherworking",
+      changeType: "UPDATED",
+      search: "armor kit",
+    });
+    expect(recipeChangesResponseSchema.parse(JSON.parse(response.body))).toMatchObject({
+      comparison: { baseBuildId: "classic-era", targetBuildId: "forever-current" },
+      changes: [{ changeType: "UPDATED", name: "Heavy Armor Kit" }],
+    });
+  });
+
+  it("serves profession-level recipe change summaries", async () => {
+    let receivedFilter: unknown;
+    const response = await routeRequest(
+      "GET",
+      "/api/recipe-changes/summary",
+      { profession: "leatherworking" },
+      {
+        changes: {
+          async listChanges() {
+            return undefined;
+          },
+          async getSummary(filter) {
+            receivedFilter = filter;
+            return {
+              comparison: {
+                id: "comparison-test",
+                baseBuildId: "classic-era",
+                targetBuildId: "forever-current",
+                comparisonType: "CLASSIC_TO_FOREVER",
+                createdAt: "2026-10-12T12:00:00.000Z",
+              },
+              professionId: "leatherworking",
+              professionName: "Leatherworking",
+              summary: { new: 42, updated: 18, removed: 3, unchanged: 100, total: 163 },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(receivedFilter).toEqual({
+      comparisonType: "CLASSIC_TO_FOREVER",
+      professionId: "leatherworking",
+    });
+    expect(recipeChangesSummaryResponseSchema.parse(JSON.parse(response.body))).toMatchObject({
+      professionId: "leatherworking",
+      summary: { new: 42, updated: 18, removed: 3 },
+    });
   });
 
   it("serves stored auction observations without calling a provider", async () => {

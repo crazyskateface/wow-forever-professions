@@ -2,10 +2,16 @@ import { createHash } from "node:crypto";
 import {
   importedBuildDatasetSchema,
   type ImportedBuildDataset,
+  type NormalizedBuild,
 } from "@forever-professions/contracts";
 import type { DsqlBatchOptions } from "./batching.js";
 import { createRawDatasetKey, normalizeBuildDataset } from "./index.js";
 import type { RawDatasetPutStatus, RawDatasetStore } from "./raw-store.js";
+import {
+  generateAndStoreRecipeComparison,
+  type RecipeBuildComparisonWriteResult,
+} from "./recipe-change-store.js";
+import type { RecipeComparisonType } from "./recipe-changes.js";
 import {
   writeNormalizedBuild,
   type NormalizedBuildWriteResult,
@@ -17,6 +23,10 @@ export interface IngestBuildDatasetOptions extends DsqlBatchOptions {
   readonly rawStore: RawDatasetStore;
   readonly transactionRunner: TransactionRunner;
   readonly importedAt?: string;
+  readonly compareAgainst?: readonly {
+    readonly build: NormalizedBuild;
+    readonly comparisonType: RecipeComparisonType;
+  }[];
 }
 
 export interface IngestBuildDatasetResult extends NormalizedBuildWriteResult {
@@ -24,6 +34,11 @@ export interface IngestBuildDatasetResult extends NormalizedBuildWriteResult {
   readonly rawObjectKey: string;
   readonly rawSha256: string;
   readonly rawObjectStatus: RawDatasetPutStatus;
+  readonly comparisons: readonly (RecipeBuildComparisonWriteResult & {
+    readonly comparisonType: RecipeComparisonType;
+    readonly baseBuildId: string;
+    readonly targetBuildId: string;
+  })[];
 }
 
 export function parseRawDatasetBytes(rawBytes: Uint8Array): ImportedBuildDataset {
@@ -56,6 +71,27 @@ export async function ingestBuildDataset(
       ...(options.maximumBytes === undefined ? {} : { maximumBytes: options.maximumBytes }),
     },
   );
+  const comparisons = [];
+  for (const requested of options.compareAgainst ?? []) {
+    const stored = await generateAndStoreRecipeComparison(
+      options.transactionRunner,
+      requested.build,
+      normalized,
+      {
+        comparisonType: requested.comparisonType,
+        ...(options.importedAt === undefined ? {} : { createdAt: options.importedAt }),
+        ...(options.maximumRows === undefined ? {} : { maximumRows: options.maximumRows }),
+        ...(options.maximumBytes === undefined ? {} : { maximumBytes: options.maximumBytes }),
+      },
+    );
+    comparisons.push({
+      comparisonId: stored.comparisonId,
+      batches: stored.batches,
+      comparisonType: requested.comparisonType,
+      baseBuildId: requested.build.build.id,
+      targetBuildId: normalized.build.id,
+    });
+  }
 
   return {
     buildId: imported.build.id,
@@ -63,5 +99,6 @@ export async function ingestBuildDataset(
     rawSha256,
     rawObjectStatus,
     batches: writeResult.batches,
+    comparisons,
   };
 }

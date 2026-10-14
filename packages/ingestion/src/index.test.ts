@@ -55,7 +55,18 @@ function buildDataset(buildId: string): ImportedBuildDataset {
 
 describe("build normalization", () => {
   it("creates stable versioned rows without overwriting recipe identity", () => {
-    const normalized = normalizeBuildDataset(buildDataset("11.2.7.65000"));
+    const dataset = buildDataset("11.2.7.65000");
+    dataset.professions[0]!.recipes[0]!.reagents[0]!.item.classification = {
+      id: 14483,
+      label: "Scarce",
+      color: -7885825,
+      source: {
+        product: "wow_classic_beta",
+        build: "1.60.1.70374",
+        locale: "enUS",
+      },
+    };
+    const normalized = normalizeBuildDataset(dataset);
 
     expect(normalized.recipeVersions[0]?.id).toBe("heavy-armor-kit@11.2.7.65000");
     expect(normalized.recipes[0]).toEqual({
@@ -71,6 +82,16 @@ describe("build normalization", () => {
       "heavy-armor-kit-item",
       "heavy-leather",
     ]);
+    expect(normalized.items.find(({ id }) => id === "heavy-leather")?.classification).toEqual({
+      id: 14483,
+      label: "Scarce",
+      color: -7885825,
+      source: {
+        product: "wow_classic_beta",
+        build: "1.60.1.70374",
+        locale: "enUS",
+      },
+    });
   });
 
   it("rejects recipes whose source was not declared", () => {

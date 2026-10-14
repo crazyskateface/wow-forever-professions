@@ -4,6 +4,7 @@ import type {
 } from "aws-lambda";
 import {
   createAuroraDsqlTransactionRunner,
+  SqlRecipeChangeReader,
   SqlRecipeCatalogReader,
 } from "@forever-professions/ingestion";
 import { DsqlAuctionPricingRepository } from "@forever-professions/pricing";
@@ -25,6 +26,7 @@ const database =
     : undefined;
 const pricing = database ? new DsqlAuctionPricingRepository(database) : undefined;
 const catalog = database ? new SqlRecipeCatalogReader(database) : undefined;
+const changes = database ? new SqlRecipeChangeReader(database) : undefined;
 
 export async function handler(
   event: APIGatewayProxyEventV2,
@@ -46,6 +48,7 @@ export async function handler(
     event.queryStringParameters ?? {},
     {
       ...(catalog === undefined ? {} : { catalog }),
+      ...(changes === undefined ? {} : { changes }),
       ...(pricing === undefined ? {} : { pricing }),
     },
     body,

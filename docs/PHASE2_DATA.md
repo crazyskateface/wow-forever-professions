@@ -1,5 +1,11 @@
 # Phase 2 data foundation
 
+Current-state note: this document records the original Phase 2 delivery. The schema
+has since grown to 22 ingestion migrations and 15 ingestion tables, including recipe
+metadata, deterministic build comparisons, field-level recipe changes, and
+build-scoped item-name-description classifications. See `packages/ingestion/README.md`
+and `docs/DEVELOPMENT.md` for the current workflow.
+
 Phase 2 turns one mutable recipe list into an append-only sequence of build snapshots. A stable recipe identity can have many recipe versions, and every version keeps its thresholds, reagents, outputs, provenance, and verification state.
 
 ## Import flow
@@ -18,7 +24,7 @@ The schema files under `packages/ingestion/sql` contain one DDL statement each a
 
 The normalizer is pure and AWS-independent. The writer is backed by the official Aurora DSQL Node connector, which supplies IAM token management and whole-transaction OCC retries. All SQL values are bound parameters. Inserts are resumable and verify that existing keys still contain the expected immutable data. Raw uploads use the AWS SDK S3 client, a SHA-256 checksum, and `If-None-Match: *` to prevent replacement.
 
-The `ForeverProfessionsData` development stack was deployed in `us-east-1` and validated on October 8, 2026. The live harness applies every DDL file independently, invokes `CALL sys.wait_for_job` outside a transaction for asynchronous indexes, maps the scoped IAM ingestion role to `forever_professions_ingestion`, and imports the same fixture twice. The verified result is 16 migrations, 11 tables, 21 indexes, one build, one recipe version, and an immutable raw-object result of `created` followed by `already-exists`.
+The `ForeverProfessionsData` development stack was deployed in `us-east-1` and validated on October 8, 2026. That live validation covered migrations 001–016. The harness applies every DDL file independently, invokes `CALL sys.wait_for_job` outside a transaction for asynchronous indexes, maps the scoped IAM ingestion role to `forever_professions_ingestion`, and imports the same fixture twice. The current command discovers and applies all 22 migrations, but migrations 017–022 still require the same live DSQL revalidation before production promotion.
 
 The live run verifies IAM authentication, asynchronous index completion, the scoped application role, S3 conditional writes, DSQL-compatible transaction boundaries, and resumable imports. It does not inject an OCC conflict or establish production performance limits; those remain operational tests rather than blockers for the Phase 2 data foundation.
 
@@ -46,13 +52,13 @@ pnpm db:dsql:test
 
 The smoke command uses admin access only to apply schema and role grants. It assumes the scoped ingestion role before writing the raw object and normalized records.
 
-Once an authoritative client export has been transformed into the imported-build JSON contract, load it with:
+To load a transformed client export into Aurora DSQL, run:
 
 ```text
 pnpm data:import C:\path\to\forever-build.json
 ```
 
-The input must declare at least one source with `kind: "client-data"`. The importer preserves its exact bytes before normalization. No authoritative Forever client export has been loaded yet; the deployed validation record is explicitly marked as a non-authoritative fixture.
+The input must declare at least one source with `kind: "client-data"`. The importer preserves its exact bytes before normalization. The repository now contains a real client-derived Leatherworking snapshot, but it remains explicitly unverified and should not be described as authoritative. The historical deployed validation record is a non-authoritative fixture unless an operator has separately imported the real snapshots.
 
 ## Infrastructure safety
 

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export * from "./recipe-changes.js";
+
 export const healthResponseSchema = z.object({
   service: z.literal("forever-professions-api"),
   status: z.literal("ok"),
@@ -82,10 +84,32 @@ export const recipeAvailabilitySchema = z.enum([
   "unknown",
 ]);
 
+export const recipeSourceKindSchema = z.enum([
+  "trainer",
+  "vendor",
+  "quest",
+  "container",
+  "drop",
+]);
+
+export const recipeEvidenceOriginSchema = z.enum([
+  "forever",
+  "classic",
+  "classic-borrowed",
+  "unknown",
+]);
+
 export const canonicalRecipeMetadataSchema = z.object({
   spellId: z.number().int().positive(),
   learnSkill: z.number().int().nonnegative().nullable(),
+  borrowedLearnSkill: z.number().int().nonnegative().nullable().optional(),
   acquisition: recipeAcquisitionSchema,
+  teachingItemId: z.number().int().positive().nullable().optional(),
+  sourceKinds: z.array(recipeSourceKindSchema).optional(),
+  sourceDataOrigin: recipeEvidenceOriginSchema.optional(),
+  hiddenStatus: z.boolean().nullable().optional(),
+  hiddenDataOrigin: recipeEvidenceOriginSchema.optional(),
+  orangeSkillKnown: z.boolean().optional(),
   faction: recipeFactionSchema,
   specializationSpellId: z.number().int().positive().nullable(),
   cooldownSeconds: z.number().int().positive().nullable(),
@@ -105,10 +129,25 @@ export const professionModelSchema = z.object({
   name: z.string().min(1),
 });
 
+export const itemClassificationSchema = z.object({
+  id: z.number().int().positive(),
+  label: z.string().min(1),
+  color: z.number().int(),
+  source: z.object({
+    product: z.string().min(1),
+    build: z.string().min(1),
+    locale: z.string().min(1),
+  }),
+});
+
 export const itemModelSchema = z.object({
   id: z.string().min(1),
   gameId: z.number().int().nonnegative().optional(),
   name: z.string().min(1),
+  itemClassId: z.number().int().nonnegative().optional(),
+  itemSubClassId: z.number().int().nonnegative().optional(),
+  inventoryType: z.string().min(1).optional(),
+  classification: itemClassificationSchema.optional(),
 });
 
 export const recipeModelSchema = z.object({
@@ -206,6 +245,21 @@ export const importedBuildDatasetSchema = z.object({
   build: wowBuildSchema,
   sources: z.array(dataSourceSchema).min(1),
   professions: z.array(importedProfessionSchema),
+});
+
+export const importedRecipeOverrideSchema = z.object({
+  id: z.string().min(1),
+  metadata: canonicalRecipeMetadataSchema.partial().optional(),
+  thresholds: skillThresholdsSchema.optional(),
+  sourceId: z.string().min(1),
+  verification: verificationSchema.omit({ id: true }),
+  provenanceNotes: z.string().min(1).optional(),
+});
+
+export const importedRecipeOverridesSchema = z.object({
+  version: z.literal(1),
+  sources: z.array(dataSourceSchema),
+  recipes: z.array(importedRecipeOverrideSchema),
 });
 
 export const normalizedBuildSchema = z.object({
@@ -380,7 +434,7 @@ export const routeSkillStepSchema = z.object({
   expectedCostCopper: z.number().nonnegative().optional(),
 });
 
-export const routeSegmentSchema = z.object({
+export const routeAlternativeSchema = z.object({
   recipeId: z.string().min(1),
   recipeName: z.string().min(1),
   startSkill: z.number().int().nonnegative(),
@@ -389,6 +443,10 @@ export const routeSegmentSchema = z.object({
   expectedCrafts: z.number().positive(),
   expectedMaterials: z.number().nonnegative(),
   expectedCostCopper: z.number().nonnegative().optional(),
+});
+
+export const routeSegmentSchema = routeAlternativeSchema.extend({
+  alternatives: z.array(routeAlternativeSchema).max(6).default([]),
 });
 
 export const routeTotalsSchema = z.object({
@@ -520,6 +578,10 @@ export const reagentSchema = z.object({
   itemId: z.string().min(1),
   gameItemId: z.number().int().positive().optional(),
   name: z.string().min(1),
+  itemClassId: z.number().int().nonnegative().optional(),
+  itemSubClassId: z.number().int().nonnegative().optional(),
+  inventoryType: z.string().min(1).optional(),
+  classification: itemClassificationSchema.optional(),
   quantity: z.number().int().positive(),
 });
 
@@ -527,6 +589,10 @@ export const fixtureRecipeOutputSchema = z.object({
   itemId: z.string().min(1),
   gameItemId: z.number().int().positive().optional(),
   name: z.string().min(1),
+  itemClassId: z.number().int().nonnegative().optional(),
+  itemSubClassId: z.number().int().nonnegative().optional(),
+  inventoryType: z.string().min(1).optional(),
+  classification: itemClassificationSchema.optional(),
   quantity: z.number().int().positive(),
 });
 
@@ -591,6 +657,7 @@ export type RouteOptimizationResult = z.infer<
 export type RouteOptimizationResponse = z.infer<
   typeof routeOptimizationResponseSchema
 >;
+export type RouteAlternative = z.infer<typeof routeAlternativeSchema>;
 export type RouteSegment = z.infer<typeof routeSegmentSchema>;
 export type RouteSkillStep = z.infer<typeof routeSkillStepSchema>;
 export type ShoppingListRequest = z.infer<typeof shoppingListRequestSchema>;
@@ -609,8 +676,11 @@ export type CanonicalRecipeMetadata = z.infer<
   typeof canonicalRecipeMetadataSchema
 >;
 export type ImportedBuildDataset = z.infer<typeof importedBuildDatasetSchema>;
+export type ImportedRecipeOverride = z.infer<typeof importedRecipeOverrideSchema>;
+export type ImportedRecipeOverrides = z.infer<typeof importedRecipeOverridesSchema>;
 export type ImportedProfession = z.infer<typeof importedProfessionSchema>;
 export type ImportedRecipe = z.infer<typeof importedRecipeSchema>;
+export type ItemClassification = z.infer<typeof itemClassificationSchema>;
 export type ItemModel = z.infer<typeof itemModelSchema>;
 export type NormalizedBuild = z.infer<typeof normalizedBuildSchema>;
 export type ProfessionModel = z.infer<typeof professionModelSchema>;

@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
 import {
   ingestBuildDataset,
-  normalizeScriptArguments,
+  normalizeBuildDataset,
+  parseBuildImportScriptArguments,
+  parseRawDatasetBytes,
   type RawDatasetPutInput,
   type RawDatasetPutStatus,
   type RawDatasetStore,
@@ -98,13 +100,17 @@ class FileRawDatasetStore implements RawDatasetStore {
   }
 }
 
-const [inputPath] = normalizeScriptArguments(process.argv.slice(2));
-if (!inputPath) throw new Error("Usage: import-local <input JSON path>");
+const { inputPath, compareAgainst } = parseBuildImportScriptArguments(process.argv.slice(2));
 const invocationDirectory = process.env.INIT_CWD
   ? resolve(process.env.INIT_CWD)
   : process.cwd();
 const resolvedInputPath = resolve(invocationDirectory, inputPath);
 const rawBytes = await readFile(resolvedInputPath);
+const comparisonBase = compareAgainst
+  ? normalizeBuildDataset(
+      parseRawDatasetBytes(await readFile(resolve(invocationDirectory, compareAgainst.path))),
+    )
+  : undefined;
 const pool = new Pool({ connectionString: localConnectionUrl(), max: 3 });
 
 try {
@@ -113,6 +119,13 @@ try {
     rawBytes,
     rawStore: new FileRawDatasetStore(resolve(invocationDirectory, ".local-data")),
     transactionRunner: createLocalTransactionRunner(pool),
+    ...(comparisonBase === undefined || compareAgainst === undefined
+      ? {}
+      : {
+          compareAgainst: [
+            { build: comparisonBase, comparisonType: compareAgainst.comparisonType },
+          ],
+        }),
   });
   const counts = await pool.query(
     "SELECT (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM provenance) AS provenance_records",

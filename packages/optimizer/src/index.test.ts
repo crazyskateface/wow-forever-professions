@@ -112,6 +112,93 @@ describe("leveling route optimizer", () => {
     });
   });
 
+  it("returns ranked alternatives with the exact sub-range each recipe can cover", () => {
+    const primary: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "a-primary",
+      name: "Primary",
+      thresholds: { orange: 1, yellow: 5, green: 6, gray: 7 },
+      reagents: [{ itemId: "leather", quantity: 4 }],
+    };
+    const laterConversion: RouteRecipe = {
+      ...primary,
+      id: "b-conversion",
+      name: "Later Conversion",
+      learnSkill: 2,
+      acquisition: "vendor",
+      thresholds: { orange: 2, yellow: 5, green: 6, gray: 7 },
+      reagents: [{ itemId: "scraps", quantity: 1 }],
+    };
+
+    const result = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 1,
+      targetSkill: 4,
+      objective: "crafts",
+      recipes: [primary, laterConversion],
+    });
+
+    expect(result.segments).toHaveLength(1);
+    expect(result.segments[0]?.alternatives).toMatchObject([
+      {
+        recipeId: "b-conversion",
+        startSkill: 2,
+        endSkill: 4,
+        expectedSkillUps: 2,
+        expectedCrafts: 2,
+        expectedMaterials: 2,
+      },
+    ]);
+  });
+
+  it("treats scarce reagents as a last resort and omits them from ordinary alternatives", () => {
+    const primary: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "a-primary",
+      name: "Primary",
+      thresholds: { orange: 1, yellow: 5, green: 6, gray: 7 },
+      reagents: [{ itemId: "ordinary-leather", quantity: 100 }],
+    };
+    const scarce: RouteRecipe = {
+      ...primary,
+      id: "b-scarce",
+      name: "Scarce",
+      reagents: [{ itemId: "pristine-leather", quantity: 1 }],
+    };
+    const ordinaryAlternative: RouteRecipe = {
+      ...primary,
+      id: "c-ordinary-alternative",
+      name: "Ordinary Alternative",
+      reagents: [{ itemId: "ordinary-hide", quantity: 2 }],
+    };
+
+    const avoidable = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 1,
+      targetSkill: 2,
+      objective: "materials",
+      recipes: [primary, scarce, ordinaryAlternative],
+      scarceItemIds: ["pristine-leather"],
+    });
+    expect(avoidable.segments[0]?.recipeId).toBe("c-ordinary-alternative");
+    expect(
+      avoidable.segments[0]?.alternatives.map(({ recipeId }) => recipeId),
+    ).not.toContain("b-scarce");
+
+    const necessary = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 1,
+      targetSkill: 2,
+      objective: "materials",
+      recipes: [scarce],
+      scarceItemIds: ["pristine-leather"],
+    });
+    expect(necessary).toMatchObject({
+      status: "complete",
+      segments: [{ recipeId: "b-scarce" }],
+    });
+  });
+
   it("supports known-recipe, trainer-only, recipe, and reagent exclusions", () => {
     const recipes: RouteRecipe[] = [
       changingChanceRecipe,

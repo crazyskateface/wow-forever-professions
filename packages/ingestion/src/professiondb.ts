@@ -10,8 +10,12 @@ type LuaTable = Map<LuaKey, LuaValue>;
 export interface ProfessionDbSnapshotInput {
   readonly coreLua: string;
   readonly acquireMethodsLua?: string;
+  readonly recipeItemsLua?: string;
+  readonly sourcesLua?: string;
+  readonly hiddenRecipesLua?: string;
   readonly recipeNamesLua: string;
   readonly itemNamesLua: string;
+  readonly itemCoreLua?: readonly string[];
   readonly profession: {
     readonly id: string;
     readonly name: string;
@@ -20,6 +24,8 @@ export interface ProfessionDbSnapshotInput {
   readonly professionDbVersion: string;
   readonly itemDbVersion: string;
   readonly sourceUrl: string;
+  readonly gameVersion?: "Forever" | "Vanilla";
+  readonly canonicalItemNames?: ReadonlyMap<number, string>;
 }
 
 export interface ProfessionDbConversionResult {
@@ -32,6 +38,11 @@ export interface ProfessionDbConversionResult {
     readonly knownLearnSkillRecipes: number;
     readonly borrowedRequiredSkillRecipes: number;
     readonly automaticRecipes: number;
+    readonly teachingItemRecipes: number;
+    readonly sourceKindRecipes: number;
+    readonly borrowedSourceRecipes: number;
+    readonly hiddenRecipeRecords: number;
+    readonly classifiedItems: number;
     readonly specializationRecipes: number;
     readonly provisionalOutputQuantityRecipes: number;
   };
@@ -74,6 +85,20 @@ class LuaLiteralParser {
         this.skipSpace();
         this.expect("=");
         value = this.parseValue();
+      } else if (/[A-Za-z_]/.test(this.peek())) {
+        const identifierStart = this.position;
+        const identifier = this.readWhile(/[A-Za-z0-9_]/);
+        this.skipSpace();
+        if (this.peek() === "=") {
+          this.position += 1;
+          key = identifier;
+          value = this.parseValue();
+        } else {
+          this.position = identifierStart;
+          key = nextArrayIndex;
+          nextArrayIndex += 1;
+          value = this.parseValue();
+        }
       } else {
         key = nextArrayIndex;
         nextArrayIndex += 1;
@@ -119,6 +144,14 @@ class LuaLiteralParser {
         continue;
       }
       const escaped = this.source[this.position++]!;
+      if (/[0-9]/.test(escaped)) {
+        let digits = escaped;
+        while (digits.length < 3 && /[0-9]/.test(this.peek())) {
+          digits += this.source[this.position++]!;
+        }
+        value += String.fromCharCode(Number(digits));
+        continue;
+      }
       const escapes: Readonly<Record<string, string>> = {
         n: "\n",
         r: "\r",
@@ -196,9 +229,10 @@ function requireString(value: LuaValue | undefined, context: string): string {
   return value;
 }
 
-function parseBorrowedRequiredSkills(coreLua: string): Set<number> {
-  const match = coreLua.match(
-    /lib:LoadBorrowed\("requiredSkill",\s*"Vanilla",\s*\{([^}]*)\}\)/,
+function parseBorrowedValues(source: string, field: string): Set<number> {
+  const escapedField = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = source.match(
+    new RegExp(`lib:LoadBorrowed\\("${escapedField}",\\s*"Vanilla",\\s*\\{([^}]*)\\}\\)`),
   );
   if (!match) return new Set();
   return new Set(
@@ -207,6 +241,57 @@ function parseBorrowedRequiredSkills(coreLua: string): Set<number> {
       .map((value) => Number(value.trim()))
       .filter(Number.isInteger),
   );
+}
+
+const SOURCE_KIND_BY_KEY = {
+  t: "trainer",
+  v: "vendor",
+  q: "quest",
+  c: "container",
+  d: "drop",
+} as const;
+
+type RecipeSourceKind = (typeof SOURCE_KIND_BY_KEY)[keyof typeof SOURCE_KIND_BY_KEY];
+
+interface ItemClassification {
+  readonly itemClassId: number;
+  readonly itemSubClassId: number;
+  readonly inventoryType: string;
+}
+
+function parseItemClassifications(sources: readonly string[]): Map<number, ItemClassification> {
+  const classifications = new Map<number, ItemClassification>();
+  for (const source of sources) {
+    const classMatch = source.match(/lib:LoadCore\(\s*(\d+)\s*,/);
+    if (!classMatch) continue;
+    const itemClassId = Number(classMatch[1]);
+    const records = parseCallTable(source, "lib:LoadCore(");
+    for (const [itemKey, packedValue] of records) {
+      const gameItemId = requireNumber(itemKey, "Item classification ID");
+      if (typeof packedValue !== "string") continue;
+      const fields = packedValue.split(String.fromCharCode(31));
+      const itemSubClassId = Number(fields[1]);
+      const inventoryType = fields[2];
+      if (!Number.isInteger(itemSubClassId) || !inventoryType) continue;
+      classifications.set(gameItemId, { itemClassId, itemSubClassId, inventoryType });
+    }
+  }
+  return classifications;
+}
+
+function parseRecipeSourceKinds(source: string | undefined): Map<number, readonly RecipeSourceKind[]> {
+  if (!source) return new Map();
+  const records = parseCallTable(source, "lib:LoadSources(");
+  const result = new Map<number, readonly RecipeSourceKind[]>();
+  for (const [spellKey, rawSources] of records) {
+    const spellId = requireNumber(spellKey, "Recipe source spell ID");
+    const sourceTable = requireTable(rawSources, `Recipe ${spellId} sources`);
+    const kinds = Object.entries(SOURCE_KIND_BY_KEY).flatMap(([key, kind]) =>
+      sourceTable.get(key) instanceof Map ? [kind] : [],
+    );
+    if (kinds.length > 0) result.set(spellId, kinds);
+  }
+  return result;
 }
 
 function buildIdFromHeader(coreLua: string): string {
@@ -219,16 +304,39 @@ function itemName(
   names: LuaTable,
   gameItemId: number,
   missingItemNameIds: Set<number>,
+  canonicalItemNames?: ReadonlyMap<number, string>,
 ): string {
+  const canonicalName = canonicalItemNames?.get(gameItemId);
+  if (canonicalName !== undefined) return canonicalName;
   const value = names.get(gameItemId);
   if (typeof value === "string" && value.length > 0) return value;
   missingItemNameIds.add(gameItemId);
   return `Unknown item #${gameItemId}`;
 }
 
+function itemRecord(
+  names: LuaTable,
+  gameItemId: number,
+  missingItemNameIds: Set<number>,
+  classifications: ReadonlyMap<number, ItemClassification>,
+  canonicalItemNames?: ReadonlyMap<number, string>,
+) {
+  const classification = classifications.get(gameItemId);
+  return {
+    id: `item-${gameItemId}`,
+    gameId: gameItemId,
+    name: itemName(names, gameItemId, missingItemNameIds, canonicalItemNames),
+    ...(classification === undefined ? {} : classification),
+  };
+}
+
 export function convertProfessionDbSnapshot(
   input: ProfessionDbSnapshotInput,
 ): ProfessionDbConversionResult {
+  const gameVersion = input.gameVersion ?? "Forever";
+  const sourceVersion = gameVersion === "Vanilla" ? "classic-era" : "forever";
+  const sourceLabel = gameVersion === "Vanilla" ? "Classic Era" : "Forever";
+  const sourceId = `professiondb-${input.professionDbVersion}-${sourceVersion}`;
   const buildId = buildIdFromHeader(input.coreLua);
   const core = parseCallTable(input.coreLua, `lib:LoadCore(${input.profession.skillLineId},`);
   const recipeNames = parseCallTable(
@@ -239,11 +347,25 @@ export function convertProfessionDbSnapshot(
   const acquireMethods = input.acquireMethodsLua
     ? parseCallTable(input.acquireMethodsLua, "lib:LoadAcquireMethods(")
     : new Map<LuaKey, LuaValue>();
-  const borrowedRequiredSkills = parseBorrowedRequiredSkills(input.coreLua);
+  const recipeItems = input.recipeItemsLua
+    ? parseCallTable(input.recipeItemsLua, "lib:LoadRecipeItems(")
+    : new Map<LuaKey, LuaValue>();
+  const recipeSourceKinds = parseRecipeSourceKinds(input.sourcesLua);
+  const hiddenRecipes = input.hiddenRecipesLua
+    ? parseCallTable(input.hiddenRecipesLua, "lib:LoadHiddenRecipes(")
+    : new Map<LuaKey, LuaValue>();
+  const borrowedRequiredSkills = parseBorrowedValues(input.coreLua, "requiredSkill");
+  const borrowedSources = parseBorrowedValues(input.sourcesLua ?? "", "sources");
+  const borrowedHiddenRecipes = parseBorrowedValues(input.hiddenRecipesLua ?? "", "hidden");
+  const itemClassifications = parseItemClassifications(input.itemCoreLua ?? []);
   const registeredItemIds = new Set<number>();
   const missingItemNameIds = new Set<number>();
   let knownLearnSkillRecipes = 0;
   let automaticRecipes = 0;
+  let teachingItemRecipes = 0;
+  let sourceKindRecipes = 0;
+  let borrowedSourceRecipes = 0;
+  let hiddenRecipeRecords = 0;
   let specializationRecipes = 0;
   const recipes = [...core.entries()].map(([recipeKey, rawRecipe]) => {
     const spellId = requireNumber(recipeKey, "Recipe spell ID");
@@ -257,6 +379,9 @@ export function convertProfessionDbSnapshot(
       `Recipe ${spellId} crafted item ID`,
     );
     const rawRequiredSkill = recipe.get("requiredSkill");
+    const borrowedLearnSkill = borrowedRequiredSkills.has(spellId) && rawRequiredSkill !== undefined
+      ? requireNumber(rawRequiredSkill, `Recipe ${spellId} borrowed required skill`)
+      : null;
     const learnSkill = borrowedRequiredSkills.has(spellId)
       ? null
       : rawRequiredSkill === undefined
@@ -270,7 +395,40 @@ export function convertProfessionDbSnapshot(
         : requireNumber(rawRequiredSpec, `Recipe ${spellId} required specialization`);
     if (specializationSpellId !== null) specializationRecipes += 1;
     const acquisitionMethod = acquireMethods.get(spellId);
-    const acquisition = acquisitionMethod === 1 ? ("automatic" as const) : ("unknown" as const);
+    const rawTeachingItemId = recipeItems.get(spellId);
+    const teachingItemId = rawTeachingItemId === undefined
+      ? null
+      : requireNumber(rawTeachingItemId, `Recipe ${spellId} teaching item`);
+    if (teachingItemId !== null) teachingItemRecipes += 1;
+    const sourceKinds = recipeSourceKinds.get(spellId) ?? [];
+    if (sourceKinds.length > 0) sourceKindRecipes += 1;
+    const sourceDataOrigin = sourceKinds.length === 0
+      ? ("unknown" as const)
+      : gameVersion === "Vanilla"
+        ? ("classic" as const)
+        : borrowedSources.has(spellId)
+        ? ("classic-borrowed" as const)
+        : ("forever" as const);
+    if (sourceDataOrigin === "classic-borrowed") borrowedSourceRecipes += 1;
+    const hiddenRecord = hiddenRecipes.get(spellId) === true;
+    if (hiddenRecord) hiddenRecipeRecords += 1;
+    const hiddenDataOrigin = hiddenRecord
+      ? gameVersion === "Vanilla"
+        ? ("classic" as const)
+        : borrowedHiddenRecipes.has(spellId)
+        ? ("classic-borrowed" as const)
+        : ("forever" as const)
+      : ("unknown" as const);
+    const sourceDataIsNative = sourceDataOrigin === "forever" || sourceDataOrigin === "classic";
+    const acquisitionFromSource =
+      sourceDataIsNative && sourceKinds.length === 1
+        ? sourceKinds[0] === "container"
+          ? "unknown"
+          : sourceKinds[0]
+        : "unknown";
+    const acquisition = acquisitionMethod === 1
+      ? ("automatic" as const)
+      : acquisitionFromSource;
     if (acquisition === "automatic") automaticRecipes += 1;
 
     const thresholds = {
@@ -279,6 +437,7 @@ export function convertProfessionDbSnapshot(
       green: requireNumber(difficulty.get(3), `Recipe ${spellId} green threshold`),
       gray: requireNumber(difficulty.get(4), `Recipe ${spellId} gray threshold`),
     };
+    const orangeSkillKnown = !(learnSkill === null && thresholds.orange === 1);
     const reagents = [...reagentTable.entries()].map(([itemKey, quantityValue]) => {
       const gameId = requireNumber(itemKey, `Recipe ${spellId} reagent item ID`);
       const quantity = requireNumber(
@@ -287,11 +446,13 @@ export function convertProfessionDbSnapshot(
       );
       registeredItemIds.add(gameId);
       return {
-        item: {
-          id: `item-${gameId}`,
+        item: itemRecord(
+          itemNames,
           gameId,
-          name: itemName(itemNames, gameId, missingItemNameIds),
-        },
+          missingItemNameIds,
+          itemClassifications,
+          input.canonicalItemNames,
+        ),
         quantity,
       };
     });
@@ -303,34 +464,62 @@ export function convertProfessionDbSnapshot(
       metadata: {
         spellId,
         learnSkill,
+        borrowedLearnSkill,
         acquisition,
+        teachingItemId,
+        sourceKinds,
+        sourceDataOrigin,
+        hiddenStatus: hiddenRecord ? true : null,
+        hiddenDataOrigin,
+        orangeSkillKnown,
         faction: "unknown" as const,
         specializationSpellId,
         cooldownSeconds: null,
-        availability: acquisition === "automatic" ? ("available" as const) : ("unknown" as const),
+        availability:
+          hiddenRecord && (hiddenDataOrigin === "forever" || hiddenDataOrigin === "classic")
+            ? ("unavailable" as const)
+            : acquisition === "automatic" || sourceDataIsNative
+              ? ("available" as const)
+              : ("unknown" as const),
       },
       thresholds,
       reagents,
       outputs: [
         {
-          item: {
-            id: `item-${craftedItemId}`,
-            gameId: craftedItemId,
-            name: itemName(itemNames, craftedItemId, missingItemNameIds),
-          },
+          item: itemRecord(
+            itemNames,
+            craftedItemId,
+            missingItemNameIds,
+            itemClassifications,
+            input.canonicalItemNames,
+          ),
           minimumQuantity: 1,
           maximumQuantity: 1,
         },
       ],
-      sourceId: `professiondb-${input.professionDbVersion}-forever-${buildId}`,
+      sourceId: `${sourceId}-${buildId}`,
       verification: {
         status: "unverified" as const,
         notes:
           "Client-derived recipe structure. Output quantity is provisionally one because the published ProfessionDB snapshot does not encode stack size.",
       },
-      provenanceNotes: borrowedRequiredSkills.has(spellId)
-        ? "Thresholds, reagents, and crafted item are Forever client data. The published Vanilla-borrowed required skill was deliberately not imported. Item names come from the matching LibItemDB Forever snapshot."
-        : "Thresholds, reagents, and crafted item are Forever client data. Item names come from the matching LibItemDB Forever snapshot. Output quantity remains unverified.",
+      provenanceNotes: [
+        `Thresholds, reagents, and crafted item are ${sourceLabel} client data.`,
+        borrowedRequiredSkills.has(spellId)
+          ? `The required skill ${borrowedLearnSkill ?? "value"} is borrowed from Vanilla and retained only as an unconfirmed fallback.`
+          : undefined,
+        sourceDataOrigin === "classic-borrowed"
+          ? "Recipe source kinds are borrowed from Vanilla and are not confirmed for Forever."
+          : undefined,
+        hiddenDataOrigin === "classic-borrowed"
+          ? "The hidden-recipe flag is borrowed from Vanilla and is not treated as Forever availability evidence."
+          : undefined,
+        orangeSkillKnown
+          ? undefined
+          : "The client orange value of 1 is an unanchored placeholder, not a verified skill threshold.",
+        `Item names and classifications come from the matching LibItemDB ${sourceLabel} snapshot.`,
+        "Output quantity remains unverified.",
+      ].filter((value): value is string => value !== undefined).join(" "),
     };
   });
 
@@ -338,9 +527,9 @@ export function convertProfessionDbSnapshot(
     build: { id: buildId, version: buildId.split(".").slice(0, 3).join(".") },
     sources: [
       {
-        id: `professiondb-${input.professionDbVersion}-forever-${buildId}`,
-        kind: "client-data",
-        label: `LibProfessionDB ${input.professionDbVersion} + LibItemDB ${input.itemDbVersion}`,
+        id: `${sourceId}-${buildId}`,
+        kind: gameVersion === "Vanilla" ? "classic-fallback" : "client-data",
+        label: `LibProfessionDB ${input.professionDbVersion} + LibItemDB ${input.itemDbVersion} (${sourceLabel})`,
         url: input.sourceUrl,
       },
     ],
@@ -364,6 +553,11 @@ export function convertProfessionDbSnapshot(
       knownLearnSkillRecipes,
       borrowedRequiredSkillRecipes: borrowedRequiredSkills.size,
       automaticRecipes,
+      teachingItemRecipes,
+      sourceKindRecipes,
+      borrowedSourceRecipes,
+      hiddenRecipeRecords,
+      classifiedItems: [...registeredItemIds].filter((id) => itemClassifications.has(id)).length,
       specializationRecipes,
       provisionalOutputQuantityRecipes: recipes.length,
     },

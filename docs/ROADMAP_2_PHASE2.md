@@ -2,6 +2,10 @@
 
 Status: implemented on October 9, 2026.
 
+Historical checkpoint: Roadmap v2 Phases 3 and 4 are now implemented. The current
+optimizer is stateful dynamic programming rather than the greedy implementation
+described as the next step at the end of this document.
+
 ## Domain boundary
 
 Phase 2 now has a framework-independent evaluator in `@forever-professions/domain`.

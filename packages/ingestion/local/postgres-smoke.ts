@@ -4,6 +4,8 @@ import { Pool, type PoolClient } from "pg";
 import type { ImportedBuildDataset } from "@forever-professions/contracts";
 import {
   ingestBuildDataset,
+  normalizeBuildDataset,
+  SqlRecipeChangeReader,
   type RawDatasetPutInput,
   type RawDatasetPutStatus,
   type RawDatasetStore,
@@ -119,6 +121,50 @@ function sampleDataset(): ImportedBuildDataset {
   };
 }
 
+function targetDataset(): ImportedBuildDataset {
+  const target = structuredClone(sampleDataset());
+  target.build = { id: "local-11.2.8.65100", version: "11.2.8" };
+  target.sources[0]!.id = "local-client-11.2.8";
+  target.sources[0]!.label = "Local target client-data smoke fixture";
+  for (const recipe of target.professions[0]!.recipes) {
+    recipe.sourceId = "local-client-11.2.8";
+  }
+  const armorKit = target.professions[0]!.recipes[0]!;
+  armorKit.metadata.learnSkill = 145;
+  armorKit.thresholds = { orange: 145, yellow: 165, green: 175, gray: 185 };
+  armorKit.reagents[0]!.quantity = 4;
+  target.professions[0]!.recipes.push({
+    id: "tanning-rack",
+    name: "Tanning Rack",
+    metadata: {
+      spellId: 99999,
+      learnSkill: 20,
+      acquisition: "trainer",
+      faction: "both",
+      specializationSpellId: null,
+      cooldownSeconds: null,
+      availability: "available",
+    },
+    thresholds: { orange: 20, yellow: 40, green: 50, gray: 60 },
+    reagents: [
+      {
+        item: { id: "light-leather", gameId: 2318, name: "Light Leather" },
+        quantity: 4,
+      },
+    ],
+    outputs: [
+      {
+        item: { id: "tanning-rack-item", gameId: 99000, name: "Tanning Rack" },
+        minimumQuantity: 1,
+        maximumQuantity: 1,
+      },
+    ],
+    sourceId: "local-client-11.2.8",
+    verification: { status: "unverified", notes: "Local smoke data only." },
+  });
+  return target;
+}
+
 class MemoryRawDatasetStore implements RawDatasetStore {
   readonly objects = new Map<string, Uint8Array>();
 
@@ -151,6 +197,8 @@ async function clearLocalRows(pool: Pool): Promise<void> {
   const client = await pool.connect();
   await client.query("BEGIN");
   try {
+    await client.query("DELETE FROM recipe_change");
+    await client.query("DELETE FROM recipe_comparison");
     await client.query("DELETE FROM recipe_output");
     await client.query("DELETE FROM recipe_reagent");
     await client.query("DELETE FROM recipe_threshold");
@@ -212,8 +260,10 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     reagents: string;
     outputs: string;
     recipe_metadata: string;
+    comparisons: string;
+    recipe_changes: string;
   }>(
-    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs",
+    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
   );
   const row = counts.rows[0]!;
 
@@ -223,6 +273,8 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     "SELECT COUNT(*) AS count FROM recipe_output ro LEFT JOIN recipe_version rv ON rv.recipe_version_id = ro.recipe_version_id LEFT JOIN item i ON i.item_id = ro.item_id WHERE rv.recipe_version_id IS NULL OR i.item_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_metadata rm LEFT JOIN recipe_version rv ON rv.recipe_version_id = rm.recipe_version_id WHERE rv.recipe_version_id IS NULL",
     "SELECT COUNT(*) AS count FROM provenance p LEFT JOIN recipe_version rv ON rv.recipe_version_id = p.recipe_version_id LEFT JOIN data_source s ON s.source_id = p.source_id LEFT JOIN verification v ON v.verification_id = p.verification_id WHERE rv.recipe_version_id IS NULL OR s.source_id IS NULL OR v.verification_id IS NULL",
+    "SELECT COUNT(*) AS count FROM recipe_comparison c LEFT JOIN wow_build b ON b.build_id = c.base_build_id LEFT JOIN wow_build t ON t.build_id = c.target_build_id WHERE b.build_id IS NULL OR t.build_id IS NULL",
+    "SELECT COUNT(*) AS count FROM recipe_change rc LEFT JOIN recipe_comparison c ON c.comparison_id = rc.comparison_id LEFT JOIN profession p ON p.profession_id = rc.profession_id WHERE c.comparison_id IS NULL OR p.profession_id IS NULL",
   ] as const;
   let orphanCount = 0;
   for (const orphanQuery of orphanQueries) {
@@ -238,6 +290,8 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     recipeMetadata: Number(row.recipe_metadata),
     reagents: Number(row.reagents),
     outputs: Number(row.outputs),
+    comparisons: Number(row.comparisons),
+    recipeChanges: Number(row.recipe_changes),
     orphans: orphanCount,
   };
 }
@@ -246,7 +300,9 @@ async function main(): Promise<void> {
   const pool = new Pool({ connectionString: localConnectionUrl(), max: 3 });
   const rawStore = new MemoryRawDatasetStore();
   const transactionRunner = createLocalTransactionRunner(pool);
-  const rawBytes = new TextEncoder().encode(JSON.stringify(sampleDataset()));
+  const baseDataset = sampleDataset();
+  const rawBytes = new TextEncoder().encode(JSON.stringify(baseDataset));
+  const targetRawBytes = new TextEncoder().encode(JSON.stringify(targetDataset()));
 
   try {
     const migrationsApplied = await applyMigrations(pool);
@@ -265,16 +321,79 @@ async function main(): Promise<void> {
       importedAt: "2026-01-02T00:00:00.000Z",
       maximumRows: 2,
     });
+    const targetImport = await ingestBuildDataset({
+      rawBytes: targetRawBytes,
+      rawStore,
+      transactionRunner,
+      importedAt: "2026-01-03T00:00:00.000Z",
+      maximumRows: 2,
+      compareAgainst: [
+        {
+          build: normalizeBuildDataset(baseDataset),
+          comparisonType: "CLASSIC_TO_FOREVER",
+        },
+      ],
+    });
+    const repeatedTargetImport = await ingestBuildDataset({
+      rawBytes: targetRawBytes,
+      rawStore,
+      transactionRunner,
+      importedAt: "2026-01-04T00:00:00.000Z",
+      maximumRows: 2,
+      compareAgainst: [
+        {
+          build: normalizeBuildDataset(baseDataset),
+          comparisonType: "CLASSIC_TO_FOREVER",
+        },
+      ],
+    });
     const rows = await verifyDatabase(pool);
+    const database: SqlExecutor = {
+      query: async (sql, values): Promise<SqlQueryResult> => {
+        const result = values === undefined ? await pool.query(sql) : await pool.query(sql, [...values]);
+        return {
+          rowCount: result.rowCount,
+          rows: result.rows as readonly Record<string, unknown>[],
+        };
+      },
+    };
+    const changeReader = new SqlRecipeChangeReader(database);
+    const changeSummary = await changeReader.getSummary({
+      comparisonType: "CLASSIC_TO_FOREVER",
+      professionId: "leatherworking",
+    });
+    const changes = await changeReader.listChanges({
+      comparisonType: "CLASSIC_TO_FOREVER",
+      professionId: "leatherworking",
+    });
+
+    if (
+      rows.comparisons !== 1 ||
+      rows.recipeChanges !== 3 ||
+      changeSummary?.summary.new !== 1 ||
+      changeSummary.summary.updated !== 1 ||
+      changeSummary.summary.unchanged !== 1 ||
+      changes?.changes.length !== 2
+    ) {
+      throw new Error("Local recipe comparison persistence returned unexpected results.");
+    }
 
     process.stdout.write(
       `${JSON.stringify(
         {
           migrationsApplied,
           rawObjectKey: firstImport.rawObjectKey,
-          rawObjectStatuses: [firstImport.rawObjectStatus, repeatedImport.rawObjectStatus],
+          rawObjectStatuses: [
+            firstImport.rawObjectStatus,
+            repeatedImport.rawObjectStatus,
+            targetImport.rawObjectStatus,
+            repeatedTargetImport.rawObjectStatus,
+          ],
           rawObjects: rawStore.objects.size,
           batches: firstImport.batches,
+          comparisonWrites: [targetImport.comparisons, repeatedTargetImport.comparisons],
+          changeSummary,
+          returnedChanges: changes.changes.length,
           rows,
         },
         null,

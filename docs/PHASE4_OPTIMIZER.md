@@ -1,5 +1,11 @@
 # Phase 4 leveling route optimizer
 
+Current-state note: this document describes the first optimizer delivery. The current
+engine is the later Roadmap v2 stateful dynamic-programming implementation with
+switch/acquisition friction and client-defined Scarce-material avoidance. See
+`docs/ROADMAP_2_PHASE3.md`, `docs/ROADMAP_2_PHASE4.md`, and
+`packages/optimizer/README.md`.
+
 ## Delivered architecture
 
 The optimizer begins as a pure shared package. For each requested skill point it:

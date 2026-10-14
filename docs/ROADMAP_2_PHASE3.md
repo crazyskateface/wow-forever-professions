@@ -2,6 +2,9 @@
 
 Status: implemented on October 9, 2026.
 
+Historical checkpoint: Phase 4 has since added active-recipe state, switch resistance,
+and practical acquisition friction as described in `ROADMAP_2_PHASE4.md`.
+
 ## Route algorithm
 
 The route optimizer now uses a backward dynamic-programming pass rather than

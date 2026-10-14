@@ -47,6 +47,21 @@ function optionalString(
   return value;
 }
 
+function optionalItemClassification(row: Readonly<Record<string, unknown>>) {
+  const id = optionalNumber(row, "classification_id");
+  if (id === undefined) return undefined;
+  return {
+    id,
+    label: requiredString(row, "classification_label"),
+    color: requiredNumber(row, "classification_color"),
+    source: {
+      product: requiredString(row, "classification_source_product"),
+      build: requiredString(row, "classification_source_build_id"),
+      locale: requiredString(row, "classification_source_locale"),
+    },
+  };
+}
+
 export class SqlRecipeCatalogReader implements RecipeCatalogReader {
   constructor(private readonly database: SqlExecutor) {}
 
@@ -89,11 +104,11 @@ export class SqlRecipeCatalogReader implements RecipeCatalogReader {
         [professionId, buildId],
       ),
       this.database.query(
-        "SELECT rr.recipe_version_id, i.item_id, i.game_id, i.name, rr.quantity FROM recipe_reagent rr JOIN item i ON i.item_id = rr.item_id JOIN recipe_version rv ON rv.recipe_version_id = rr.recipe_version_id JOIN recipe r ON r.recipe_id = rv.recipe_id WHERE r.profession_id = $1 AND rv.build_id = $2 ORDER BY rr.recipe_version_id, i.item_id",
+        "SELECT rr.recipe_version_id, i.item_id, i.game_id, i.name, rr.quantity, ic.classification_id, ic.classification_label, ic.color AS classification_color, ic.source_product AS classification_source_product, ic.source_build_id AS classification_source_build_id, ic.source_locale AS classification_source_locale FROM recipe_reagent rr JOIN item i ON i.item_id = rr.item_id JOIN recipe_version rv ON rv.recipe_version_id = rr.recipe_version_id JOIN recipe r ON r.recipe_id = rv.recipe_id LEFT JOIN item_classification ic ON ic.item_id = i.item_id AND ic.recipe_build_id = rv.build_id WHERE r.profession_id = $1 AND rv.build_id = $2 ORDER BY rr.recipe_version_id, i.item_id",
         [professionId, buildId],
       ),
       this.database.query(
-        "SELECT ro.recipe_version_id, i.item_id, i.game_id, i.name, ro.minimum_quantity, ro.maximum_quantity FROM recipe_output ro JOIN item i ON i.item_id = ro.item_id JOIN recipe_version rv ON rv.recipe_version_id = ro.recipe_version_id JOIN recipe r ON r.recipe_id = rv.recipe_id WHERE r.profession_id = $1 AND rv.build_id = $2 ORDER BY ro.recipe_version_id, i.item_id",
+        "SELECT ro.recipe_version_id, i.item_id, i.game_id, i.name, ro.minimum_quantity, ro.maximum_quantity, ic.classification_id, ic.classification_label, ic.color AS classification_color, ic.source_product AS classification_source_product, ic.source_build_id AS classification_source_build_id, ic.source_locale AS classification_source_locale FROM recipe_output ro JOIN item i ON i.item_id = ro.item_id JOIN recipe_version rv ON rv.recipe_version_id = ro.recipe_version_id JOIN recipe r ON r.recipe_id = rv.recipe_id LEFT JOIN item_classification ic ON ic.item_id = i.item_id AND ic.recipe_build_id = rv.build_id WHERE r.profession_id = $1 AND rv.build_id = $2 ORDER BY ro.recipe_version_id, i.item_id",
         [professionId, buildId],
       ),
     ]);
@@ -102,11 +117,13 @@ export class SqlRecipeCatalogReader implements RecipeCatalogReader {
     for (const row of reagentResult.rows) {
       const versionId = requiredString(row, "recipe_version_id");
       const gameItemId = row.game_id === null ? undefined : requiredNumber(row, "game_id");
+      const classification = optionalItemClassification(row);
       const reagents = reagentsByVersion.get(versionId) ?? [];
       reagents.push({
         itemId: requiredString(row, "item_id"),
         ...(gameItemId === undefined ? {} : { gameItemId }),
         name: requiredString(row, "name"),
+        ...(classification === undefined ? {} : { classification }),
         quantity: requiredNumber(row, "quantity"),
       });
       reagentsByVersion.set(versionId, reagents);
@@ -123,11 +140,13 @@ export class SqlRecipeCatalogReader implements RecipeCatalogReader {
         );
       }
       const gameItemId = row.game_id === null ? undefined : requiredNumber(row, "game_id");
+      const classification = optionalItemClassification(row);
       const outputs = outputsByVersion.get(versionId) ?? [];
       outputs.push({
         itemId: requiredString(row, "item_id"),
         ...(gameItemId === undefined ? {} : { gameItemId }),
         name: requiredString(row, "name"),
+        ...(classification === undefined ? {} : { classification }),
         quantity: minimum,
       });
       outputsByVersion.set(versionId, outputs);

@@ -1,0 +1,200 @@
+# Development and agent handoff guide
+
+This is the current-state guide for contributors and agents entering the repository.
+The dated roadmap documents explain how the system evolved; they are not the best
+source for current commands or runtime behavior.
+
+## Read first
+
+1. Read the root `AGENTS.md`, then the nearest scoped `AGENTS.md` for files you will
+   change.
+2. Read the root `README.md` for implemented features and the full local start.
+3. Read `data/imports/README.md` before changing imported game data.
+4. Read the package README for ingestion, optimizer, pricing, or shopping changes.
+5. Treat every file under `sources/` as read-only synced reference material.
+
+## Current system shape
+
+```text
+LibProfessionDB + LibItemDB + reviewed overrides + pinned client DB2
+                              |
+                    imported build JSON
+                              |
+            raw archive + normalized SQL records
+                    /                   \
+        current recipe catalog      stored build comparison
+                    |                   |
+             API + optimizer       Forever Changes API
+                    \                   /
+                      React/Vite client
+```
+
+The current product data is Leatherworking only:
+
+| Purpose | Build | File |
+| --- | --- | --- |
+| Classic comparison baseline | `1.15.9.69722` | `data/imports/classic-era-1.15.9.69722-leatherworking.json` |
+| Forever target catalog | `1.60.1.69977` | `data/imports/forever-1.60.1.69977-leatherworking.json` |
+| Client icons and item labels | `1.60.1.70374` | `apps/web/public/icons/items/manifest.json` plus classification source metadata |
+
+The target contains 603 recipes and 760 referenced items. Its current Classic →
+Forever comparison is 289 New, 227 Updated, 0 Removed, and 87 Unchanged logical
+recipes.
+
+## Ownership boundaries
+
+| Area | Owner | Important rule |
+| --- | --- | --- |
+| Shared API/data shapes | `packages/contracts` | Validate every external boundary with Zod. |
+| Profession math and quality | `packages/domain` | Pure, deterministic, framework-independent. |
+| Route selection | `packages/optimizer` | No UI or database dependencies. |
+| Shopping decisions | `packages/shopping` | Missing prices/sources remain explicit. |
+| Auction providers/storage | `packages/pricing` | Integer copper; vendor shapes stay in adapters. |
+| Build conversion/storage/diffs | `packages/ingestion` | Preserve exact bytes, builds, provenance, and immutable rows. |
+| HTTP adaptation | `apps/api` | Thin routing into testable package/application functions. |
+| Browser presentation | `apps/web` | Keep loaded-data interactions client-side; do not duplicate optimizer logic. |
+| AWS resources | `ops` | CDK v2, stable construct IDs, explicit retention/removal behavior. |
+
+Applications may depend on shared packages. Shared packages must not depend on an
+application. In particular, the UI never decides which recipe is optimal and the API
+never calls AH Ledger in a user request.
+
+## Local runtime
+
+Services use fixed local ports:
+
+| Service | Address |
+| --- | --- |
+| Vite | `http://127.0.0.1:5173` |
+| API | `http://127.0.0.1:3001` |
+| PostgreSQL | `127.0.0.1:55432` |
+
+Vite proxies `/api` to port 3001. The API selects PostgreSQL only when
+`LOCAL_DATABASE_URL` is present; otherwise it serves the illustrative fixture and has
+no stored recipe comparison.
+
+Use this import order for the complete UI:
+
+```text
+pnpm db:local:up
+pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
+```
+
+The PostgreSQL container stores its database in `tmpfs`. Stopping/removing it clears
+normalized data. Raw objects under `.local-data/` are content-addressed and persist.
+
+### Immutable-build regeneration gotcha
+
+`wow_build` binds one build ID to the exact imported raw hash. If a checked-in JSON
+snapshot is regenerated with different bytes but the same game build ID, importing it
+over the existing local row correctly reports an immutable-value conflict. Reset the
+disposable local database, reimport the baseline, and then reimport the target with
+the comparison. Do not weaken the immutable writer to make this go away.
+
+The catalog reader serves the most recently imported build. The recipe-change reader
+serves the latest stored comparison of the requested comparison type.
+
+## Data and trust invariants
+
+- Never infer a missing Forever fact from a recipe name or from a Classic value.
+- A borrowed Classic value must retain fallback provenance and must not be promoted to
+  a supported Forever value.
+- Presence in client files does not prove that a recipe is obtainable in game.
+- Explicitly unavailable recipes never enter routes. Unknown availability is
+  permissive but visible; unknown learning rank is ineligible.
+- Recipe identity for comparisons is `(professionId, spellId)`, not display name or
+  row ID.
+- Comparisons store Unchanged records too, allowing summaries to be reconstructed
+  exactly. The UI hides them by default.
+- Enriching an item with icon or item-name-description metadata is not a gameplay
+  recipe change and must not turn a recipe into Updated.
+- Forever's `Scarce` designation comes from client
+  `ItemSparse.ItemNameDescriptionID → ItemNameDescription`. Do not maintain a list of
+  item names. Store generic classification metadata and let the optimizer interpret
+  the `Scarce` label.
+- Classification records are scoped to the recipe build and also retain their actual
+  client source product/build/locale because enrichment may come from a newer client
+  than the recipe archive.
+- Missing auction prices are unavailable, never zero.
+
+## Item assets
+
+Item images are static WebP files under `apps/web/public/icons/items`. The manifest
+records recipe build, asset build, FileDataID mappings, and missing item IDs. Keeping
+these deterministic assets in the web build is the current deployment strategy; the
+React `ItemIcon` component prevents every image from loading at startup by using
+native lazy loading for non-hero images.
+
+The converter queries the installed client with `wowdata`. It resolves `latest` once,
+then pins all DB2 and icon reads to the returned build. Equipment without a direct
+`Item.IconFileDataID` falls back through `ItemModifiedAppearance` and
+`ItemAppearance.DefaultIconFileDataID`.
+
+## Forever Changes behavior
+
+The comparison engine tracks name, reagents, outputs, four thresholds, learning rank,
+acquisition, faction, specialization, cooldown, and availability. It only reports a
+target field as changed when target evidence is comparable; unknown learning,
+acquisition, availability, and unanchored orange placeholders do not create false
+updates.
+
+The UI currently has no comparison chooser. The Forever Changes tab intentionally
+shows the stored Classic Era → Forever comparison. API and persistence support
+`forever-build` comparisons for future use.
+
+The shared current-skill slider powers change availability tags and the filters for
+recipes above current skill or with unknown requirements. Item-type filtering prefers
+LibItemDB class/subclass metadata and uses name heuristics only as a display fallback.
+
+## Verification expectations
+
+Run checks in proportion to the change. The complete gate is:
+
+```text
+pnpm verify
+```
+
+Useful focused checks:
+
+```text
+pnpm typecheck
+pnpm --filter @forever-professions/contracts test
+pnpm --filter @forever-professions/ingestion test
+pnpm --filter @forever-professions/optimizer test
+pnpm --filter @forever-professions/api test
+pnpm --filter @forever-professions/web build
+pnpm db:local:test
+```
+
+After data or SQL changes, also import both real snapshots into disposable PostgreSQL,
+query the affected API, and regenerate the quality report. A typecheck alone does not
+prove migration ordering, catalog reconstruction, or comparison persistence.
+
+On some Windows sandboxed runs, parallel Vitest workers can lose transformed files
+from the sandbox temp directory and report `ENOENT` before tests execute. Re-run the
+suite outside that filesystem sandbox or run the focused suite separately; do not
+misclassify that host-level temp failure as a product test failure.
+
+## Known limitations
+
+- Leatherworking is the only complete imported profession.
+- Most acquisition/availability facts and every recipe's final verification remain
+  incomplete.
+- Item-type display heuristics remain necessary for records without LibItemDB type
+  metadata.
+- Current item assets ship with the web application rather than an object-storage CDN.
+- Live market coverage depends on normalized prices refreshed separately from API
+  requests.
+- The add-on collection approach is deferred; the current pipeline relies on source
+  archives, installed-client DB2 data, reviewed overrides, and quality reporting.
+- Aurora DSQL migrations 017–022 have not yet completed the same live revalidation as
+  migrations 001–016.
+
+## Documentation maintenance
+
+When behavior changes, update the root README and the closest focused document in the
+same change. Keep exact dataset hashes in `data/imports/README.md`, endpoint examples in
+`docs/API_TESTING.md`, and component/package invariants in their package README or
+scoped `AGENTS.md`. Mark dated roadmap claims as historical rather than silently
+treating them as current truth.

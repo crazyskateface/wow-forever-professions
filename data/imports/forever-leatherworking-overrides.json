@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "manual-override-embossed-leather-cloak-2026-10-11",
+      "kind": "manual-override",
+      "label": "Embossed Leather Cloak Forever correction",
+      "url": "https://wow-forever.gg/professions/leatherworking/"
+    },
+    {
+      "id": "manual-override-fine-leather-boots-2026-10-11",
+      "kind": "manual-override",
+      "label": "Fine Leather Boots acquisition correction",
+      "url": "https://wow-forever.gg/professions/leatherworking/"
+    },
+    {
+      "id": "manual-override-embossed-leather-boots-2026-10-11",
+      "kind": "manual-override",
+      "label": "Embossed Leather Boots Forever correction",
+      "url": "https://ahledger.com/wow-forever/recipes/2161-embossed-leather-boots"
+    },
+    {
+      "id": "manual-override-leatherworking-alternatives-2026-10-11",
+      "kind": "manual-override",
+      "label": "Leatherworking trainer and conversion recipe corrections",
+      "url": "https://ahledger.com/wow-forever/recipes"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "spell-2158",
+      "metadata": {
+        "learnSkill": 65,
+        "acquisition": "drop",
+        "sourceKinds": ["drop"],
+        "sourceDataOrigin": "forever",
+        "orangeSkillKnown": true,
+        "availability": "available"
+      },
+      "thresholds": { "orange": 65, "yellow": 95, "green": 110, "gray": 125 },
+      "sourceId": "manual-override-fine-leather-boots-2026-10-11",
+      "verification": {
+        "status": "unverified",
+        "notes": "Forever client data and published profession references identify this as an available dropped-pattern recipe learned at 65. Reagents remain client-derived and output quantity remains provisional."
+      },
+      "provenanceNotes": "Manual Forever correction for acquisition and availability. Pattern: Fine Leather Boots is a world drop, so the recipe does not appear in the profession spellbook until the pattern is learned."
+    },
+    {
+      "id": "spell-2161",
+      "metadata": {
+        "learnSkill": 40,
+        "acquisition": "trainer",
+        "sourceKinds": ["trainer"],
+        "sourceDataOrigin": "forever",
+        "orangeSkillKnown": true,
+        "availability": "available"
+      },
+      "thresholds": { "orange": 40, "yellow": 80, "green": 95, "gray": 110 },
+      "sourceId": "manual-override-embossed-leather-boots-2026-10-11",
+      "verification": {
+        "status": "unverified",
+        "notes": "Learning rank, trainer acquisition, availability, and 40/80/95/110 thresholds are corrected from an October 11, 2026 in-game observation and published Forever recipe data."
+      },
+      "provenanceNotes": "Manual Forever correction for eligibility, trainer acquisition, and skill thresholds."
+    },
+    {
+      "id": "spell-2162",
+      "metadata": {
+        "learnSkill": 60,
+        "acquisition": "trainer",
+        "sourceKinds": ["trainer"],
+        "sourceDataOrigin": "forever",
+        "orangeSkillKnown": true,
+        "availability": "available"
+      },
+      "thresholds": { "orange": 60, "yellow": 70, "green": 85, "gray": 100 },
+      "sourceId": "manual-override-embossed-leather-cloak-2026-10-11",
+      "verification": {
+        "status": "unverified",
+        "notes": "Learning rank, trainer acquisition, availability, and 60/70/85/100 thresholds are corrected from an October 11, 2026 in-game observation and published Forever profession data."
+      },
+      "provenanceNotes": "Manual Forever correction for eligibility and skill thresholds; the player observed ten guaranteed orange skill-ups from 60 through 69."
+    },
+    {
+      "id": "spell-3763",
+      "metadata": {
+        "learnSkill": 45,
+        "acquisition": "trainer",
+        "sourceKinds": ["trainer"],
+        "sourceDataOrigin": "forever",
+        "orangeSkillKnown": true,
+        "availability": "available"
+      },
+      "thresholds": { "orange": 45, "yellow": 85, "green": 100, "gray": 115 },
+      "sourceId": "manual-override-leatherworking-alternatives-2026-10-11",
+      "verification": {
+        "status": "unverified",
+        "notes": "Learning rank, trainer acquisition, availability, and 45/85/100/115 thresholds are corrected from published Forever recipe data."
+      },
+      "provenanceNotes": "Manual Forever correction for Fine Leather Belt eligibility, trainer acquisition, and skill thresholds."
+    },
+    {
+      "id": "spell-3816",
+      "metadata": {
+        "learnSkill": 10,
+        "acquisition": "trainer",
+        "sourceKinds": ["trainer"],
+        "sourceDataOrigin": "forever",
+        "orangeSkillKnown": true,
+        "availability": "available"
+      },
+      "thresholds": { "orange": 10, "yellow": 50, "green": 60, "gray": 70 },
+      "sourceId": "manual-override-leatherworking-alternatives-2026-10-11",
+      "verification": {
+        "status": "unverified",
+        "notes": "Learning rank, trainer acquisition, availability, and 10/50/60/70 thresholds are corrected from published Forever recipe data."
+      },
+      "provenanceNotes": "Manual Forever correction for Cured Light Hide eligibility, trainer acquisition, and skill thresholds."
+    },
+    {
+      "id": "spell-3817",
+      "metadata": {
+        "learnSkill": 50,
+        "acquisition": "trainer",
+        "sourceKinds": ["trainer"],
+        "sourceDataOrigin": "forever",
+        "orangeSkillKnown": true,
+        "availability": "available"
+      },
+      "thresholds": { "orange": 50, "yellow": 90, "green": 97, "gray": 105 },
+      "sourceId": "manual-override-leatherworking-alternatives-2026-10-11",
+      "verification": {
+        "status": "unverified",
+        "notes": "Learning rank, trainer acquisition, availability, and 50/90/97/105 thresholds are corrected from published Forever recipe data."
+      },
+      "provenanceNotes": "Manual Forever correction for Cured Medium Hide eligibility, trainer acquisition, and skill thresholds."
+    },
+    {
+      "id": "spell-3818",
+      "metadata": {
+        "learnSkill": 95,
+        "acquisition": "trainer",
+        "sourceKinds": ["trainer"],
+        "sourceDataOrigin": "forever",
+        "orangeSkillKnown": true,
+        "availability": "available"
+      },
+      "thresholds": { "orange": 95, "yellow": 135, "green": 140, "gray": 145 },
+      "sourceId": "manual-override-leatherworking-alternatives-2026-10-11",
+      "verification": {
+        "status": "unverified",
+        "notes": "Learning rank, trainer acquisition, availability, and 95/135/140/145 thresholds are corrected from published Forever recipe data."
+      },
+      "provenanceNotes": "Manual Forever correction for Cured Heavy Hide eligibility, trainer acquisition, and skill thresholds."
+    },
+    {
+      "id": "spell-10482",
+      "metadata": {
+        "learnSkill": 135,
+        "acquisition": "trainer",
+        "sourceKinds": ["trainer"],
+        "sourceDataOrigin": "forever",
+        "orangeSkillKnown": true,
+        "availability": "available"
+      },
+      "thresholds": { "orange": 135, "yellow": 175, "green": 175, "gray": 175 },
+      "sourceId": "manual-override-leatherworking-alternatives-2026-10-11",
+      "verification": {
+        "status": "unverified",
+        "notes": "Learning rank, trainer acquisition, availability, and 135/175/175/175 thresholds are corrected from published Forever recipe data."
+      },
+      "provenanceNotes": "Manual Forever correction for Cured Thick Hide eligibility, trainer acquisition, and skill thresholds."
+    }
+  ]
+}

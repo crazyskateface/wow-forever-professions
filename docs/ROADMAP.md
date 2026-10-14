@@ -1,5 +1,9 @@
 # Forever Professions roadmap
 
+Historical note: this is the original implementation roadmap. The guide-first Roadmap
+v2 and subsequent Forever Changes/client-asset work supersede its current-status
+assumptions. Start with `README.md` and `docs/DEVELOPMENT.md`.
+
 The product should feel like a polished calculator, not a traditional guide site. Its first job is to answer what a player can craft, the chance of a skill point, the expected number of crafts, and the materials consumed.
 
 ## Target architecture
