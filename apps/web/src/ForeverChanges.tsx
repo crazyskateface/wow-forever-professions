@@ -6,6 +6,8 @@ import type {
   RecipeComparisonSnapshot,
 } from "@forever-professions/contracts";
 import { ItemIcon } from "./ItemIcon.js";
+import { ItemTooltip } from "./ItemTooltip.js";
+import type { ItemTooltipData } from "./item-tooltip.js";
 import {
   DEFAULT_CHANGE_FILTERS,
   type ChangeFilter,
@@ -223,6 +225,24 @@ export function RecipeChangeBadge({ changeType }: { readonly changeType: RecipeC
   );
 }
 
+function changeTooltipItem(change: RecipeChange): ItemTooltipData {
+  const snapshot = change.target ?? change.base;
+  const output = snapshot?.outputs[0];
+  return {
+    name: output?.name ?? change.name,
+    ...(output?.gameItemId === undefined ? {} : { gameItemId: output.gameItemId }),
+    ...(output?.itemClassId === undefined ? {} : { itemClassId: output.itemClassId }),
+    ...(output?.itemSubClassId === undefined ? {} : { itemSubClassId: output.itemSubClassId }),
+    ...(output?.inventoryType === undefined ? {} : { inventoryType: output.inventoryType }),
+    details: [
+      { text: `${change.professionName} recipe` },
+      snapshot?.learnSkill === null || snapshot?.learnSkill === undefined
+        ? { text: "Recipe learning skill unknown", tone: "warning" }
+        : { text: `Recipe learned at skill ${snapshot.learnSkill}`, tone: "muted" },
+    ],
+  };
+}
+
 function ChangeCard({
   change,
   currentSkill,
@@ -237,11 +257,13 @@ function ChangeCard({
   return (
     <details className={`change-card change-card-${change.changeType.toLowerCase()}`}>
       <summary>
-        <ItemIcon
-          className="change-card-icon"
-          gameItemId={snapshot?.outputs[0]?.gameItemId}
-          name={snapshot?.outputs[0]?.name ?? change.name}
-        />
+        <ItemTooltip item={changeTooltipItem(change)}>
+          <ItemIcon
+            className="change-card-icon"
+            gameItemId={snapshot?.outputs[0]?.gameItemId}
+            name={snapshot?.outputs[0]?.name ?? change.name}
+          />
+        </ItemTooltip>
         <span className="change-card-copy">
           <span className="change-card-meta">
             <RecipeChangeBadge changeType={change.changeType} />

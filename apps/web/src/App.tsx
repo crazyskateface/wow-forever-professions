@@ -36,6 +36,8 @@ import {
 import { leatherworkingFixture } from "@forever-professions/fixtures";
 import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
+import { ItemTooltip } from "./ItemTooltip.js";
+import type { ItemTooltipData } from "./item-tooltip.js";
 import {
   DEFAULT_PERSONALIZATION,
   clearPersonalization,
@@ -197,6 +199,45 @@ function acquisitionLabel(recipe: Recipe): string {
   if (recipe.acquisition === "unknown") return "Source unknown";
   if (recipe.acquisition === "automatic") return "Learned automatically";
   return recipe.acquisition[0]!.toUpperCase() + recipe.acquisition.slice(1);
+}
+
+function outputTooltipItem(recipe: Recipe, professionName: string): ItemTooltipData {
+  const output = recipe.outputs[0]!;
+  return {
+    name: output.name,
+    ...(output.gameItemId === undefined ? {} : { gameItemId: output.gameItemId }),
+    ...(output.itemClassId === undefined ? {} : { itemClassId: output.itemClassId }),
+    ...(output.itemSubClassId === undefined ? {} : { itemSubClassId: output.itemSubClassId }),
+    ...(output.inventoryType === undefined ? {} : { inventoryType: output.inventoryType }),
+    ...(output.classification === undefined ? {} : { classification: output.classification }),
+    details: [
+      { text: `Crafted by ${professionName}` },
+      { text: `Creates ${output.quantity} per craft` },
+      recipe.learnSkill === null
+        ? { text: "Recipe learning skill unknown", tone: "warning" }
+        : { text: `Recipe learned at skill ${recipe.learnSkill}`, tone: "muted" },
+    ],
+  };
+}
+
+function reagentTooltipItem(
+  reagent: Recipe["reagents"][number],
+  price: number | undefined,
+): ItemTooltipData {
+  return {
+    name: reagent.name,
+    ...(reagent.gameItemId === undefined ? {} : { gameItemId: reagent.gameItemId }),
+    ...(reagent.itemClassId === undefined ? {} : { itemClassId: reagent.itemClassId }),
+    ...(reagent.itemSubClassId === undefined ? {} : { itemSubClassId: reagent.itemSubClassId }),
+    ...(reagent.inventoryType === undefined ? {} : { inventoryType: reagent.inventoryType }),
+    ...(reagent.classification === undefined ? {} : { classification: reagent.classification }),
+    details: [
+      { text: `Required per craft: ${reagent.quantity}` },
+      price === undefined
+        ? { text: "Market price unavailable", tone: "muted" }
+        : { text: `Market unit price: ${formatCopper(price)}`, tone: "accent" },
+    ],
+  };
 }
 
 interface RouteRequestOptions {
@@ -1243,7 +1284,9 @@ export function App() {
                     >
                       <span className="guide-step-number">{index + 1}</span>
                       <span className="guide-step-title">
-                        <ItemIcon className="guide-item-icon" gameItemId={guideRecipe.outputs[0]?.gameItemId} name={guideRecipe.name} />
+                        <ItemTooltip item={outputTooltipItem(guideRecipe, profession.name)}>
+                          <ItemIcon className="guide-item-icon" gameItemId={guideRecipe.outputs[0]?.gameItemId} name={guideRecipe.name} />
+                        </ItemTooltip>
                         <span>
                           <strong>{guideRecipe.name}</strong>
                           <small className={`guide-source source-${guideRecipe.acquisition}`}>
@@ -1295,7 +1338,9 @@ export function App() {
                 <div className="recipe-group">
                   <button aria-current={candidate.id === recipe.id ? "true" : undefined} className={candidate.id === recipe.id ? "recipe active" : "recipe"} onClick={() => selectRecipe(candidate)} type="button">
                     <span className={`recipe-stripe stripe-${index}`} aria-hidden="true" />
-                    <ItemIcon className={`item-icon item-${index}`} gameItemId={candidate.outputs[0]?.gameItemId} name={candidate.name} />
+                    <ItemTooltip item={outputTooltipItem(candidate, profession.name)}>
+                      <ItemIcon className={`item-icon item-${index}`} gameItemId={candidate.outputs[0]?.gameItemId} name={candidate.name} />
+                    </ItemTooltip>
                     <span className="recipe-copy"><strong>{candidate.name}</strong><small>{candidate.reagents.length} reagents · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>{getRecipeChangeType(candidate) ? <RecipeChangeBadge changeType={getRecipeChangeType(candidate)!} /> : null}</span>
                     <span className={`recipe-level ${getRecipeDifficulty(skill, candidate.thresholds)}`}>
                       {candidate.thresholds.orange}
@@ -1344,7 +1389,9 @@ export function App() {
             <>
               <section className="recipe-hero" aria-labelledby="recipe-title">
                 <div className="hero-title-row">
-                  <ItemIcon className="hero-item-icon" eager gameItemId={recipe.outputs[0]?.gameItemId} name={recipe.name} />
+                  <ItemTooltip item={outputTooltipItem(recipe, profession.name)} pinnable>
+                    <ItemIcon className="hero-item-icon" eager gameItemId={recipe.outputs[0]?.gameItemId} name={recipe.name} />
+                  </ItemTooltip>
                   <div>
                     <div className="breadcrumb">{profession.name}</div>
                     <div className="recipe-name-row">
@@ -1411,7 +1458,12 @@ export function App() {
                     const expectedQuantity = getExpectedReagentQuantity(reagent.quantity, calculation.probability);
                     return (
                       <div className="material-row" key={reagent.itemId} role="row">
-                        <span className="material-name"><ItemIcon className={`item-icon reagent-${index}`} gameItemId={reagent.gameItemId} name={reagent.name} /><span><strong>{reagent.name}</strong><small>Item {reagent.gameItemId ?? "—"}</small></span></span>
+                        <span className="material-name">
+                          <ItemTooltip item={reagentTooltipItem(reagent, price)} pinnable>
+                            <ItemIcon className={`item-icon reagent-${index}`} gameItemId={reagent.gameItemId} name={reagent.name} />
+                          </ItemTooltip>
+                          <span><strong>{reagent.name}</strong><small>Item {reagent.gameItemId ?? "—"}</small></span>
+                        </span>
                         <strong>{formatNumber(expectedQuantity)}</strong>
                         <span className="source-pill"><i aria-hidden="true" /> Auction house</span>
                         <strong className="material-cost">{price === undefined ? "Unavailable" : formatCopper(price * expectedQuantity)}</strong>

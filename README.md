@@ -48,6 +48,9 @@ data.
   and verification status.
 - Uses 760 build-stamped WebP item icons. Off-screen list and change-card images are
   browser-lazy-loaded; missing assets fall back to item initials.
+- Shows catalog-backed item details after a one-second icon hover. Calculator icons
+  can pin the tooltip on click and support close-button, Escape, and outside-click
+  dismissal without inventing unsupported item stats.
 
 ### Forever Changes
 
