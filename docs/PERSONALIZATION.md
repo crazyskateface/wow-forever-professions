@@ -18,6 +18,10 @@ web client stores one versioned JSON profile under the local-storage key
 The selected market is used for recipe prices, cost optimization, and shopping-list
 requests. The selected faction is sent to the optimizer as an eligibility constraint.
 The browser restores saved route settings when it generates the initial guide.
+Changing region, market, or faction cancels in-flight planning requests and clears
+route and shopping results that were calculated with the previous profile. The
+session's known-recipe selection is preserved so the next route rebuild uses the
+player's active choices.
 
 The Legacy profession bonus is saved but intentionally not applied to calculations.
 Forever-specific modifier behavior has not been verified, so applying the number to

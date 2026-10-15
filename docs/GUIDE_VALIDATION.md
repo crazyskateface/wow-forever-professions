@@ -53,6 +53,10 @@ writes:
 - a Markdown report containing skill-range disagreements, evidence risks, craft
   totals, material totals, Scarce usage, and suspicious segment counts.
 
+If any reference step omits reagent data, the report labels all reference material
+totals as partial and suppresses numeric deltas rather than treating omitted data as
+zero.
+
 Optional positional arguments select a reference file, output directory, and API base
 URL. Set `GUIDE_VALIDATION_GENERATED_AT` to a fixed ISO timestamp for a byte-for-byte
 repeatable baseline.

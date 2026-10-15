@@ -132,6 +132,7 @@ export interface MaterialComparison {
   readonly materialName: string;
   readonly generatedQuantity?: number | undefined;
   readonly referenceQuantity?: number | undefined;
+  readonly referenceQuantityStatus: "complete" | "partial";
   readonly delta?: number | undefined;
 }
 
@@ -163,6 +164,7 @@ export interface GuideValidationResult {
     readonly generatedExpectedCrafts: number;
     readonly referenceExpectedCrafts?: number | undefined;
     readonly expectedCraftDelta?: number | undefined;
+    readonly referenceMaterialsComplete: boolean;
     readonly unresolvedReferenceRecipes: readonly string[];
     readonly uncertainGeneratedRecipes: readonly string[];
     readonly scarceGeneratedRecipes: readonly string[];
@@ -283,7 +285,10 @@ function generatedMaterials(
 
 function referenceMaterials(
   reference: ReferenceGuide,
-): ReadonlyMap<string, { name: string; quantity: number }> {
+): {
+  readonly complete: boolean;
+  readonly totals: ReadonlyMap<string, { name: string; quantity: number }>;
+} {
   const totals = new Map<string, { name: string; quantity: number }>();
   for (const step of reference.steps) {
     for (const reagent of step.reagents ?? []) {
@@ -292,7 +297,10 @@ function referenceMaterials(
       totals.set(key, { name: reagent.name, quantity: current + reagent.quantity });
     }
   }
-  return totals;
+  return {
+    complete: reference.steps.every(({ reagents }) => reagents !== undefined),
+    totals,
+  };
 }
 
 function referenceStepAt(
@@ -362,7 +370,8 @@ function disagreementsFor(
   const disagreements: GuideDisagreement[] = [];
   for (const step of route.steps) {
     const referenceStep = referenceStepAt(reference, step.skill);
-    if (normalizedName(step.recipeName) === normalizedName(referenceStep.recipeName)) {
+    const referenceRecipe = recipesByName.get(normalizedName(referenceStep.recipeName));
+    if (referenceRecipe?.id === step.recipeId) {
       continue;
     }
     const generatedRecipe = recipesById.get(step.recipeId);
@@ -371,7 +380,7 @@ function disagreementsFor(
     }
     const classified = classificationFor(
       generatedRecipe,
-      recipesByName.get(normalizedName(referenceStep.recipeName)),
+      referenceRecipe,
       route.objective,
       reference.optimizationIntent,
     );
@@ -406,6 +415,7 @@ function disagreementsFor(
 function materialComparisons(
   generated: ReadonlyMap<string, { name: string; quantity: number }>,
   reference: ReadonlyMap<string, { name: string; quantity: number }>,
+  referenceComplete: boolean,
 ): readonly MaterialComparison[] {
   return [...new Set([...generated.keys(), ...reference.keys()])]
     .map((key) => {
@@ -413,17 +423,24 @@ function materialComparisons(
       const referenceMaterial = reference.get(key);
       const generatedQuantity = generatedMaterial?.quantity;
       const referenceQuantity = referenceMaterial?.quantity;
+      const referenceQuantityStatus: MaterialComparison["referenceQuantityStatus"] =
+        referenceComplete ? "complete" : "partial";
       return {
         materialName: generatedMaterial?.name ?? referenceMaterial!.name,
+        referenceQuantityStatus,
         ...(generatedQuantity === undefined
           ? {}
           : { generatedQuantity: rounded(generatedQuantity) }),
         ...(referenceQuantity === undefined
           ? {}
           : { referenceQuantity: rounded(referenceQuantity) }),
-        ...(generatedQuantity === undefined || referenceQuantity === undefined
+        ...(
+          !referenceComplete ||
+          generatedQuantity === undefined ||
+          referenceQuantity === undefined
           ? {}
-          : { delta: rounded(generatedQuantity - referenceQuantity) }),
+          : { delta: rounded(generatedQuantity - referenceQuantity) }
+        ),
       };
     })
     .sort((left, right) => {
@@ -459,7 +476,7 @@ export function createGuideValidation(
   const recipesById = new Map(input.recipes.map((recipe) => [recipe.id, recipe]));
   const recipesByName = uniqueRecipesByName(input.recipes);
   const generatedMaterialTotals = generatedMaterials(input.route, recipesById);
-  const referenceMaterialTotals = referenceMaterials(input.reference);
+  const referenceMaterialAccounting = referenceMaterials(input.reference);
   const baselineSegments = input.route.segments.map((segment) =>
     baselineSegment(segment, recipesById),
   );
@@ -545,6 +562,7 @@ export function createGuideValidation(
             referenceExpectedCrafts: rounded(referenceCrafts),
             expectedCraftDelta: rounded(input.route.totals.expectedCrafts - referenceCrafts),
           }),
+      referenceMaterialsComplete: referenceMaterialAccounting.complete,
       unresolvedReferenceRecipes,
       uncertainGeneratedRecipes,
       scarceGeneratedRecipes,
@@ -556,7 +574,11 @@ export function createGuideValidation(
       ).length,
     },
     disagreements,
-    materials: materialComparisons(generatedMaterialTotals, referenceMaterialTotals),
+    materials: materialComparisons(
+      generatedMaterialTotals,
+      referenceMaterialAccounting.totals,
+      referenceMaterialAccounting.complete,
+    ),
   };
 }
 
@@ -566,6 +588,16 @@ function markdownCell(value: string): string {
 
 function displayed(value: number | undefined): string {
   return value === undefined ? "—" : String(rounded(value));
+}
+
+function displayedReferenceMaterial(material: MaterialComparison): string {
+  if (material.referenceQuantity === undefined) {
+    return material.referenceQuantityStatus === "partial" ? "unknown (partial)" : "—";
+  }
+  const quantity = displayed(material.referenceQuantity);
+  return material.referenceQuantityStatus === "partial"
+    ? `${quantity} (partial)`
+    : quantity;
 }
 
 export function renderGuideValidationMarkdown(result: GuideValidationResult): string {
@@ -613,12 +645,14 @@ export function renderGuideValidationMarkdown(result: GuideValidationResult): st
     "",
     "## Material comparison",
     "",
-    "Positive deltas mean the generated route uses more. A missing side means the material appears in only one route; this can also reflect different intermediate-crafting accounting.",
+    summary.referenceMaterialsComplete
+      ? "Positive deltas mean the generated route uses more. A missing side means the material appears in only one route; this can also reflect different intermediate-crafting accounting."
+      : "Reference quantities are partial because one or more reference steps omit reagent data. Partial quantities are labeled and deltas are suppressed.",
     "",
     "| Material | Generated | Reference | Delta |",
     "| --- | ---: | ---: | ---: |",
     ...result.materials.map((material) =>
-      `| ${markdownCell(material.materialName)} | ${displayed(material.generatedQuantity)} | ${displayed(material.referenceQuantity)} | ${displayed(material.delta)} |`,
+      `| ${markdownCell(material.materialName)} | ${displayed(material.generatedQuantity)} | ${displayedReferenceMaterial(material)} | ${displayed(material.delta)} |`,
     ),
     "",
     "## Reference route",

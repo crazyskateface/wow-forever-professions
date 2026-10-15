@@ -379,14 +379,16 @@ export function ForeverChanges({
         </div>
       </div>
 
-      <div className="change-summary" aria-label="Change totals">
+      <div className="change-summary" aria-label="Change status filter" role="group">
         {([
+          ["CHANGED", "All changes", counts.new + counts.updated + counts.removed],
           ["NEW", "New", counts.new],
           ["UPDATED", "Updated", counts.updated],
           ["REMOVED", "Removed", counts.removed],
           ["UNCHANGED", "Unchanged", counts.unchanged],
         ] as const).map(([type, label, value]) => (
           <button
+            aria-pressed={changeFilter === type}
             className={`summary-${type.toLowerCase()}${changeFilter === type ? " active" : ""}`}
             key={type}
             onClick={() => onFiltersChange({ ...filters, changeFilter: type })}
@@ -399,112 +401,93 @@ export function ForeverChanges({
       </div>
 
       <div className="changes-toolbar">
-        <div className="changes-toolbar-actions">
-          <div className="change-filters" aria-label="Change type filter" role="group">
-            {([
-              ["CHANGED", "All changes"],
-              ["NEW", "New"],
-              ["UPDATED", "Updated"],
-              ["REMOVED", "Removed"],
-              ["UNCHANGED", "Unchanged"],
-            ] as const).map(([type, label]) => (
+        <details className="changes-filter-menu">
+          <summary className={activeFilterCount > 0 ? "active" : ""}>
+            <span aria-hidden="true">≡</span>
+            Filters
+            {activeFilterCount > 0 ? <strong>{activeFilterCount}</strong> : null}
+          </summary>
+          <div className="changes-filter-popover">
+            <label className="changes-filter-field">
+              <span>Item type</span>
+              <select
+                aria-label="Filter changed recipes by item type"
+                onChange={(event) => onFiltersChange({
+                  ...filters,
+                  itemType: event.target.value as RecipeItemType,
+                })}
+                value={itemType}
+              >
+                <option value="ALL">All item types ({professionChanges.length})</option>
+                {ITEM_TYPE_ORDER.map((type) => (
+                  <option key={type} value={type}>
+                    {ITEM_TYPE_LABELS[type]} ({itemTypeCounts.get(type) ?? 0})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="changes-availability-toggle">
+              <span>
+                <strong>Show recipes above current skill</strong>
+                <small>Includes known requirements above skill {currentSkill}.</small>
+              </span>
+              <input
+                aria-label="Show recipes above current skill"
+                checked={showAboveSkill}
+                onChange={(event) => onFiltersChange({
+                  ...filters,
+                  showAboveSkill: event.target.checked,
+                })}
+                type="checkbox"
+              />
+            </label>
+            <label className="changes-availability-toggle">
+              <span>
+                <strong>Include unknown skill requirements</strong>
+                <small>These cannot be verified against the skill slider yet.</small>
+              </span>
+              <input
+                aria-label="Include unknown skill requirements"
+                checked={showUnknownSkill}
+                onChange={(event) => onFiltersChange({
+                  ...filters,
+                  showUnknownSkill: event.target.checked,
+                })}
+                type="checkbox"
+              />
+            </label>
+            {activeFilterCount > 0 ? (
               <button
-                aria-pressed={changeFilter === type}
-                className={changeFilter === type ? "active" : ""}
-                key={type}
-                onClick={() => onFiltersChange({ ...filters, changeFilter: type })}
+                className="changes-filter-reset"
+                aria-label="Reset Forever Changes filters"
+                onClick={() => onFiltersChange({
+                  ...filters,
+                  itemType: DEFAULT_CHANGE_FILTERS.itemType,
+                  showAboveSkill: DEFAULT_CHANGE_FILTERS.showAboveSkill,
+                  showUnknownSkill: DEFAULT_CHANGE_FILTERS.showUnknownSkill,
+                })}
                 type="button"
               >
-                {label}
+                Reset filters
               </button>
-            ))}
+            ) : null}
           </div>
-          <details className="changes-filter-menu">
-            <summary className={activeFilterCount > 0 ? "active" : ""}>
-              <span aria-hidden="true">≡</span>
-              Filters
-              {activeFilterCount > 0 ? <strong>{activeFilterCount}</strong> : null}
-            </summary>
-            <div className="changes-filter-popover">
-              <label className="changes-filter-field">
-                <span>Item type</span>
-                <select
-                  aria-label="Filter changed recipes by item type"
-                  onChange={(event) => onFiltersChange({
-                    ...filters,
-                    itemType: event.target.value as RecipeItemType,
-                  })}
-                  value={itemType}
-                >
-                  <option value="ALL">All item types ({professionChanges.length})</option>
-                  {ITEM_TYPE_ORDER.map((type) => (
-                    <option key={type} value={type}>
-                      {ITEM_TYPE_LABELS[type]} ({itemTypeCounts.get(type) ?? 0})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="changes-availability-toggle">
-                <span>
-                  <strong>Show recipes above current skill</strong>
-                  <small>Includes known requirements above skill {currentSkill}.</small>
-                </span>
-                <input
-                  aria-label="Show recipes above current skill"
-                  checked={showAboveSkill}
-                  onChange={(event) => onFiltersChange({
-                    ...filters,
-                    showAboveSkill: event.target.checked,
-                  })}
-                  type="checkbox"
-                />
-              </label>
-              <label className="changes-availability-toggle">
-                <span>
-                  <strong>Include unknown skill requirements</strong>
-                  <small>These cannot be verified against the skill slider yet.</small>
-                </span>
-                <input
-                  aria-label="Include unknown skill requirements"
-                  checked={showUnknownSkill}
-                  onChange={(event) => onFiltersChange({
-                    ...filters,
-                    showUnknownSkill: event.target.checked,
-                  })}
-                  type="checkbox"
-                />
-              </label>
-              {activeFilterCount > 0 ? (
-                <button
-                  className="changes-filter-reset"
-                  aria-label="Reset Forever Changes filters"
-                  onClick={() => onFiltersChange({
-                    ...filters,
-                    itemType: DEFAULT_CHANGE_FILTERS.itemType,
-                    showAboveSkill: DEFAULT_CHANGE_FILTERS.showAboveSkill,
-                    showUnknownSkill: DEFAULT_CHANGE_FILTERS.showUnknownSkill,
-                  })}
-                  type="button"
-                >
-                  Reset filters
-                </button>
-              ) : null}
-            </div>
-          </details>
-        </div>
-        <label className="profession-filter">
-          <span>Profession</span>
-          <select
-            onChange={(event) => onFiltersChange({
-              ...filters,
-              professionId: event.target.value,
-            })}
-            value={professionId}
-          >
-            <option value="">All professions</option>
-            {professions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
+        </details>
+        {professions.length > 1 ? (
+          <label className="profession-filter">
+            <span>Profession</span>
+            <select
+              onChange={(event) => onFiltersChange({
+                ...filters,
+                professionId: event.target.value,
+              })}
+              value={professionId}
+            >
+              <option value="">All professions</option>
+              {professions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>
+        ) : null}
       </div>
 
       <div className="changes-result-heading" aria-live="polite">

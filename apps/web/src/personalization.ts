@@ -210,12 +210,14 @@ export function parsePersonalization(value: unknown): PersonalizationPreferences
 }
 
 export function readPersonalization(
-  storage: BrowserStorage | undefined =
-    typeof window === "undefined" ? undefined : window.localStorage,
+  storage?: BrowserStorage,
 ): PersonalizationPreferences {
-  if (storage === undefined) return DEFAULT_PERSONALIZATION;
   try {
-    const stored = storage.getItem(PERSONALIZATION_STORAGE_KEY);
+    const resolvedStorage = storage ?? (
+      typeof window === "undefined" ? undefined : window.localStorage
+    );
+    if (resolvedStorage === undefined) return DEFAULT_PERSONALIZATION;
+    const stored = resolvedStorage.getItem(PERSONALIZATION_STORAGE_KEY);
     return stored === null
       ? DEFAULT_PERSONALIZATION
       : parsePersonalization(JSON.parse(stored));
@@ -226,25 +228,27 @@ export function readPersonalization(
 
 export function writePersonalization(
   preferences: PersonalizationPreferences,
-  storage: BrowserStorage | undefined =
-    typeof window === "undefined" ? undefined : window.localStorage,
+  storage?: BrowserStorage,
 ): boolean {
-  if (storage === undefined) return false;
   try {
-    storage.setItem(PERSONALIZATION_STORAGE_KEY, JSON.stringify(preferences));
+    const resolvedStorage = storage ?? (
+      typeof window === "undefined" ? undefined : window.localStorage
+    );
+    if (resolvedStorage === undefined) return false;
+    resolvedStorage.setItem(PERSONALIZATION_STORAGE_KEY, JSON.stringify(preferences));
     return true;
   } catch {
     return false;
   }
 }
 
-export function clearPersonalization(
-  storage: BrowserStorage | undefined =
-    typeof window === "undefined" ? undefined : window.localStorage,
-): boolean {
-  if (storage === undefined) return false;
+export function clearPersonalization(storage?: BrowserStorage): boolean {
   try {
-    storage.removeItem(PERSONALIZATION_STORAGE_KEY);
+    const resolvedStorage = storage ?? (
+      typeof window === "undefined" ? undefined : window.localStorage
+    );
+    if (resolvedStorage === undefined) return false;
+    resolvedStorage.removeItem(PERSONALIZATION_STORAGE_KEY);
     return true;
   } catch {
     return false;

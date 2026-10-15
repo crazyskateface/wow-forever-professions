@@ -170,12 +170,131 @@ describe("guide route validation", () => {
       materialName: "Leather",
       generatedQuantity: 4,
       referenceQuantity: 5,
+      referenceQuantityStatus: "complete",
       delta: -1,
     });
     expect(result.materials).toContainEqual({
       materialName: "Pristine Hide",
       generatedQuantity: 6,
+      referenceQuantityStatus: "complete",
     });
+  });
+
+  it("labels incomplete reference materials as partial and suppresses deltas", () => {
+    const partialReference: ReferenceGuide = {
+      ...reference,
+      steps: [
+        reference.steps[0]!,
+        { ...reference.steps[1]!, reagents: undefined },
+      ],
+    };
+    const result = createGuideValidation({
+      generatedAt: "2026-10-14T12:30:00.000Z",
+      professionId: "leatherworking",
+      professionName: "Leatherworking",
+      recipeBuildId: "forever-test",
+      route,
+      recipes,
+      reference: partialReference,
+    });
+
+    expect(result.summary.referenceMaterialsComplete).toBe(false);
+    expect(result.materials).toContainEqual({
+      materialName: "Leather",
+      generatedQuantity: 4,
+      referenceQuantity: 4,
+      referenceQuantityStatus: "partial",
+    });
+    expect(result.materials.find(({ materialName }) => materialName === "Leather"))
+      .not.toHaveProperty("delta");
+    expect(renderGuideValidationMarkdown(result)).toContain(
+      "4 (partial) | — |",
+    );
+  });
+
+  it("does not count an ambiguous same-name reference as a match", () => {
+    const duplicateRoute: CompleteRouteResult = {
+      status: "complete",
+      objective: "crafts",
+      startSkill: 1,
+      targetSkill: 2,
+      steps: [{
+        skill: 1,
+        recipeId: "duplicate-a",
+        recipeName: "Duplicate Recipe",
+        skillUpProbability: 1,
+        expectedCrafts: 1,
+        expectedMaterials: 1,
+      }],
+      segments: [{
+        recipeId: "duplicate-a",
+        recipeName: "Duplicate Recipe",
+        startSkill: 1,
+        endSkill: 2,
+        expectedSkillUps: 1,
+        expectedCrafts: 1,
+        expectedMaterials: 1,
+        alternatives: [],
+      }],
+      totals: {
+        expectedSkillUps: 1,
+        expectedCrafts: 1,
+        expectedMaterials: 1,
+      },
+    };
+    const duplicateRecipes: readonly ValidationRecipe[] = [
+      {
+        id: "duplicate-a",
+        name: "Duplicate Recipe",
+        learnSkill: 1,
+        acquisition: "trainer",
+        availability: "available",
+        verificationStatus: "verified",
+        reagents: [{ itemId: "a", name: "Leather", quantity: 1 }],
+      },
+      {
+        id: "duplicate-b",
+        name: "Duplicate Recipe",
+        learnSkill: 1,
+        acquisition: "trainer",
+        availability: "available",
+        verificationStatus: "verified",
+        reagents: [{ itemId: "b", name: "Hide", quantity: 1 }],
+      },
+    ];
+    const duplicateReference: ReferenceGuide = {
+      ...reference,
+      startSkill: 1,
+      targetSkill: 2,
+      steps: [{
+        startSkill: 1,
+        endSkill: 2,
+        recipeName: "Duplicate Recipe",
+        expectedCrafts: 1,
+        reagents: [{ name: "Leather", quantity: 1 }],
+      }],
+    };
+    const result = createGuideValidation({
+      generatedAt: "2026-10-14T12:30:00.000Z",
+      professionId: "leatherworking",
+      professionName: "Leatherworking",
+      recipeBuildId: "forever-test",
+      route: duplicateRoute,
+      recipes: duplicateRecipes,
+      reference: duplicateReference,
+    });
+
+    expect(result.summary).toMatchObject({
+      matchingSkills: 0,
+      mismatchingSkills: 1,
+      unresolvedReferenceRecipes: ["Duplicate Recipe"],
+    });
+    expect(result.disagreements).toEqual([
+      expect.objectContaining({
+        classification: "reference-recipe-unresolved",
+        generatedRecipeId: "duplicate-a",
+      }),
+    ]);
   });
 
   it("renders a source-attributed Markdown review report", () => {

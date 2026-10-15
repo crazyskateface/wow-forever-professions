@@ -95,4 +95,30 @@ describe("browser personalization", () => {
     expect(clearPersonalization(storage)).toBe(true);
     expect(storage.values.size).toBe(0);
   });
+
+  it("survives browsers that block access to localStorage", () => {
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const blockedWindow = Object.defineProperty({}, "localStorage", {
+      configurable: true,
+      get() {
+        throw new Error("Storage access is blocked.");
+      },
+    });
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: blockedWindow,
+    });
+
+    try {
+      expect(readPersonalization()).toEqual(DEFAULT_PERSONALIZATION);
+      expect(writePersonalization(DEFAULT_PERSONALIZATION)).toBe(false);
+      expect(clearPersonalization()).toBe(false);
+    } finally {
+      if (previousWindow === undefined) {
+        Reflect.deleteProperty(globalThis, "window");
+      } else {
+        Object.defineProperty(globalThis, "window", previousWindow);
+      }
+    }
+  });
 });
