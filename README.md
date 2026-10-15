@@ -73,6 +73,27 @@ data.
 - Reads prices refreshed ahead of time; API requests never call an auction provider
   directly.
 
+### Guide quality validation
+
+- Captures a compact, build-stamped baseline of the generated 1–300 route.
+- Compares every skill decision, expected craft total, and aggregated material total
+  with explicitly sourced external guide references.
+- Flags unresolved recipe names, unknown acquisition/availability, unverified route
+  candidates, Scarce-material use, and suspiciously short or long segments.
+- Produces diagnostic Markdown only; external guides never mutate canonical recipe
+  data or reviewed overrides.
+
+### Personalization without accounts
+
+- Saves current and target skill, route objective, trainer-only mode, shopping
+  strategy, region, market, faction, and Forever Changes filters in the browser.
+- Restores the saved profile when generating the initial guide and uses its market and
+  faction in price, route, and shopping-list requests.
+- Validates and versions stored preferences, falls back safely when storage is corrupt
+  or unavailable, and provides a one-click reset.
+- Saves a Legacy profession bonus for future modeling but does not apply it until the
+  underlying Forever behavior is verified.
+
 ### Reproducible client-data pipeline
 
 - Converts LibProfessionDB v1.9.1 and LibItemDB v1.4.1 Lua literals without executing
@@ -176,6 +197,7 @@ pnpm api:smoke                 # fixture-oriented smoke; run API without LOCAL_D
 pnpm api:request -- /api/health
 pnpm api:optimize -- 150 180 crafts
 pnpm api:shopping -- 33.375 cheapest  # fixture recipe IDs; fixture API only
+pnpm guide:validate               # compare the real 1–300 route with the checked-in reference
 pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
 ```
 
@@ -254,6 +276,10 @@ fabricated data.
   invariants, and contribution/agent handoff notes.
 - [docs/FOREVER_CHANGES.md](docs/FOREVER_CHANGES.md): implemented comparison pipeline,
   UI behavior, and remaining work.
+- [docs/GUIDE_VALIDATION.md](docs/GUIDE_VALIDATION.md): reproducible route baselines,
+  external-guide comparison, current findings, and review order.
+- [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md): browser-local profile fields,
+  runtime behavior, trust boundary, and reset/failure handling.
 - [docs/API_TESTING.md](docs/API_TESTING.md): local and deployed endpoint testing.
 - [data/imports/README.md](data/imports/README.md): exact imported datasets, trust
   boundary, hashes, and regeneration commands.

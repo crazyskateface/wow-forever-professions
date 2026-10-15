@@ -19,6 +19,7 @@
     "data:convert:professiondb": "pnpm --filter @forever-professions/ingestion convert:professiondb",
     "data:import": "pnpm --filter @forever-professions/ingestion import:client-data",
     "data:import:local": "pnpm --filter @forever-professions/ingestion import:local",
+    "guide:validate": "pnpm --filter @forever-professions/api validate:guide",
     "api:request": "pnpm --filter @forever-professions/api request",
     "api:shopping": "pnpm --filter @forever-professions/api shopping",
     "api:optimize": "pnpm --filter @forever-professions/api optimize",

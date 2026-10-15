@@ -3,8 +3,11 @@
 Current implementation note (October 14, 2026): the canonical data slice, per-skill
 cost model, stateful route optimizer, practical route stabilization, guide-first UI,
 shopping planner, data-quality disclosures, and Classic Era → Forever Changes feature
-are implemented for Leatherworking. Use `README.md` and `docs/DEVELOPMENT.md` for the
-current system; this document remains the product-direction roadmap.
+are implemented for Leatherworking. Phase 13 has started with a reproducible,
+build-stamped route baseline and external-guide comparison report, and Phase 14's
+browser-local personalization baseline is implemented. Use `README.md`,
+`docs/DEVELOPMENT.md`, `docs/GUIDE_VALIDATION.md`, and `docs/PERSONALIZATION.md` for
+the current system; this document remains the product-direction roadmap.
 
 ## Product Direction Reset
 
@@ -821,6 +824,11 @@ Routes should be regenerated and compared after every significant build.
 
 # Phase 13 — Guide Quality Testing
 
+Status: started on October 14, 2026. The repository now captures the generated
+Leatherworking route and compares every skill decision, expected craft count, and
+material total with a dated, source-attributed external guide. Disagreements remain a
+review queue and never update canonical recipe data automatically.
+
 ## Goal
 
 Validate computed routes against actual play.
@@ -849,6 +857,13 @@ Both are valuable discoveries.
 ---
 
 # Phase 14 — Personalization Without Accounts
+
+Status: browser-local personalization implemented on October 14, 2026. Current and
+target skill, optimization and shopping preferences, trainer-only mode, region,
+market, faction, and Forever Changes filters now restore from a versioned local
+profile. The Legacy profession-bonus value is retained but remains calculation-neutral
+until the game mechanic is verified. Known recipes and multiple character profiles
+remain later work.
 
 ## Goal
 

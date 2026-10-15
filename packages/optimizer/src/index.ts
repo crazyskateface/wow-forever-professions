@@ -7,6 +7,8 @@ import {
   type RecipeEvaluationContext,
 } from "@forever-professions/domain";
 
+export * from "./route-validation.js";
+
 export type RouteObjective = "cost" | "crafts" | "materials";
 
 export interface RouteRecipe extends LevelingRecipe {

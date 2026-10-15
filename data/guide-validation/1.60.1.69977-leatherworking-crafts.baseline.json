@@ -1,0 +1,332 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-14T23:07:22.212Z",
+  "professionId": "leatherworking",
+  "professionName": "Leatherworking",
+  "recipeBuildId": "1.60.1.69977",
+  "objective": "crafts",
+  "startSkill": 1,
+  "targetSkill": 300,
+  "totals": {
+    "expectedSkillUps": 299,
+    "expectedCrafts": 299,
+    "expectedMaterials": 3185
+  },
+  "segments": [
+    {
+      "recipeId": "spell-2149",
+      "recipeName": "Handstitched Leather Boots",
+      "startSkill": 1,
+      "endSkill": 21,
+      "expectedCrafts": 20,
+      "expectedMaterials": 60,
+      "evidence": {
+        "recipeId": "spell-2149",
+        "recipeName": "Handstitched Leather Boots",
+        "learnSkill": 1,
+        "acquisition": "automatic",
+        "availability": "available",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-3816",
+      "recipeName": "Cured Light Hide",
+      "startSkill": 21,
+      "endSkill": 51,
+      "expectedCrafts": 30,
+      "expectedMaterials": 60,
+      "evidence": {
+        "recipeId": "spell-3816",
+        "recipeName": "Cured Light Hide",
+        "learnSkill": 10,
+        "acquisition": "trainer",
+        "availability": "available",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-2161",
+      "recipeName": "Embossed Leather Boots",
+      "startSkill": 51,
+      "endSkill": 81,
+      "expectedCrafts": 30,
+      "expectedMaterials": 390,
+      "evidence": {
+        "recipeId": "spell-2161",
+        "recipeName": "Embossed Leather Boots",
+        "learnSkill": 40,
+        "acquisition": "trainer",
+        "availability": "available",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-1255123",
+      "recipeName": "Forceful Medium Armor Kit",
+      "startSkill": 81,
+      "endSkill": 96,
+      "expectedCrafts": 15,
+      "expectedMaterials": 75,
+      "evidence": {
+        "recipeId": "spell-1255123",
+        "recipeName": "Forceful Medium Armor Kit",
+        "learnSkill": 80,
+        "acquisition": "unknown",
+        "availability": "unknown",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-3818",
+      "recipeName": "Cured Heavy Hide",
+      "startSkill": 96,
+      "endSkill": 136,
+      "expectedCrafts": 40,
+      "expectedMaterials": 160,
+      "evidence": {
+        "recipeId": "spell-3818",
+        "recipeName": "Cured Heavy Hide",
+        "learnSkill": 95,
+        "acquisition": "trainer",
+        "availability": "available",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-10482",
+      "recipeName": "Cured Thick Hide",
+      "startSkill": 136,
+      "endSkill": 175,
+      "expectedCrafts": 39,
+      "expectedMaterials": 78,
+      "evidence": {
+        "recipeId": "spell-10482",
+        "recipeName": "Cured Thick Hide",
+        "learnSkill": 135,
+        "acquisition": "trainer",
+        "availability": "available",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-10490",
+      "recipeName": "Comfortable Leather Hat",
+      "startSkill": 175,
+      "endSkill": 196,
+      "expectedCrafts": 21,
+      "expectedMaterials": 336,
+      "evidence": {
+        "recipeId": "spell-10490",
+        "recipeName": "Comfortable Leather Hat",
+        "learnSkill": 175,
+        "acquisition": "unknown",
+        "availability": "unknown",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-10509",
+      "recipeName": "Turtle Scale Gloves",
+      "startSkill": 196,
+      "endSkill": 201,
+      "expectedCrafts": 5,
+      "expectedMaterials": 75,
+      "evidence": {
+        "recipeId": "spell-10509",
+        "recipeName": "Turtle Scale Gloves",
+        "learnSkill": 180,
+        "acquisition": "unknown",
+        "availability": "unknown",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-10542",
+      "recipeName": "Tough Scorpid Gloves",
+      "startSkill": 201,
+      "endSkill": 221,
+      "expectedCrafts": 20,
+      "expectedMaterials": 320,
+      "evidence": {
+        "recipeId": "spell-10542",
+        "recipeName": "Tough Scorpid Gloves",
+        "learnSkill": 200,
+        "acquisition": "unknown",
+        "availability": "unknown",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-10566",
+      "recipeName": "Wild Leather Boots",
+      "startSkill": 221,
+      "endSkill": 241,
+      "expectedCrafts": 20,
+      "expectedMaterials": 400,
+      "evidence": {
+        "recipeId": "spell-10566",
+        "recipeName": "Wild Leather Boots",
+        "learnSkill": 220,
+        "acquisition": "unknown",
+        "availability": "unknown",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-1254992",
+      "recipeName": "Charged Scorpid Helm",
+      "startSkill": 241,
+      "endSkill": 261,
+      "expectedCrafts": 20,
+      "expectedMaterials": 260,
+      "evidence": {
+        "recipeId": "spell-1254992",
+        "recipeName": "Charged Scorpid Helm",
+        "learnSkill": 240,
+        "acquisition": "unknown",
+        "availability": "unknown",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-1254975",
+      "recipeName": "Charged Scorpid Vest",
+      "startSkill": 261,
+      "endSkill": 281,
+      "expectedCrafts": 20,
+      "expectedMaterials": 420,
+      "evidence": {
+        "recipeId": "spell-1254975",
+        "recipeName": "Charged Scorpid Vest",
+        "learnSkill": 260,
+        "acquisition": "unknown",
+        "availability": "unknown",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    },
+    {
+      "recipeId": "spell-1254971",
+      "recipeName": "Charged Scorpid Boots",
+      "startSkill": 281,
+      "endSkill": 300,
+      "expectedCrafts": 19,
+      "expectedMaterials": 551,
+      "evidence": {
+        "recipeId": "spell-1254971",
+        "recipeName": "Charged Scorpid Boots",
+        "learnSkill": 280,
+        "acquisition": "unknown",
+        "availability": "unknown",
+        "verificationStatus": "unverified",
+        "scarceReagents": []
+      }
+    }
+  ],
+  "materials": [
+    {
+      "materialName": "Coarse Thread",
+      "quantity": 170
+    },
+    {
+      "materialName": "Cured Heavy Hide",
+      "quantity": 42
+    },
+    {
+      "materialName": "Cured Thick Hide",
+      "quantity": 40
+    },
+    {
+      "materialName": "Deeprock Salt",
+      "quantity": 39
+    },
+    {
+      "materialName": "Elemental Air",
+      "quantity": 118
+    },
+    {
+      "materialName": "Elixir of Minor Strength",
+      "quantity": 30
+    },
+    {
+      "materialName": "Heavy Hide",
+      "quantity": 40
+    },
+    {
+      "materialName": "Heavy Leather",
+      "quantity": 252
+    },
+    {
+      "materialName": "Heavy Scorpid Scale",
+      "quantity": 626
+    },
+    {
+      "materialName": "Heavy Silken Thread",
+      "quantity": 5
+    },
+    {
+      "materialName": "Light Hide",
+      "quantity": 30
+    },
+    {
+      "materialName": "Light Leather",
+      "quantity": 280
+    },
+    {
+      "materialName": "Medium Armor Kit",
+      "quantity": 15
+    },
+    {
+      "materialName": "Rugged Leather",
+      "quantity": 428
+    },
+    {
+      "materialName": "Rune Thread",
+      "quantity": 59
+    },
+    {
+      "materialName": "Salt",
+      "quantity": 150
+    },
+    {
+      "materialName": "Scorpid Scale",
+      "quantity": 160
+    },
+    {
+      "materialName": "Silken Thread",
+      "quantity": 82
+    },
+    {
+      "materialName": "Strange Dust",
+      "quantity": 30
+    },
+    {
+      "materialName": "Thick Hide",
+      "quantity": 39
+    },
+    {
+      "materialName": "Thick Leather",
+      "quantity": 430
+    },
+    {
+      "materialName": "Turtle Scale",
+      "quantity": 40
+    },
+    {
+      "materialName": "Wildvine",
+      "quantity": 80
+    }
+  ]
+}

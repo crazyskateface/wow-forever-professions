@@ -163,6 +163,7 @@ pnpm dev:web
 The full local catalog requires this import order:
 
 ```text
+pnpm db:local:up
 pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
 pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
 ```
@@ -191,6 +192,9 @@ Forever Changes will not have a stored comparison.
   their ports and whether they remain running.
 - Do not commit or push unless the user explicitly asks. Do not amend or rewrite
   existing commits without explicit permission.
+- Publish changes through pull requests. When the user authorizes committing and
+  publishing work, create a `codex/*` feature branch, commit there, push that branch,
+  and open a pull request. Never push commits directly to `main`.
 
 ## Verification
 
