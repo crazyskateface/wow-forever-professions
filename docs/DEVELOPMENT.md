@@ -129,6 +129,18 @@ these deterministic assets in the web build is the current deployment strategy; 
 React `ItemIcon` component prevents every image from loading at startup by using
 native lazy loading for non-hero images.
 
+Every recipe, change-card, output, and reagent icon uses the shared item-tooltip
+surface. Pointer hover opens a preview after one second and leaving the owning
+control closes that preview immediately. Focusing a recipe button or change summary
+opens the same preview for keyboard users, and Escape dismisses either mode.
+Calculator output and reagent icons are also buttons that pin the tooltip, move focus
+to its close control, and restore focus when the close button or Escape dismisses it;
+an outside click also closes it. Tooltip content is limited to catalog-backed item
+class, subclass, equipment slot, armor, required level, vendor sell price,
+classification, quantity, recipe, market price, and ID facts. Do not infer binding,
+quality, stats, or any other field absent from the imported data. Provisional output
+quantities must remain visibly labeled provisional.
+
 The converter queries the installed client with `wowdata`. It resolves `latest` once,
 then pins all DB2 and icon reads to the returned build. It joins `Item` and
 `ItemSparse` for names, item types, slots, required levels, and sell prices. Base
