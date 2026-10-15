@@ -780,8 +780,8 @@ Classic fallback
 # Phase 12 — Forever Build Update Pipeline
 
 Status: item client-data enrichment extended on October 15, 2026. A single pinned
-Forever client build now supplies build-scoped display names, item types, equipment
-slots, required levels, vendor sell prices, generic item labels, and deterministic
+Forever client build now supplies build-scoped display names, rarity IDs, item types,
+equipment slots, required levels, vendor sell prices, generic item labels, and deterministic
 base armor. The normalized database and API preserve those fields with their actual
 client product/build/locale. Items absent from `ItemSparse` remain explicitly
 unenriched. Automated client/archive acquisition and build activation remain future

@@ -299,12 +299,19 @@ button.item-tooltip-trigger-button { padding: 0; border: 0; background: transpar
 .item-tooltip-preview { pointer-events: none; animation: item-tooltip-in .12s ease-out; }
 .item-tooltip-pinned { pointer-events: auto; }
 .item-tooltip-heading { min-height: 21px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.item-tooltip-heading strong { color: #f6dc72; font-size: 15px; line-height: 1.3; }
+.item-tooltip { --item-quality-color: #f6dc72; }
+.item-tooltip-quality-poor { --item-quality-color: #9d9d9d; }
+.item-tooltip-quality-common { --item-quality-color: #ffffff; }
+.item-tooltip-quality-uncommon { --item-quality-color: #1eff00; }
+.item-tooltip-quality-rare { --item-quality-color: #4a9eff; }
+.item-tooltip-quality-epic { --item-quality-color: #c06cff; }
+.item-tooltip-heading strong { color: var(--item-quality-color); font-size: 15px; line-height: 1.3; }
 .item-tooltip-close { width: 25px; height: 25px; margin: -6px -7px 0 0; display: grid; flex: 0 0 auto; place-items: center; color: #d5786f; border: 1px solid #60433f; border-radius: 4px; background: #201719; font-size: 20px; line-height: 1; cursor: pointer; }
 .item-tooltip-close:hover { color: #ff9a8f; border-color: #98615a; background: #2b1b1e; }
 .item-tooltip-slot, .item-tooltip-category, .item-tooltip-stat, .item-tooltip-classification, .item-tooltip-details span, .item-tooltip-id, .item-tooltip-sell-price, .item-tooltip-hint { display: block; }
 .item-tooltip-slot { margin-top: 4px; color: #fff; font-weight: 700; }
 .item-tooltip-category { color: #d9d7d2; }
+.item-tooltip-quality-label { color: var(--item-quality-color); font-weight: 700; }
 .item-tooltip-stat { color: #f4f1e8; }
 .item-tooltip-classification { width: max-content; margin-top: 7px; padding: 2px 6px; color: #78d5ff; border: 1px solid rgba(120, 213, 255, .36); border-radius: 3px; background: rgba(120, 213, 255, .08); font-size: 11px; font-weight: 800; text-transform: uppercase; }
 .item-tooltip-classification.is-scarce { color: #ffb26f; border-color: rgba(255, 178, 111, .4); background: rgba(255, 135, 84, .09); }

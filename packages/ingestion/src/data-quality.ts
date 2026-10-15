@@ -22,6 +22,7 @@ export interface DataQualityReport {
   readonly verificationStatuses: Readonly<Record<string, number>>;
   readonly itemMetadata: {
     readonly clientDataItems: number;
+    readonly qualityItems: number;
     readonly equipmentSlotItems: number;
     readonly armorItems: number;
     readonly requiredLevelItems: number;
@@ -285,6 +286,7 @@ export function auditImportedBuildDataset(input: ImportedBuildDataset): DataQual
     verificationStatuses: counts(recipes.map(({ verification }) => verification.status)),
     itemMetadata: {
       clientDataItems: items.filter(({ clientData }) => clientData !== undefined).length,
+      qualityItems: items.filter(({ clientData }) => clientData?.qualityId !== undefined).length,
       equipmentSlotItems: items.filter(
         ({ clientData }) => clientData?.equipmentSlot !== undefined,
       ).length,
@@ -352,6 +354,7 @@ export function renderDataQualityMarkdown(report: DataQualityReport): string {
     "## Item client data",
     "",
     `- Client-enriched items: ${report.itemMetadata.clientDataItems}/${report.items}`,
+    `- Item rarities: ${report.itemMetadata.qualityItems}/${report.items}`,
     `- Equipment slots: ${report.itemMetadata.equipmentSlotItems}/${report.items}`,
     `- Armor values: ${report.itemMetadata.armorItems}/${report.items}`,
     `- Required levels: ${report.itemMetadata.requiredLevelItems}/${report.items}`,

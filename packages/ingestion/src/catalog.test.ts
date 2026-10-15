@@ -51,6 +51,7 @@ describe("SQL recipe catalog", () => {
               name: "Heavy Leather",
               quantity: 5,
               client_display_name: "Heavy Leather",
+              client_quality_id: 1,
               item_class_id: 7,
               item_subclass_id: 6,
               inventory_type: "INVTYPE_NON_EQUIP_IGNORE",
@@ -80,6 +81,7 @@ describe("SQL recipe catalog", () => {
               minimum_quantity: 1,
               maximum_quantity: 1,
               client_display_name: "Fine Leather Cloak",
+              client_quality_id: 2,
               item_class_id: 4,
               item_subclass_id: 1,
               inventory_type: "INVTYPE_CLOAK",
@@ -114,6 +116,7 @@ describe("SQL recipe catalog", () => {
             itemClassId: 7,
             clientData: {
               displayName: "Heavy Leather",
+              qualityId: 1,
               requiredLevel: 0,
               sellPriceCopper: 15,
               source: { build: "1.60.1.70374" },
@@ -132,6 +135,7 @@ describe("SQL recipe catalog", () => {
             inventoryType: "INVTYPE_CLOAK",
             clientData: {
               displayName: "Fine Leather Cloak",
+              qualityId: 2,
               equipmentSlot: "Back",
               armor: 14,
               requiredLevel: 10,

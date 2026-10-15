@@ -402,6 +402,7 @@ export function parseWowdataItemClientData(
       inventoryType: inventory.token,
       clientData: {
         displayName,
+        qualityId: sparse.OverallQualityID,
         ...(inventory.equipmentSlot === undefined
           ? {}
           : { equipmentSlot: inventory.equipmentSlot }),

@@ -207,6 +207,50 @@ export async function writeNormalizedBuild(
       ...item.clientData,
     }];
   });
+
+  const itemQualities = itemClientData.flatMap((row) =>
+    row.qualityId === undefined
+      ? []
+      : [{
+          itemId: row.itemId,
+          recipeBuildId: row.recipeBuildId,
+          qualityId: row.qualityId,
+        }],
+  );
+  batches.itemQualities = await writeBatches(
+    runner,
+    itemQualities,
+    {
+      label: (row) => `item quality ${row.itemId}@${row.recipeBuildId}`,
+      insertSql:
+        "INSERT INTO item_quality (item_id, recipe_build_id, quality_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+      insertValues: (row) => [row.itemId, row.recipeBuildId, row.qualityId],
+      selectSql:
+        "SELECT item_id, recipe_build_id, quality_id FROM item_quality WHERE item_id = $1 AND recipe_build_id = $2",
+      selectValues: (row) => [row.itemId, row.recipeBuildId],
+      expected: (row) => ({
+        item_id: row.itemId,
+        recipe_build_id: row.recipeBuildId,
+        quality_id: row.qualityId,
+      }),
+      assertReferences: async (database, row) => {
+        await assertExists(
+          database,
+          "SELECT 1 AS found FROM item WHERE item_id = $1",
+          [row.itemId],
+          `Missing item ${row.itemId}.`,
+        );
+        await assertExists(
+          database,
+          "SELECT 1 AS found FROM wow_build WHERE build_id = $1",
+          [row.recipeBuildId],
+          `Missing build ${row.recipeBuildId}.`,
+        );
+      },
+    },
+    batchOptions,
+  );
+
   batches.itemClientData = await writeBatches(
     runner,
     itemClientData,

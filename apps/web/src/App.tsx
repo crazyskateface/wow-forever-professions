@@ -211,6 +211,7 @@ function tooltipItemData(item: TooltipRecipeItem): Omit<ItemTooltipData, "detail
   return {
     name: clientData?.displayName ?? item.name,
     ...(item.gameItemId === undefined ? {} : { gameItemId: item.gameItemId }),
+    ...(clientData?.qualityId === undefined ? {} : { qualityId: clientData.qualityId }),
     ...(item.itemClassId === undefined ? {} : { itemClassId: item.itemClassId }),
     ...(item.itemSubClassId === undefined ? {} : { itemSubClassId: item.itemSubClassId }),
     ...(item.inventoryType === undefined ? {} : { inventoryType: item.inventoryType }),

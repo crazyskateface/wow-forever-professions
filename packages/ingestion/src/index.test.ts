@@ -72,6 +72,7 @@ describe("build normalization", () => {
       inventoryType: "INVTYPE_NON_EQUIP_IGNORE",
       clientData: {
         displayName: "Heavy Leather",
+        qualityId: 1,
         requiredLevel: 0,
         sellPriceCopper: 15,
         source: {
@@ -109,6 +110,7 @@ describe("build normalization", () => {
     });
     expect(normalized.items.find(({ id }) => id === "heavy-leather")?.clientData).toEqual({
       displayName: "Heavy Leather",
+      qualityId: 1,
       requiredLevel: 0,
       sellPriceCopper: 15,
       source: {

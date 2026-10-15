@@ -145,6 +145,7 @@ export const itemClassificationSchema = z.object({
 
 export const itemClientDataSchema = z.object({
   displayName: z.string().min(1),
+  qualityId: z.number().int().nonnegative().optional(),
   equipmentSlot: z.string().min(1).optional(),
   armor: z.number().int().nonnegative().optional(),
   requiredLevel: z.number().int().nonnegative(),

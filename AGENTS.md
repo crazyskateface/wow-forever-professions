@@ -77,6 +77,8 @@ deterministic and framework-independent. Shared request and response shapes belo
 - Store Unchanged comparison records so summaries can be reconstructed exactly; the
   UI may hide them by default.
 - Icon or item-classification enrichment is not a gameplay recipe change.
+- Item rarity comes from the pinned client's `ItemSparse.OverallQualityID`; never infer
+  rarity from an item name, icon, class, or equipment slot.
 - Forever's `Scarce` material designation comes from client
   `ItemSparse.ItemNameDescriptionID -> ItemNameDescription`. Do not create or restore
   a hardcoded list of scarce item names.

@@ -18,6 +18,7 @@ import {
   formatTooltipSellPrice,
   getInventoryTypeLabel,
   getItemCategoryLabel,
+  getItemQuality,
   ITEM_TOOLTIP_HOVER_DELAY_MS,
   type ItemTooltipData,
 } from "./item-tooltip.js";
@@ -186,14 +187,17 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
     ? undefined
     : active.item.equipmentSlot ?? getInventoryTypeLabel(active.item.inventoryType);
   const category = active === undefined ? undefined : getItemCategoryLabel(active.item);
+  const quality = active === undefined ? undefined : getItemQuality(active.item.qualityId);
 
   return (
     <ItemTooltipContext.Provider value={context}>
       {children}
       {active !== undefined && typeof document !== "undefined" ? createPortal(
         <div
-          aria-label={active.mode === "pinned" ? `${active.item.name} item details` : undefined}
-          className={`item-tooltip item-tooltip-${active.mode}`}
+          aria-label={active.mode === "pinned"
+            ? `${active.item.name}${quality ? `, ${quality.label}` : ""} item details`
+            : undefined}
+          className={`item-tooltip item-tooltip-${active.mode}${quality ? ` item-tooltip-quality-${quality.token}` : ""}`}
           id={TOOLTIP_PANEL_ID}
           ref={panelRef}
           role={active.mode === "pinned" ? "dialog" : "tooltip"}
@@ -218,7 +222,13 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
             ) : null}
           </div>
           {equipmentSlot ? <span className="item-tooltip-slot">{equipmentSlot}</span> : null}
-          {category ? <span className="item-tooltip-category">{category}</span> : null}
+          {category || quality ? (
+            <span className="item-tooltip-category">
+              {category}
+              {category && quality ? " · " : null}
+              {quality ? <span className="item-tooltip-quality-label">{quality.label}</span> : null}
+            </span>
+          ) : null}
           {active.item.armor === undefined ? null : (
             <span className="item-tooltip-stat">{active.item.armor} Armor</span>
           )}

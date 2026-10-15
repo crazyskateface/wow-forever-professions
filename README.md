@@ -51,8 +51,10 @@ data.
 - Shows catalog-backed item details after a one-second pointer hover or when the
   owning recipe control receives keyboard focus. Calculator icons can pin the
   tooltip on click and support close-button, Escape, and outside-click dismissal.
-  Imported client metadata supplies equipment slot, armor, required level, and
-  vendor sell price when those fields are available.
+  Imported client metadata supplies in-game rarity, equipment slot, armor, required
+  level, and vendor sell price when those fields are available. Tooltip titles use
+  the familiar gray, white, green, blue, and purple rarity colors and also spell out
+  the rarity alongside the item category.
 
 ### Forever Changes
 
@@ -110,10 +112,10 @@ data.
   `ItemSparse.ItemNameDescriptionID → ItemNameDescription`, preserving the source
   product, client build, and locale. The current Leatherworking set contains three
   `Scarce` reagents and four `Crafted` outputs from client build `1.60.1.70374`.
-- Imports build-scoped item display names, equipment slots, armor, required levels,
-  and vendor sell prices from the same pinned client. Armor is derived from the
-  client's armor-total, quality, location, and shield tables instead of guessed from
-  an item name.
+- Imports build-scoped item display names, rarity IDs, equipment slots, armor,
+  required levels, and vendor sell prices from the same pinned client. Armor is
+  derived from the client's armor-total, quality, location, and shield tables
+  instead of guessed from an item name.
 - Extracts local client icons through `wowdata`, including the equipment-appearance
   fallback path, and writes a build-stamped manifest.
 - Produces a repeatable quality audit instead of filling unknown facts with guesses.
@@ -129,8 +131,9 @@ The data is useful but not authoritative:
 - all 603 Forever recipes are still marked unverified;
 - 484 recipes have supported Forever learning ranks and 119 remain unknown;
 - 589 acquisition and availability states remain unknown;
-- 630 of 760 referenced items have client tooltip attributes; the other 130 have no
-  `ItemSparse` row in the pinned client build and remain explicitly unenriched;
+- 630 of 760 referenced items have client tooltip attributes, including rarity; the
+  other 130 have no `ItemSparse` row in the pinned client build and remain explicitly
+  unenriched;
 - 90 recipes reference at least one item missing an English name in the source
   snapshot;
 - 595 output quantities remain provisional after reviewed overrides.

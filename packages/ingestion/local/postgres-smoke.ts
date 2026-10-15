@@ -69,6 +69,7 @@ function sampleDataset(): ImportedBuildDataset {
                   inventoryType: "INVTYPE_NON_EQUIP_IGNORE",
                   clientData: {
                     displayName: "Heavy Leather",
+                    qualityId: 1,
                     requiredLevel: 0,
                     sellPriceCopper: 15,
                     source: {
@@ -224,6 +225,7 @@ async function clearLocalRows(pool: Pool): Promise<void> {
     await client.query("DELETE FROM recipe_version");
     await client.query("DELETE FROM verification");
     await client.query("DELETE FROM recipe");
+    await client.query("DELETE FROM item_quality");
     await client.query("DELETE FROM item_client_data");
     await client.query("DELETE FROM item_classification");
     await client.query("DELETE FROM item");
@@ -282,8 +284,9 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     comparisons: string;
     recipe_changes: string;
     item_client_data: string;
+    item_quality: string;
   }>(
-    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM item_client_data) AS item_client_data, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
+    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM item_client_data) AS item_client_data, (SELECT COUNT(*) FROM item_quality) AS item_quality, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
   );
   const row = counts.rows[0]!;
 
@@ -296,6 +299,7 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     "SELECT COUNT(*) AS count FROM recipe_comparison c LEFT JOIN wow_build b ON b.build_id = c.base_build_id LEFT JOIN wow_build t ON t.build_id = c.target_build_id WHERE b.build_id IS NULL OR t.build_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_change rc LEFT JOIN recipe_comparison c ON c.comparison_id = rc.comparison_id LEFT JOIN profession p ON p.profession_id = rc.profession_id WHERE c.comparison_id IS NULL OR p.profession_id IS NULL",
     "SELECT COUNT(*) AS count FROM item_client_data icd LEFT JOIN item i ON i.item_id = icd.item_id LEFT JOIN wow_build b ON b.build_id = icd.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
+    "SELECT COUNT(*) AS count FROM item_quality iq LEFT JOIN item i ON i.item_id = iq.item_id LEFT JOIN wow_build b ON b.build_id = iq.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
   ] as const;
   let orphanCount = 0;
   for (const orphanQuery of orphanQueries) {
@@ -314,6 +318,7 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     comparisons: Number(row.comparisons),
     recipeChanges: Number(row.recipe_changes),
     itemClientData: Number(row.item_client_data),
+    itemQualities: Number(row.item_quality),
     orphans: orphanCount,
   };
 }

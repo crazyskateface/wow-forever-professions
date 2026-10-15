@@ -107,7 +107,7 @@ serves the latest stored comparison of the requested comparison type.
   row ID.
 - Comparisons store Unchanged records too, allowing summaries to be reconstructed
   exactly. The UI hides them by default.
-- Enriching an item with icon, item-name-description, or tooltip metadata is not a
+- Enriching an item with icon, item-name-description, rarity, or tooltip metadata is not a
   gameplay recipe change and must not turn a recipe into Updated.
 - Forever's `Scarce` designation comes from client
   `ItemSparse.ItemNameDescriptionID → ItemNameDescription`. Do not maintain a list of
@@ -117,8 +117,8 @@ serves the latest stored comparison of the requested comparison type.
   client source product/build/locale because enrichment may come from a newer client
   than the recipe archive.
 - Tooltip records are also recipe-build scoped and retain their actual client source.
-  A missing `ItemSparse` row stays missing; do not backfill name, level, armor, or sell
-  price from another game version.
+  A missing `ItemSparse` row stays missing; do not backfill name, rarity, level, armor,
+  or sell price from another game version.
 - Missing auction prices are unavailable, never zero.
 
 ## Item assets
@@ -136,14 +136,15 @@ opens the same preview for keyboard users, and Escape dismisses either mode.
 Calculator output and reagent icons are also buttons that pin the tooltip, move focus
 to its close control, and restore focus when the close button or Escape dismisses it;
 an outside click also closes it. Tooltip content is limited to catalog-backed item
-class, subclass, equipment slot, armor, required level, vendor sell price,
-classification, quantity, recipe, market price, and ID facts. Do not infer binding,
-quality, stats, or any other field absent from the imported data. Provisional output
+class, subclass, item rarity, equipment slot, armor, required level, vendor sell
+price, classification, quantity, recipe, market price, and ID facts. Do not infer
+binding, stats, or any other field absent from the imported data. Rarity comes from
+`ItemSparse.OverallQualityID`; do not derive it from an item name or icon. Provisional output
 quantities must remain visibly labeled provisional.
 
 The converter queries the installed client with `wowdata`. It resolves `latest` once,
 then pins all DB2 and icon reads to the returned build. It joins `Item` and
-`ItemSparse` for names, item types, slots, required levels, and sell prices. Base
+`ItemSparse` for names, rarity, item types, slots, required levels, and sell prices. Base
 armor comes from `ItemArmorTotal`, `ItemArmorQuality`, and `ArmorLocation`; shields
 come from `ItemArmorShield`. Equipment without a direct `Item.IconFileDataID` falls
 back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID`.
@@ -224,7 +225,7 @@ misclassify that host-level temp failure as a product test failure.
   requests.
 - The add-on collection approach is deferred; the current pipeline relies on source
   archives, installed-client DB2 data, reviewed overrides, and quality reporting.
-- Aurora DSQL migrations 017–023 have not yet completed the same live revalidation as
+- Aurora DSQL migrations 017–024 have not yet completed the same live revalidation as
   migrations 001–016.
 
 ## Documentation maintenance
