@@ -197,7 +197,7 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
           aria-label={active.mode === "pinned"
             ? `${active.item.name}${quality ? `, ${quality.label}` : ""} item details`
             : undefined}
-          className={`item-tooltip item-tooltip-${active.mode}${quality ? ` item-tooltip-quality-${quality.token}` : ""}`}
+          className={`item-tooltip item-tooltip-${active.mode}${quality ? ` item-quality-${quality.token}` : ""}`}
           id={TOOLTIP_PANEL_ID}
           ref={panelRef}
           role={active.mode === "pinned" ? "dialog" : "tooltip"}

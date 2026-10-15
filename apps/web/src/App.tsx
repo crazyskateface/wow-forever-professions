@@ -38,6 +38,7 @@ import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
 import {
+  getItemRarityNameClass,
   hasProvisionalOutputQuantity,
   type ItemTooltipData,
 } from "./item-tooltip.js";
@@ -205,6 +206,10 @@ function acquisitionLabel(recipe: Recipe): string {
 }
 
 type TooltipRecipeItem = Recipe["outputs"][number] | Recipe["reagents"][number];
+
+function recipeOutputQualityId(recipe: Recipe | undefined): number | undefined {
+  return recipe?.outputs[0]?.clientData?.qualityId;
+}
 
 function tooltipItemData(item: TooltipRecipeItem): Omit<ItemTooltipData, "details"> {
   const clientData = item.clientData;
@@ -799,6 +804,20 @@ export function App() {
     );
     return [...matches].sort((left, right) => left.name.localeCompare(right.name));
   }, [profession.recipes, search]);
+  const recipeById = useMemo(
+    () => new Map(profession.recipes.map((candidate) => [candidate.id, candidate] as const)),
+    [profession.recipes],
+  );
+  const itemQualityById = useMemo(() => {
+    const qualities = new Map<string, number>();
+    for (const candidate of profession.recipes) {
+      for (const item of [...candidate.reagents, ...candidate.outputs]) {
+        const qualityId = item.clientData?.qualityId;
+        if (qualityId !== undefined) qualities.set(item.itemId, qualityId);
+      }
+    }
+    return qualities;
+  }, [profession.recipes]);
   const recipeChangeTypes = useMemo(() => {
     const changes = new Map<string, RecipeChangeType>();
     for (const change of recipeChanges) {
@@ -1315,7 +1334,7 @@ export function App() {
                       <span className="guide-step-title">
                         <ItemIcon className="guide-item-icon" gameItemId={guideRecipe.outputs[0]?.gameItemId} name={guideRecipe.name} />
                         <span>
-                          <strong>{guideRecipe.name}</strong>
+                          <strong className={getItemRarityNameClass(recipeOutputQualityId(guideRecipe))}>{guideRecipe.name}</strong>
                           <small className={`guide-source source-${guideRecipe.acquisition}`}>
                             {acquisitionLabel(guideRecipe)}
                           </small>
@@ -1342,7 +1361,7 @@ export function App() {
                                 onClick={() => openRouteRecipe(alternative.recipeId)}
                                 type="button"
                               >
-                                <span>{alternativeRecipe.name}</span>
+                                <span className={getItemRarityNameClass(recipeOutputQualityId(alternativeRecipe))}>{alternativeRecipe.name}</span>
                                 <small>{alternative.startSkill} – {alternative.endSkill}</small>
                               </button>
                             );
@@ -1366,7 +1385,7 @@ export function App() {
                   <ItemTooltipButton aria-current={candidate.id === recipe.id ? "true" : undefined} className={candidate.id === recipe.id ? "recipe active" : "recipe"} item={outputTooltipItem(candidate, profession.name)} onClick={() => selectRecipe(candidate)} type="button">
                     <span className={`recipe-stripe stripe-${index}`} aria-hidden="true" />
                     <ItemIcon className={`item-icon item-${index}`} gameItemId={candidate.outputs[0]?.gameItemId} name={candidate.name} />
-                    <span className="recipe-copy"><strong>{candidate.name}</strong><small>{candidate.reagents.length} reagents · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>{getRecipeChangeType(candidate) ? <RecipeChangeBadge changeType={getRecipeChangeType(candidate)!} /> : null}</span>
+                    <span className="recipe-copy"><strong className={getItemRarityNameClass(recipeOutputQualityId(candidate))}>{candidate.name}</strong><small>{candidate.reagents.length} reagents · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>{getRecipeChangeType(candidate) ? <RecipeChangeBadge changeType={getRecipeChangeType(candidate)!} /> : null}</span>
                     <span className={`recipe-level ${getRecipeDifficulty(skill, candidate.thresholds)}`}>
                       {candidate.thresholds.orange}
                     </span>
@@ -1404,6 +1423,7 @@ export function App() {
               currentSkill={skill}
               error={changesError}
               filters={changeFilters}
+              itemQualityById={itemQualityById}
               loading={changesLoading}
               onFiltersChange={setChangeFilters}
               onRetry={() => setChangesReload((value) => value + 1)}
@@ -1420,7 +1440,7 @@ export function App() {
                   <div>
                     <div className="breadcrumb">{profession.name}</div>
                     <div className="recipe-name-row">
-                      <h1 id="recipe-title">{recipe.name}</h1>
+                      <h1 className={getItemRarityNameClass(recipeOutputQualityId(recipe))} id="recipe-title">{recipe.name}</h1>
                       <span
                         aria-label={`${calculation.difficulty} difficulty`}
                         className={`difficulty-dot ${calculation.difficulty}`}
@@ -1447,7 +1467,7 @@ export function App() {
                   <div>
                     <strong>Not available at your current skill</strong>
                     <p>
-                      {recipe.name} requires {profession.name} {recipeRequiredSkill}. Your
+                      <span className={getItemRarityNameClass(recipeOutputQualityId(recipe))}>{recipe.name}</span> requires {profession.name} {recipeRequiredSkill}. Your
                       current skill is {skill}.
                     </p>
                   </div>
@@ -1487,7 +1507,7 @@ export function App() {
                           <ItemTooltip item={reagentTooltipItem(reagent, price)} pinnable>
                             <ItemIcon className={`item-icon reagent-${index}`} gameItemId={reagent.gameItemId} name={reagent.name} />
                           </ItemTooltip>
-                          <span><strong>{reagent.name}</strong><small>Item {reagent.gameItemId ?? "—"}</small></span>
+                          <span><strong className={getItemRarityNameClass(reagent.clientData?.qualityId)}>{reagent.name}</strong><small>Item {reagent.gameItemId ?? "—"}</small></span>
                         </span>
                         <strong>{formatNumber(expectedQuantity)}</strong>
                         <span className="source-pill"><i aria-hidden="true" /> Auction house</span>
@@ -1572,7 +1592,7 @@ export function App() {
                           type="checkbox"
                         />
                         <span>
-                          <strong>{candidate.name}</strong>
+                          <strong className={getItemRarityNameClass(recipeOutputQualityId(candidate))}>{candidate.name}</strong>
                           <small>{candidate.id} · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>
                         </span>
                       </label>
@@ -1591,7 +1611,7 @@ export function App() {
                 <div className="route-result" aria-live="polite">
                   <div className="route-summary"><article><span>Expected crafts</span><strong>{formatNumber(routeResponse.result.totals.expectedCrafts)}</strong></article><article><span>Material units</span><strong>{formatNumber(routeResponse.result.totals.expectedMaterials)}</strong></article><article><span>Expected cost</span><strong>{routeResponse.result.totals.expectedCostCopper === undefined ? "—" : formatCopper(routeResponse.result.totals.expectedCostCopper)}</strong></article></div>
                   {routeResponse.result.status === "blocked" ? <p className="route-warning">Route blocked at skill {routeResponse.result.blockedAtSkill}: {routeResponse.result.reason === "missing-price-data" ? "one or more required prices are unavailable." : "no eligible recipe covers this skill."}</p> : null}
-                  <ol className="route-segments">{routeResponse.result.segments.map((segment) => <li key={`${segment.recipeId}-${segment.startSkill}`}><span className="route-range">{segment.startSkill} → {segment.endSkill}</span><div><strong>{segment.recipeName}</strong><small>{formatNumber(segment.expectedCrafts)} crafts · {formatNumber(segment.expectedMaterials)} materials</small></div><button onClick={() => openRouteRecipe(segment.recipeId)} type="button">Open recipe</button></li>)}</ol>
+                  <ol className="route-segments">{routeResponse.result.segments.map((segment) => <li key={`${segment.recipeId}-${segment.startSkill}`}><span className="route-range">{segment.startSkill} → {segment.endSkill}</span><div><strong className={getItemRarityNameClass(recipeOutputQualityId(recipeById.get(segment.recipeId)))}>{segment.recipeName}</strong><small>{formatNumber(segment.expectedCrafts)} crafts · {formatNumber(segment.expectedMaterials)} materials</small></div><button onClick={() => openRouteRecipe(segment.recipeId)} type="button">Open recipe</button></li>)}</ol>
                   {routeResponse.attribution ? <a className="attribution" href={routeResponse.attribution.url} rel="noreferrer" target="_blank">{routeResponse.attribution.text}</a> : null}
 
                   <section className="shopping-list" aria-labelledby="shopping-title">
@@ -1602,10 +1622,10 @@ export function App() {
                       <div className="shopping-result" aria-live="polite">
                         <div className="shopping-total"><span>{shoppingResponse.plan.status === "complete" ? "Expected total" : "Known subtotal"}</span><strong>{formatCopper(shoppingResponse.plan.expectedCostCopper ?? shoppingResponse.plan.knownSubtotalCopper)}</strong></div>
                         <div className="shopping-columns">
-                          <div><h3>Buy</h3>{shoppingResponse.plan.purchases.length === 0 ? <p className="empty-list">Nothing to buy.</p> : <ul>{shoppingResponse.plan.purchases.map((purchase) => <li key={purchase.itemId}><span>{purchase.itemName}<small>{formatCopper(purchase.unitPriceCopper)} each</small></span><strong>{formatNumber(purchase.quantity)} · {formatCopper(purchase.expectedCostCopper)}</strong></li>)}</ul>}</div>
-                          <div><h3>Craft intermediates</h3>{shoppingResponse.plan.crafts.length === 0 ? <p className="empty-list">No intermediate crafts chosen.</p> : <ul>{shoppingResponse.plan.crafts.map((craft) => <li key={`${craft.recipeId}-${craft.outputItemId}`}><span>{craft.recipeName}<small>{craft.outputItemName}</small></span><strong>{formatNumber(craft.expectedCrafts)} crafts</strong></li>)}</ul>}</div>
+                          <div><h3>Buy</h3>{shoppingResponse.plan.purchases.length === 0 ? <p className="empty-list">Nothing to buy.</p> : <ul>{shoppingResponse.plan.purchases.map((purchase) => <li key={purchase.itemId}><span className={getItemRarityNameClass(itemQualityById.get(purchase.itemId))}>{purchase.itemName}<small>{formatCopper(purchase.unitPriceCopper)} each</small></span><strong>{formatNumber(purchase.quantity)} · {formatCopper(purchase.expectedCostCopper)}</strong></li>)}</ul>}</div>
+                          <div><h3>Craft intermediates</h3>{shoppingResponse.plan.crafts.length === 0 ? <p className="empty-list">No intermediate crafts chosen.</p> : <ul>{shoppingResponse.plan.crafts.map((craft) => <li key={`${craft.recipeId}-${craft.outputItemId}`}><span className={getItemRarityNameClass(itemQualityById.get(craft.outputItemId))}>{craft.recipeName}<small className={getItemRarityNameClass(itemQualityById.get(craft.outputItemId))}>{craft.outputItemName}</small></span><strong>{formatNumber(craft.expectedCrafts)} crafts</strong></li>)}</ul>}</div>
                         </div>
-                        {shoppingResponse.plan.unresolved.length > 0 ? <div className="shopping-warning"><strong>Needs attention</strong><ul>{shoppingResponse.plan.unresolved.map((item) => <li key={`${item.itemId}-${item.reason}`}>{item.itemName}: {formatNumber(item.quantity)} ({item.reason.replaceAll("-", " ")})</li>)}</ul></div> : null}
+                        {shoppingResponse.plan.unresolved.length > 0 ? <div className="shopping-warning"><strong>Needs attention</strong><ul>{shoppingResponse.plan.unresolved.map((item) => <li key={`${item.itemId}-${item.reason}`}><span className={getItemRarityNameClass(itemQualityById.get(item.itemId))}>{item.itemName}</span>: {formatNumber(item.quantity)} ({item.reason.replaceAll("-", " ")})</li>)}</ul></div> : null}
                         {shoppingResponse.plan.cycles.length > 0 ? <p className="shopping-warning">Recursive crafting cycle blocked: {shoppingResponse.plan.cycles.map((cycle) => cycle.join(" → ")).join("; ")}</p> : null}
                       </div>
                     ) : null}

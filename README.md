@@ -52,9 +52,10 @@ data.
   owning recipe control receives keyboard focus. Calculator icons can pin the
   tooltip on click and support close-button, Escape, and outside-click dismissal.
   Imported client metadata supplies in-game rarity, equipment slot, armor, required
-  level, and vendor sell price when those fields are available. Tooltip titles use
-  the familiar gray, white, green, blue, and purple rarity colors and also spell out
-  the rarity alongside the item category.
+  level, and vendor sell price when those fields are available. Item names throughout
+  the guide, catalog, calculator, changes view, route planner, shopping list, and
+  tooltips use the familiar gray, white, green, blue, and purple rarity colors.
+  Tooltips also spell out the rarity alongside the item category.
 
 ### Forever Changes
 

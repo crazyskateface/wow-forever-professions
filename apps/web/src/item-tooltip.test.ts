@@ -4,6 +4,7 @@ import {
   getInventoryTypeLabel,
   getItemCategoryLabel,
   getItemQuality,
+  getItemRarityNameClass,
   hasProvisionalOutputQuantity,
   ITEM_TOOLTIP_HOVER_DELAY_MS,
 } from "./item-tooltip.js";
@@ -36,6 +37,8 @@ describe("item tooltip data", () => {
     ]);
     expect(getItemQuality(undefined)).toBeUndefined();
     expect(getItemQuality(99)).toBeUndefined();
+    expect(getItemRarityNameClass(3)).toBe("item-rarity-name item-quality-rare");
+    expect(getItemRarityNameClass(undefined)).toBe("item-rarity-name");
   });
 
   it("formats vendor prices like an in-game tooltip", () => {

@@ -139,8 +139,12 @@ an outside click also closes it. Tooltip content is limited to catalog-backed it
 class, subclass, item rarity, equipment slot, armor, required level, vendor sell
 price, classification, quantity, recipe, market price, and ID facts. Do not infer
 binding, stats, or any other field absent from the imported data. Rarity comes from
-`ItemSparse.OverallQualityID`; do not derive it from an item name or icon. Provisional output
-quantities must remain visibly labeled provisional.
+`ItemSparse.OverallQualityID`; do not derive it from an item name or icon. Visible item
+and crafted-output names use the shared `getItemRarityNameClass` helper so the guide,
+catalog, calculator, changes view, route planner, shopping list, and tooltip stay
+consistent. Missing or unsupported quality IDs inherit the surrounding text color
+instead of being guessed. Provisional output quantities must remain visibly labeled
+provisional.
 
 The converter queries the installed client with `wowdata`. It resolves `latest` once,
 then pins all DB2 and icon reads to the returned build. It joins `Item` and

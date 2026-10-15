@@ -117,6 +117,11 @@ export function getItemQuality(
   return qualityId === undefined ? undefined : ITEM_QUALITIES[qualityId];
 }
 
+export function getItemRarityNameClass(qualityId: number | undefined): string {
+  const quality = getItemQuality(qualityId);
+  return `item-rarity-name${quality ? ` item-quality-${quality.token}` : ""}`;
+}
+
 export function getItemCategoryLabel(item: ItemTooltipData): string | undefined {
   if (item.itemClassId === 4 && item.itemSubClassId !== undefined) {
     return ARMOR_SUBCLASS_LABELS[item.itemSubClassId] ?? ITEM_CLASS_LABELS[item.itemClassId];
