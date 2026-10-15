@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type {
   RecipeChange,
   RecipeChangeCounts,
@@ -63,6 +63,15 @@ const ITEM_TYPE_ORDER = [
   "MATERIAL",
   "OTHER",
 ] as const satisfies readonly Exclude<RecipeItemType, "ALL">[];
+
+export function normalizeProfessionId(
+  professionId: string,
+  professions: readonly (readonly [string, string])[],
+): string {
+  return professionId.length === 0 || professions.some(([id]) => id === professionId)
+    ? professionId
+    : "";
+}
 
 const GEAR_NAME_PATTERN = /\b(apron|armor|belt|boots?|bracers?|breastplate|chestguard|cloak|crown|gauntlets?|gloves?|harness|hat|headband|helm|helmet|hood|jerkin|leggings?|mask|pants|pauldrons?|robe|sabatons?|sandals?|shoes?|shoulder|slippers?|spaulders?|tunic|vest|waistcord|wristguards?)\b/i;
 const CONTAINER_NAME_PATTERN = /\b(bag|pack|pouch|quiver|satchel)\b/i;
@@ -329,11 +338,16 @@ export function ForeverChanges({
     }
     return [...values.entries()].sort((left, right) => left[1].localeCompare(right[1]));
   }, [changes]);
+  const normalizedProfessionId = normalizeProfessionId(professionId, professions);
+  useEffect(() => {
+    if (loading || error !== undefined || normalizedProfessionId === professionId) return;
+    onFiltersChange({ ...filters, professionId: normalizedProfessionId });
+  }, [error, filters, loading, normalizedProfessionId, onFiltersChange, professionId]);
   const professionChanges = useMemo(
-    () => changes.filter((change) => professionId.length === 0 || change.identity.professionId === professionId),
-    [changes, professionId],
+    () => changes.filter((change) => normalizedProfessionId.length === 0 || change.identity.professionId === normalizedProfessionId),
+    [changes, normalizedProfessionId],
   );
-  const counts = professionId.length === 0 && summary !== undefined
+  const counts = normalizedProfessionId.length === 0 && summary !== undefined
     ? summary
     : countChanges(professionChanges);
   const itemTypeCounts = useMemo(() => {
@@ -360,7 +374,7 @@ export function ForeverChanges({
       );
     });
   }, [changeFilter, currentSkill, itemType, professionChanges, search, showAboveSkill, showUnknownSkill]);
-  const activeFilterCount = Number(itemType !== "ALL") + Number(!showAboveSkill) + Number(!showUnknownSkill);
+  const activeFilterCount = Number(normalizedProfessionId.length > 0) + Number(itemType !== "ALL") + Number(!showAboveSkill) + Number(!showUnknownSkill);
   const resultDescription = [
     changeFilter === "CHANGED"
       ? "Unchanged recipes are hidden by default"
@@ -462,6 +476,7 @@ export function ForeverChanges({
                 aria-label="Reset Forever Changes filters"
                 onClick={() => onFiltersChange({
                   ...filters,
+                  professionId: DEFAULT_CHANGE_FILTERS.professionId,
                   itemType: DEFAULT_CHANGE_FILTERS.itemType,
                   showAboveSkill: DEFAULT_CHANGE_FILTERS.showAboveSkill,
                   showUnknownSkill: DEFAULT_CHANGE_FILTERS.showUnknownSkill,
@@ -481,7 +496,7 @@ export function ForeverChanges({
                 ...filters,
                 professionId: event.target.value,
               })}
-              value={professionId}
+              value={normalizedProfessionId}
             >
               <option value="">All professions</option>
               {professions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}

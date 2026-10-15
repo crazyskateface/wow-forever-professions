@@ -664,6 +664,7 @@ export function App() {
       gameItemId === undefined ? [] : [gameItemId],
     );
     const controller = new AbortController();
+    setPrices([]);
     setPriceError(undefined);
     const query = new URLSearchParams({
       marketId,
