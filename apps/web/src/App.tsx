@@ -1177,20 +1177,18 @@ export function App() {
             <button aria-selected={recipeListView === "changes"} className={recipeListView === "changes" ? "active" : ""} onClick={() => setRecipeListView("changes")} role="tab" type="button">Forever Changes</button>
           </div>
 
-          <div className="recipe-list-summary">
-            <span>
-              {recipeListView === "guide"
-                ? routeLoading && routeResponse === undefined
-                  ? "Optimizing route…"
-                  : `${guideRows.length} ${guideRows.length === 1 ? "guide step" : "guide steps"}`
-                : recipeListView === "recipes"
+          {recipeListView !== "guide" ? (
+            <div className="recipe-list-summary">
+              <span>
+                {recipeListView === "recipes"
                   ? `${filteredRecipes.length} ${filteredRecipes.length === 1 ? "recipe" : "recipes"}`
                   : changesLoading
                     ? "Loading comparison…"
                     : `${recipeChanges.filter(({ changeType }) => changeType !== "UNCHANGED").length} changed recipes`}
-            </span>
-            {search ? <button onClick={() => setSearch("")} type="button">Clear search</button> : null}
-          </div>
+              </span>
+              {search ? <button onClick={() => setSearch("")} type="button">Clear search</button> : null}
+            </div>
+          ) : null}
 
           {recipeListView === "guide" ? (
             <nav
@@ -1314,7 +1312,7 @@ export function App() {
           {recipeListView !== "changes" ? (
             <div className="rail-footer">
               {recipeListView === "guide" && routeResponse ? (
-                <><span>~{Math.ceil(routeResponse.result.totals.expectedCrafts).toLocaleString()} crafts</span><strong>{routeResponse.result.segments.length} steps</strong></>
+                <span>~{Math.ceil(routeResponse.result.totals.expectedCrafts).toLocaleString()} expected crafts</span>
               ) : (
                 <><span>Forever build</span><strong>{profession.build}</strong></>
               )}
@@ -1347,7 +1345,18 @@ export function App() {
               <section className="recipe-hero" aria-labelledby="recipe-title">
                 <div className="hero-title-row">
                   <ItemIcon className="hero-item-icon" eager gameItemId={recipe.outputs[0]?.gameItemId} name={recipe.name} />
-                  <div><div className="breadcrumb">{profession.name}</div><h1 id="recipe-title">{recipe.name}</h1></div>
+                  <div>
+                    <div className="breadcrumb">{profession.name}</div>
+                    <div className="recipe-name-row">
+                      <h1 id="recipe-title">{recipe.name}</h1>
+                      <span
+                        aria-label={`${calculation.difficulty} difficulty`}
+                        className={`difficulty-dot ${calculation.difficulty}`}
+                        role="img"
+                        title={`${calculation.difficulty} difficulty`}
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="hero-actions">
                   <span
@@ -1356,7 +1365,6 @@ export function App() {
                   >
                     {recipeQuality.label} data
                   </span>
-                  <span className={`difficulty ${calculation.difficulty}`}><i aria-hidden="true" />{calculation.difficulty}</span>
                   <button onClick={() => setWorkspaceView("planner")} type="button">Use in route</button>
                 </div>
               </section>
@@ -1374,17 +1382,12 @@ export function App() {
                 </div>
               ) : null}
 
-              <section className="calculator-card" aria-labelledby="calculator-title">
-                <div className="section-title-row">
-                  <h2 id="calculator-title">Expected skill-up</h2>
-                  <div className="range-control"><span>Skill</span><button aria-label="Decrease skill" onClick={() => nudgeSkill(-1)} type="button">−</button><strong>{skill}</strong><button aria-label="Increase skill" onClick={() => nudgeSkill(1)} type="button">+</button></div>
-                </div>
+              <section className="calculator-card" aria-label="Skill-up calculator">
                 <div className="calculator-grid">
                   <SkillChart recipe={recipe} skill={skill} />
                   <div className="outcome-panel">
                     <div className="outcome-feature"><span>Skill-up chance</span><strong>{Math.round(calculation.probability * 100)}<small>%</small></strong><p>per craft at skill {skill}</p></div>
                     <div className="outcome-row"><span>Expected attempts</span><strong>{formatNumber(calculation.expectedCrafts)}</strong></div>
-                    <div className="outcome-row"><span>Difficulty</span><strong className={calculation.difficulty}>{calculation.difficulty}</strong></div>
                   </div>
                 </div>
               </section>
