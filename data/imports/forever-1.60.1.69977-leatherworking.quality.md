@@ -15,7 +15,7 @@ Professions: 1 · Recipes: 603 · Items: 760
 
 - Client-enriched items: 630/760
 - Equipment slots: 452/760
-- Armor values: 442/760
+- Armor values: 443/760
 - Required levels: 630/760
 - Vendor sell prices: 630/760
 

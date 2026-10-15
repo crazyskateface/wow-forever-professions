@@ -12183,6 +12183,7 @@
                 "clientData": {
                   "displayName": "Big Voodoo Robe",
                   "equipmentSlot": "Chest",
+                  "armor": 117,
                   "requiredLevel": 38,
                   "sellPriceCopper": 7275,
                   "source": {

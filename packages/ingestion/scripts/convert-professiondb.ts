@@ -44,7 +44,10 @@ const invocationDirectory = process.env.INIT_CWD
 const resolvedProfessionDbRoot = resolve(invocationDirectory, professionDbRoot);
 const resolvedItemDbRoot = resolve(invocationDirectory, itemDbRoot);
 const resolvedOutputPath = resolve(invocationDirectory, outputPath);
-const wowInstallationRoot = requestedWowInstallationRoot ?? process.env.WOW_CLIENT_ROOT;
+const requestedClientRoot = requestedWowInstallationRoot ?? process.env.WOW_CLIENT_ROOT;
+const wowInstallationRoot = requestedClientRoot === undefined
+  ? undefined
+  : resolve(invocationDirectory, requestedClientRoot);
 const resolvedIconOutputDirectory = resolve(
   invocationDirectory,
   requestedIconOutputDirectory ??

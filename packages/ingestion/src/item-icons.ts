@@ -278,7 +278,10 @@ function calculateItemArmor(
   const qualityModifier = armorQualityByLevel.get(sparse.ItemLevel)?.Qualitymod[
     sparse.OverallQualityID
   ];
-  const locationModifier = armorLocationByInventoryType.get(item.InventoryType)?.[
+  const armorLocationInventoryType = item.InventoryType === 20
+    ? 5
+    : item.InventoryType;
+  const locationModifier = armorLocationByInventoryType.get(armorLocationInventoryType)?.[
     locationColumn
   ];
   if (

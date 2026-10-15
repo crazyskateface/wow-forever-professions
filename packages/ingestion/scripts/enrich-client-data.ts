@@ -19,12 +19,13 @@ const invocationDirectory = process.env.INIT_CWD
   ? resolve(process.env.INIT_CWD)
   : process.cwd();
 const resolvedDatasetPath = resolve(invocationDirectory, datasetPath);
-const wowInstallationRoot = requestedWowInstallationRoot ?? process.env.WOW_CLIENT_ROOT;
-if (!wowInstallationRoot) {
+const requestedClientRoot = requestedWowInstallationRoot ?? process.env.WOW_CLIENT_ROOT;
+if (!requestedClientRoot) {
   throw new Error(
     "A WoW installation root is required as the second argument or WOW_CLIENT_ROOT.",
   );
 }
+const wowInstallationRoot = resolve(invocationDirectory, requestedClientRoot);
 
 const dataset = parseRawDatasetBytes(await readFile(resolvedDatasetPath));
 const result = await enrichItemClientData({

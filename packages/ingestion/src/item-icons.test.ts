@@ -82,6 +82,7 @@ describe("item icon extraction", () => {
         rows: [
           { ID: 2308, ClassID: 4, SubclassID: 1, InventoryType: 16 },
           { ID: 2318, ClassID: 7, SubclassID: 6, InventoryType: 0 },
+          { ID: 9999, ClassID: 4, SubclassID: 1, InventoryType: 20 },
         ],
       },
       {
@@ -104,18 +105,36 @@ describe("item icon extraction", () => {
             RequiredLevel: 0,
             SellPrice: 15,
           },
+          {
+            ID: 9999,
+            Display_lang: "Test Robe",
+            InventoryType: 20,
+            ItemLevel: 15,
+            OverallQualityID: 2,
+            RequiredLevel: 10,
+            SellPrice: 300,
+          },
         ],
       },
       { rows: [{ ItemLevel: 15, Cloth: 174.37, Leather: 434.66, Mail: 899.43, Plate: 768.16 }] },
       { rows: [{ ID: 15, Qualitymod: [0.9, 0.95, 1, 1.1, 1.2, 1.2, 1.2] }] },
       {
-        rows: [{
-          ID: 16,
-          Clothmodifier: 0.08,
-          Leathermodifier: 0.08,
-          Chainmodifier: 0.08,
-          Platemodifier: 0.08,
-        }],
+        rows: [
+          {
+            ID: 5,
+            Clothmodifier: 0.25,
+            Leathermodifier: 0.25,
+            Chainmodifier: 0.25,
+            Platemodifier: 0.25,
+          },
+          {
+            ID: 16,
+            Clothmodifier: 0.08,
+            Leathermodifier: 0.08,
+            Chainmodifier: 0.08,
+            Platemodifier: 0.08,
+          },
+        ],
       },
       { rows: [] },
       source,
@@ -138,6 +157,14 @@ describe("item icon extraction", () => {
       displayName: "Light Leather",
       requiredLevel: 0,
       sellPriceCopper: 15,
+      source,
+    });
+    expect(records.get(9999)?.clientData).toEqual({
+      displayName: "Test Robe",
+      equipmentSlot: "Chest",
+      armor: 44,
+      requiredLevel: 10,
+      sellPriceCopper: 300,
       source,
     });
   });
