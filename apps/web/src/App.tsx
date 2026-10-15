@@ -936,10 +936,6 @@ export function App() {
     ].sort(),
     [markets, region],
   );
-  const regionMarkets = useMemo(
-    () => markets.filter((market) => market.region.toLowerCase() === region),
-    [markets, region],
-  );
   const selectedMarket = markets.find(({ id }) => id === marketId);
   const marketLabel = selectedMarket?.label ?? marketId;
 
@@ -980,14 +976,6 @@ export function App() {
       market.faction.toLowerCase() === nextFaction
     );
     if (nextMarket !== undefined) setMarketId(nextMarket.id);
-  }
-
-  function selectMarket(nextMarketId: string): void {
-    invalidatePlanningResults();
-    setMarketId(nextMarketId);
-    const nextMarket = markets.find(({ id }) => id === nextMarketId);
-    if (nextMarket === undefined) return;
-    setRegion(nextMarket.region.toLowerCase());
   }
 
   function resetPersonalization(): void {
@@ -1181,21 +1169,6 @@ export function App() {
                 </select>
               </label>
             </div>
-            <label className="personalization-field">
-              <span>Auction market</span>
-              <select
-                disabled={marketsLoading || regionMarkets.length === 0}
-                onChange={(event) => selectMarket(event.target.value)}
-                value={regionMarkets.some(({ id }) => id === marketId) ? marketId : ""}
-              >
-                {regionMarkets.length === 0 ? (
-                  <option value="">{marketsLoading ? "Loading markets…" : "No market available"}</option>
-                ) : null}
-                {regionMarkets.map((market) => (
-                  <option key={market.id} value={market.id}>{market.label}</option>
-                ))}
-              </select>
-            </label>
             <label className="personalization-field">
               <span>Legacy profession bonus</span>
               <input
