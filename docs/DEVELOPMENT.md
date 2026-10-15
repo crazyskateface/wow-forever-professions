@@ -133,6 +133,9 @@ Every recipe, change-card, output, and reagent icon uses the shared item-tooltip
 surface. Pointer hover opens a preview after one second and leaving the owning
 control closes that preview immediately. Focusing a recipe button or change summary
 opens the same preview for keyboard users, and Escape dismisses either mode.
+Forever Changes resolves current recipes through the calculator's catalog tooltip
+payload so the same item exposes the same fields in both views; removed recipes fall
+back to the smaller comparison snapshot because no current catalog record exists.
 Calculator output and reagent icons are also buttons that pin the tooltip, move focus
 to its close control, and restore focus when the close button or Escape dismisses it;
 an outside click also closes it. Tooltip content is limited to catalog-backed item

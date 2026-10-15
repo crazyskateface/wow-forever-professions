@@ -808,6 +808,15 @@ export function App() {
     () => new Map(profession.recipes.map((candidate) => [candidate.id, candidate] as const)),
     [profession.recipes],
   );
+  const recipeTooltipBySpellId = useMemo(() => {
+    const tooltips = new Map<number, ItemTooltipData>();
+    for (const candidate of profession.recipes) {
+      if (candidate.spellId !== null) {
+        tooltips.set(candidate.spellId, outputTooltipItem(candidate, profession.name));
+      }
+    }
+    return tooltips;
+  }, [profession.name, profession.recipes]);
   const itemQualityById = useMemo(() => {
     const qualities = new Map<string, number>();
     for (const candidate of profession.recipes) {
@@ -1427,6 +1436,7 @@ export function App() {
               loading={changesLoading}
               onFiltersChange={setChangeFilters}
               onRetry={() => setChangesReload((value) => value + 1)}
+              recipeTooltipBySpellId={recipeTooltipBySpellId}
               search={search}
               summary={changeSummary}
             />

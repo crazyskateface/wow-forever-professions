@@ -31,6 +31,7 @@ interface ForeverChangesProps {
   readonly loading: boolean;
   readonly onFiltersChange: (filters: ForeverChangeFilters) => void;
   readonly onRetry: () => void;
+  readonly recipeTooltipBySpellId: ReadonlyMap<number, ItemTooltipData>;
   readonly search: string;
   readonly summary: RecipeChangeCounts | undefined;
 }
@@ -239,10 +240,14 @@ export function RecipeChangeBadge({ changeType }: { readonly changeType: RecipeC
   );
 }
 
-function changeTooltipItem(
+export function changeTooltipItem(
   change: RecipeChange,
+  recipeTooltipBySpellId: ReadonlyMap<number, ItemTooltipData>,
   itemQualityById: ReadonlyMap<string, number>,
 ): ItemTooltipData {
+  const catalogItem = recipeTooltipBySpellId.get(change.identity.spellId);
+  if (catalogItem !== undefined) return catalogItem;
+
   const snapshot = change.target ?? change.base;
   const output = snapshot?.outputs[0];
   const qualityId = output === undefined ? undefined : itemQualityById.get(output.itemId);
@@ -266,18 +271,25 @@ function ChangeCard({
   change,
   currentSkill,
   itemQualityById,
+  recipeTooltipBySpellId,
 }: {
   readonly change: RecipeChange;
   readonly currentSkill: number;
   readonly itemQualityById: ReadonlyMap<string, number>;
+  readonly recipeTooltipBySpellId: ReadonlyMap<number, ItemTooltipData>;
 }) {
   const changedFields = Object.entries(change.changedFields);
   const snapshot = change.target ?? change.base;
   const skillAvailability = skillAvailabilityFor(change, currentSkill);
+  const tooltipItem = changeTooltipItem(
+    change,
+    recipeTooltipBySpellId,
+    itemQualityById,
+  );
 
   return (
     <details className={`change-card change-card-${change.changeType.toLowerCase()}`}>
-      <ItemTooltipSummary item={changeTooltipItem(change, itemQualityById)}>
+      <ItemTooltipSummary item={tooltipItem}>
         <ItemIcon
           className="change-card-icon"
           gameItemId={snapshot?.outputs[0]?.gameItemId}
@@ -294,11 +306,7 @@ function ChangeCard({
               </span>
             ) : null}
           </span>
-          <strong className={getItemRarityNameClass(
-            snapshot?.outputs[0] === undefined
-              ? undefined
-              : itemQualityById.get(snapshot.outputs[0].itemId)
-          )}>{change.name}</strong>
+          <strong className={getItemRarityNameClass(tooltipItem.qualityId)}>{change.name}</strong>
           <small>
             {change.changeType === "NEW"
               ? "New in Forever"
@@ -367,6 +375,7 @@ export function ForeverChanges({
   loading,
   onFiltersChange,
   onRetry,
+  recipeTooltipBySpellId,
   search,
   summary,
 }: ForeverChangesProps) {
@@ -570,6 +579,7 @@ export function ForeverChanges({
               currentSkill={currentSkill}
               itemQualityById={itemQualityById}
               key={`${change.identity.professionId}-${change.identity.spellId}`}
+              recipeTooltipBySpellId={recipeTooltipBySpellId}
             />
           ))}
         </div>
