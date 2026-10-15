@@ -36,8 +36,11 @@ import {
 import { leatherworkingFixture } from "@forever-professions/fixtures";
 import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
-import { ItemTooltip } from "./ItemTooltip.js";
-import type { ItemTooltipData } from "./item-tooltip.js";
+import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
+import {
+  hasProvisionalOutputQuantity,
+  type ItemTooltipData,
+} from "./item-tooltip.js";
 import {
   DEFAULT_PERSONALIZATION,
   clearPersonalization,
@@ -201,18 +204,47 @@ function acquisitionLabel(recipe: Recipe): string {
   return recipe.acquisition[0]!.toUpperCase() + recipe.acquisition.slice(1);
 }
 
+type TooltipRecipeItem = Recipe["outputs"][number] | Recipe["reagents"][number];
+
+function tooltipItemData(item: TooltipRecipeItem): Omit<ItemTooltipData, "details"> {
+  const clientData = item.clientData;
+  return {
+    name: clientData?.displayName ?? item.name,
+    ...(item.gameItemId === undefined ? {} : { gameItemId: item.gameItemId }),
+    ...(item.itemClassId === undefined ? {} : { itemClassId: item.itemClassId }),
+    ...(item.itemSubClassId === undefined ? {} : { itemSubClassId: item.itemSubClassId }),
+    ...(item.inventoryType === undefined ? {} : { inventoryType: item.inventoryType }),
+    ...(clientData?.equipmentSlot === undefined
+      ? {}
+      : { equipmentSlot: clientData.equipmentSlot }),
+    ...(clientData?.armor === undefined ? {} : { armor: clientData.armor }),
+    ...(clientData?.requiredLevel === undefined
+      ? {}
+      : { requiredLevel: clientData.requiredLevel }),
+    ...(clientData?.sellPriceCopper === undefined
+      ? {}
+      : { sellPriceCopper: clientData.sellPriceCopper }),
+    ...(item.classification === undefined ? {} : { classification: item.classification }),
+  };
+}
+
+function outputQuantityIsProvisional(recipe: Recipe): boolean {
+  return hasProvisionalOutputQuantity([
+    recipe.provenance.verification.notes,
+    recipe.provenance.notes,
+  ]);
+}
+
 function outputTooltipItem(recipe: Recipe, professionName: string): ItemTooltipData {
   const output = recipe.outputs[0]!;
+  const provisionalQuantity = outputQuantityIsProvisional(recipe);
   return {
-    name: output.name,
-    ...(output.gameItemId === undefined ? {} : { gameItemId: output.gameItemId }),
-    ...(output.itemClassId === undefined ? {} : { itemClassId: output.itemClassId }),
-    ...(output.itemSubClassId === undefined ? {} : { itemSubClassId: output.itemSubClassId }),
-    ...(output.inventoryType === undefined ? {} : { inventoryType: output.inventoryType }),
-    ...(output.classification === undefined ? {} : { classification: output.classification }),
+    ...tooltipItemData(output),
     details: [
       { text: `Crafted by ${professionName}` },
-      { text: `Creates ${output.quantity} per craft` },
+      provisionalQuantity
+        ? { text: `Creates ${output.quantity} per craft (provisional)`, tone: "warning" }
+        : { text: `Creates ${output.quantity} per craft` },
       recipe.learnSkill === null
         ? { text: "Recipe learning skill unknown", tone: "warning" }
         : { text: `Recipe learned at skill ${recipe.learnSkill}`, tone: "muted" },
@@ -225,12 +257,7 @@ function reagentTooltipItem(
   price: number | undefined,
 ): ItemTooltipData {
   return {
-    name: reagent.name,
-    ...(reagent.gameItemId === undefined ? {} : { gameItemId: reagent.gameItemId }),
-    ...(reagent.itemClassId === undefined ? {} : { itemClassId: reagent.itemClassId }),
-    ...(reagent.itemSubClassId === undefined ? {} : { itemSubClassId: reagent.itemSubClassId }),
-    ...(reagent.inventoryType === undefined ? {} : { inventoryType: reagent.inventoryType }),
-    ...(reagent.classification === undefined ? {} : { classification: reagent.classification }),
+    ...tooltipItemData(reagent),
     details: [
       { text: `Required per craft: ${reagent.quantity}` },
       price === undefined
@@ -1276,17 +1303,16 @@ export function App() {
                     <div className="guide-range-divider">
                       <span>{segment.startSkill} – {segment.endSkill}</span>
                     </div>
-                    <button
+                    <ItemTooltipButton
                       aria-current={active ? "step" : undefined}
                       className={active ? "guide-step active" : "guide-step"}
+                      item={outputTooltipItem(guideRecipe, profession.name)}
                       onClick={() => openRouteRecipe(segment.recipeId)}
                       type="button"
                     >
                       <span className="guide-step-number">{index + 1}</span>
                       <span className="guide-step-title">
-                        <ItemTooltip item={outputTooltipItem(guideRecipe, profession.name)}>
-                          <ItemIcon className="guide-item-icon" gameItemId={guideRecipe.outputs[0]?.gameItemId} name={guideRecipe.name} />
-                        </ItemTooltip>
+                        <ItemIcon className="guide-item-icon" gameItemId={guideRecipe.outputs[0]?.gameItemId} name={guideRecipe.name} />
                         <span>
                           <strong>{guideRecipe.name}</strong>
                           <small className={`guide-source source-${guideRecipe.acquisition}`}>
@@ -1297,7 +1323,7 @@ export function App() {
                           ) : null}
                         </span>
                       </span>
-                    </button>
+                    </ItemTooltipButton>
                     {alternatives.length > 0 ? (
                       <details className="guide-alternatives">
                         <summary>{alternatives.length} {alternatives.length === 1 ? "alternative" : "alternatives"}</summary>
@@ -1336,16 +1362,14 @@ export function App() {
               items={filteredRecipes}
               renderItem={(candidate, index) => (
                 <div className="recipe-group">
-                  <button aria-current={candidate.id === recipe.id ? "true" : undefined} className={candidate.id === recipe.id ? "recipe active" : "recipe"} onClick={() => selectRecipe(candidate)} type="button">
+                  <ItemTooltipButton aria-current={candidate.id === recipe.id ? "true" : undefined} className={candidate.id === recipe.id ? "recipe active" : "recipe"} item={outputTooltipItem(candidate, profession.name)} onClick={() => selectRecipe(candidate)} type="button">
                     <span className={`recipe-stripe stripe-${index}`} aria-hidden="true" />
-                    <ItemTooltip item={outputTooltipItem(candidate, profession.name)}>
-                      <ItemIcon className={`item-icon item-${index}`} gameItemId={candidate.outputs[0]?.gameItemId} name={candidate.name} />
-                    </ItemTooltip>
+                    <ItemIcon className={`item-icon item-${index}`} gameItemId={candidate.outputs[0]?.gameItemId} name={candidate.name} />
                     <span className="recipe-copy"><strong>{candidate.name}</strong><small>{candidate.reagents.length} reagents · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>{getRecipeChangeType(candidate) ? <RecipeChangeBadge changeType={getRecipeChangeType(candidate)!} /> : null}</span>
                     <span className={`recipe-level ${getRecipeDifficulty(skill, candidate.thresholds)}`}>
                       {candidate.thresholds.orange}
                     </span>
-                  </button>
+                  </ItemTooltipButton>
                 </div>
               )}
               resetKey={search}

@@ -6,7 +6,7 @@ import type {
   RecipeComparisonSnapshot,
 } from "@forever-professions/contracts";
 import { ItemIcon } from "./ItemIcon.js";
-import { ItemTooltip } from "./ItemTooltip.js";
+import { ItemTooltipSummary } from "./ItemTooltip.js";
 import type { ItemTooltipData } from "./item-tooltip.js";
 import {
   DEFAULT_CHANGE_FILTERS,
@@ -256,14 +256,12 @@ function ChangeCard({
 
   return (
     <details className={`change-card change-card-${change.changeType.toLowerCase()}`}>
-      <summary>
-        <ItemTooltip item={changeTooltipItem(change)}>
-          <ItemIcon
-            className="change-card-icon"
-            gameItemId={snapshot?.outputs[0]?.gameItemId}
-            name={snapshot?.outputs[0]?.name ?? change.name}
-          />
-        </ItemTooltip>
+      <ItemTooltipSummary item={changeTooltipItem(change)}>
+        <ItemIcon
+          className="change-card-icon"
+          gameItemId={snapshot?.outputs[0]?.gameItemId}
+          name={snapshot?.outputs[0]?.name ?? change.name}
+        />
         <span className="change-card-copy">
           <span className="change-card-meta">
             <RecipeChangeBadge changeType={change.changeType} />
@@ -287,7 +285,7 @@ function ChangeCard({
           </small>
         </span>
         <span className="change-card-expand" aria-hidden="true">⌄</span>
-      </summary>
+      </ItemTooltipSummary>
 
       <div className="change-card-details">
         {change.changeType === "UPDATED" && changedFields.length > 0 ? (

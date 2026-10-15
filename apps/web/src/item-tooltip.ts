@@ -11,6 +11,10 @@ export interface ItemTooltipData {
   readonly itemClassId?: number;
   readonly itemSubClassId?: number;
   readonly inventoryType?: string;
+  readonly equipmentSlot?: string;
+  readonly armor?: number;
+  readonly requiredLevel?: number;
+  readonly sellPriceCopper?: number;
   readonly classification?: {
     readonly label: string;
   };
@@ -109,4 +113,25 @@ export function getInventoryTypeLabel(inventoryType: string | undefined): string
     return undefined;
   }
   return INVENTORY_TYPE_LABELS[inventoryType];
+}
+
+export function formatTooltipSellPrice(copper: number): string {
+  const rounded = Math.max(0, Math.round(copper));
+  const gold = Math.floor(rounded / 10_000);
+  const silver = Math.floor((rounded % 10_000) / 100);
+  const remainder = rounded % 100;
+  const parts = [
+    ...(gold > 0 ? [`${gold}g`] : []),
+    ...(silver > 0 ? [`${silver}s`] : []),
+    ...(remainder > 0 || rounded === 0 ? [`${remainder}c`] : []),
+  ];
+  return parts.join(" ");
+}
+
+export function hasProvisionalOutputQuantity(
+  notes: readonly (string | undefined)[],
+): boolean {
+  return notes.some((note) =>
+    note !== undefined && /output quantity.*(?:provisional|unverified)/i.test(note)
+  );
 }

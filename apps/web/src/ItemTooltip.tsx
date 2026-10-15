@@ -10,9 +10,12 @@ import {
   useState,
   type RefObject,
   type ReactNode,
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
 } from "react";
 import { createPortal } from "react-dom";
 import {
+  formatTooltipSellPrice,
   getInventoryTypeLabel,
   getItemCategoryLabel,
   ITEM_TOOLTIP_HOVER_DELAY_MS,
@@ -57,6 +60,7 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
   const [active, setActive] = useState<ActiveTooltip>();
   const [position, setPosition] = useState<TooltipPosition>();
   const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const preview = useCallback(
     (id: string, anchor: HTMLElement, item: ItemTooltipData) => {
@@ -133,6 +137,10 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
     updatePosition();
   }, [active, updatePosition]);
 
+  useLayoutEffect(() => {
+    if (active?.mode === "pinned") closeButtonRef.current?.focus();
+  }, [active?.id, active?.mode]);
+
   useEffect(() => {
     if (active === undefined) return;
     const reposition = () => updatePosition();
@@ -145,8 +153,9 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
   }, [active, updatePosition]);
 
   useEffect(() => {
-    if (active?.mode !== "pinned") return;
+    if (active === undefined) return;
     const dismissOutside = (event: PointerEvent) => {
+      if (active.mode !== "pinned") return;
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (active.anchor.contains(target) || panelRef.current?.contains(target)) return;
@@ -155,9 +164,13 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
     const dismissWithEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      closePinnedAndRestoreFocus();
+      event.stopPropagation();
+      if (active.mode === "pinned") closePinnedAndRestoreFocus();
+      else setActive(undefined);
     };
-    document.addEventListener("pointerdown", dismissOutside, true);
+    if (active.mode === "pinned") {
+      document.addEventListener("pointerdown", dismissOutside, true);
+    }
     document.addEventListener("keydown", dismissWithEscape);
     return () => {
       document.removeEventListener("pointerdown", dismissOutside, true);
@@ -169,7 +182,9 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
     () => ({ active, closePreview, dismiss, pin, preview, syncItem }),
     [active, closePreview, dismiss, pin, preview, syncItem],
   );
-  const inventoryType = active === undefined ? undefined : getInventoryTypeLabel(active.item.inventoryType);
+  const equipmentSlot = active === undefined
+    ? undefined
+    : active.item.equipmentSlot ?? getInventoryTypeLabel(active.item.inventoryType);
   const category = active === undefined ? undefined : getItemCategoryLabel(active.item);
 
   return (
@@ -195,14 +210,21 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
                 aria-label="Close item details"
                 className="item-tooltip-close"
                 onClick={closePinnedAndRestoreFocus}
+                ref={closeButtonRef}
                 type="button"
               >
                 <span aria-hidden="true">×</span>
               </button>
             ) : null}
           </div>
-          {inventoryType ? <span className="item-tooltip-slot">{inventoryType}</span> : null}
+          {equipmentSlot ? <span className="item-tooltip-slot">{equipmentSlot}</span> : null}
           {category ? <span className="item-tooltip-category">{category}</span> : null}
+          {active.item.armor === undefined ? null : (
+            <span className="item-tooltip-stat">{active.item.armor} Armor</span>
+          )}
+          {active.item.requiredLevel === undefined || active.item.requiredLevel === 0 ? null : (
+            <span className="item-tooltip-stat">Requires Level {active.item.requiredLevel}</span>
+          )}
           {active.item.classification ? (
             <span className={`item-tooltip-classification${active.item.classification.label.toLowerCase() === "scarce" ? " is-scarce" : ""}`}>
               {active.item.classification.label}
@@ -220,6 +242,11 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
           {active.item.gameItemId === undefined ? null : (
             <span className="item-tooltip-id">Item #{active.item.gameItemId}</span>
           )}
+          {active.item.sellPriceCopper === undefined ? null : (
+            <span className="item-tooltip-sell-price">
+              Sell price: {formatTooltipSellPrice(active.item.sellPriceCopper)}
+            </span>
+          )}
           {active.mode === "pinned" ? (
             <span className="item-tooltip-hint">Press Esc or click outside to close</span>
           ) : null}
@@ -230,15 +257,9 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
   );
 }
 
-interface ItemTooltipProps {
-  readonly children: ReactNode;
-  readonly item: ItemTooltipData;
-  readonly pinnable?: boolean;
-}
-
-export function ItemTooltip({ children, item, pinnable = false }: ItemTooltipProps) {
+function useItemTooltipTrigger(item: ItemTooltipData) {
   const id = useId();
-  const triggerRef = useRef<HTMLButtonElement | HTMLSpanElement>(null);
+  const triggerRef = useRef<HTMLElement>(null);
   const hoverTimerRef = useRef<number | undefined>(undefined);
   const { active, closePreview, dismiss, pin, preview, syncItem } = useItemTooltipContext();
   const isCurrent = active?.id === id;
@@ -275,47 +296,153 @@ export function ItemTooltip({ children, item, pinnable = false }: ItemTooltipPro
     closePreview(id);
   }
 
-  const sharedProps = {
-    "aria-describedby": isCurrent && !isPinned ? TOOLTIP_PANEL_ID : undefined,
-    "data-tooltip-open": isCurrent ? active.mode : undefined,
-    onPointerEnter: startHover,
-    onPointerLeave: stopHover,
-  } as const;
-
-  if (!pinnable) {
-    return (
-      <span className="item-tooltip-trigger" ref={triggerRef as RefObject<HTMLSpanElement>} {...sharedProps}>
-        {children}
-      </span>
-    );
+  function showFocusPreview(): void {
+    const anchor = triggerRef.current;
+    if (anchor?.dataset.suppressItemTooltipFocus === "true") {
+      delete anchor.dataset.suppressItemTooltipFocus;
+      return;
+    }
+    if (anchor && active?.mode !== "pinned") preview(id, anchor, item);
   }
+
+  function pinFromTrigger(): void {
+    clearHoverTimer();
+    const anchor = triggerRef.current;
+    if (anchor) pin(id, anchor, item);
+  }
+
+  return {
+    active,
+    ariaDescriptionId: isCurrent && !isPinned ? TOOLTIP_PANEL_ID : undefined,
+    clearPreview: () => closePreview(id),
+    dataMode: isCurrent ? active.mode : undefined,
+    isCurrent,
+    isPinned,
+    pinFromTrigger,
+    showFocusPreview,
+    startHover,
+    stopHover,
+    triggerRef,
+  };
+}
+
+interface ItemTooltipProps {
+  readonly children: ReactNode;
+  readonly item: ItemTooltipData;
+  readonly pinnable?: boolean;
+}
+
+export function ItemTooltip({ children, item }: ItemTooltipProps) {
+  const trigger = useItemTooltipTrigger(item);
 
   return (
     <button
-      aria-controls={isCurrent ? TOOLTIP_PANEL_ID : undefined}
-      aria-expanded={isPinned}
+      aria-controls={trigger.isCurrent ? TOOLTIP_PANEL_ID : undefined}
+      aria-describedby={trigger.ariaDescriptionId}
+      aria-expanded={trigger.isPinned}
       aria-haspopup="dialog"
-      aria-label={`${isPinned ? "Hide" : "Show"} item details for ${item.name}`}
+      aria-label={`${trigger.isPinned ? "Hide" : "Show"} item details for ${item.name}`}
       className="item-tooltip-trigger item-tooltip-trigger-button"
-      onBlur={() => closePreview(id)}
-      onClick={() => {
-        clearHoverTimer();
-        const anchor = triggerRef.current;
-        if (anchor) pin(id, anchor, item);
-      }}
-      onFocus={() => {
-        const anchor = triggerRef.current;
-        if (anchor?.dataset.suppressItemTooltipFocus === "true") {
-          delete anchor.dataset.suppressItemTooltipFocus;
-          return;
-        }
-        if (anchor && active?.mode !== "pinned") preview(id, anchor, item);
-      }}
-      ref={triggerRef as RefObject<HTMLButtonElement>}
+      data-tooltip-open={trigger.dataMode}
+      onBlur={trigger.clearPreview}
+      onClick={trigger.pinFromTrigger}
+      onFocus={trigger.showFocusPreview}
+      onPointerEnter={trigger.startHover}
+      onPointerLeave={trigger.stopHover}
+      ref={trigger.triggerRef as RefObject<HTMLButtonElement>}
       type="button"
-      {...sharedProps}
     >
       {children}
     </button>
+  );
+}
+
+interface ItemTooltipButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  readonly item: ItemTooltipData;
+}
+
+export function ItemTooltipButton({
+  children,
+  item,
+  onBlur,
+  onFocus,
+  onPointerEnter,
+  onPointerLeave,
+  ...props
+}: ItemTooltipButtonProps) {
+  const trigger = useItemTooltipTrigger(item);
+  const describedBy = [props["aria-describedby"], trigger.ariaDescriptionId]
+    .filter(Boolean)
+    .join(" ") || undefined;
+  return (
+    <button
+      {...props}
+      aria-describedby={describedBy}
+      data-tooltip-open={trigger.dataMode}
+      onBlur={(event) => {
+        onBlur?.(event);
+        trigger.clearPreview();
+      }}
+      onFocus={(event) => {
+        onFocus?.(event);
+        if (!event.defaultPrevented) trigger.showFocusPreview();
+      }}
+      onPointerEnter={(event) => {
+        onPointerEnter?.(event);
+        if (!event.defaultPrevented) trigger.startHover();
+      }}
+      onPointerLeave={(event) => {
+        onPointerLeave?.(event);
+        trigger.stopHover();
+      }}
+      ref={trigger.triggerRef as RefObject<HTMLButtonElement>}
+    >
+      {children}
+    </button>
+  );
+}
+
+interface ItemTooltipSummaryProps extends HTMLAttributes<HTMLElement> {
+  readonly item: ItemTooltipData;
+}
+
+export function ItemTooltipSummary({
+  children,
+  item,
+  onBlur,
+  onFocus,
+  onPointerEnter,
+  onPointerLeave,
+  ...props
+}: ItemTooltipSummaryProps) {
+  const trigger = useItemTooltipTrigger(item);
+  const describedBy = [props["aria-describedby"], trigger.ariaDescriptionId]
+    .filter(Boolean)
+    .join(" ") || undefined;
+  return (
+    <summary
+      {...props}
+      aria-describedby={describedBy}
+      data-tooltip-open={trigger.dataMode}
+      onBlur={(event) => {
+        onBlur?.(event);
+        trigger.clearPreview();
+      }}
+      onFocus={(event) => {
+        onFocus?.(event);
+        if (!event.defaultPrevented) trigger.showFocusPreview();
+      }}
+      onPointerEnter={(event) => {
+        onPointerEnter?.(event);
+        if (!event.defaultPrevented) trigger.startHover();
+      }}
+      onPointerLeave={(event) => {
+        onPointerLeave?.(event);
+        trigger.stopHover();
+      }}
+      ref={trigger.triggerRef}
+    >
+      {children}
+    </summary>
   );
 }
