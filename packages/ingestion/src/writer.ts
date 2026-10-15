@@ -189,6 +189,82 @@ export async function writeNormalizedBuild(
     batchOptions,
   );
 
+  const itemClientData = build.items.flatMap((item) => {
+    if (item.clientData === undefined) return [];
+    if (
+      item.itemClassId === undefined ||
+      item.itemSubClassId === undefined ||
+      item.inventoryType === undefined
+    ) {
+      throw new Error(`Client-enriched item ${item.id} is missing its item type metadata.`);
+    }
+    return [{
+      itemId: item.id,
+      recipeBuildId: build.build.id,
+      itemClassId: item.itemClassId,
+      itemSubClassId: item.itemSubClassId,
+      inventoryType: item.inventoryType,
+      ...item.clientData,
+    }];
+  });
+  batches.itemClientData = await writeBatches(
+    runner,
+    itemClientData,
+    {
+      label: (row) => `item client data ${row.itemId}@${row.recipeBuildId}`,
+      insertSql:
+        "INSERT INTO item_client_data (item_id, recipe_build_id, display_name, item_class_id, item_subclass_id, inventory_type, equipment_slot, armor, required_level, sell_price_copper, source_product, source_build_id, source_locale) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT DO NOTHING",
+      insertValues: (row) => [
+        row.itemId,
+        row.recipeBuildId,
+        row.displayName,
+        row.itemClassId,
+        row.itemSubClassId,
+        row.inventoryType,
+        row.equipmentSlot ?? null,
+        row.armor ?? null,
+        row.requiredLevel,
+        row.sellPriceCopper,
+        row.source.product,
+        row.source.build,
+        row.source.locale,
+      ],
+      selectSql:
+        "SELECT item_id, recipe_build_id, display_name, item_class_id, item_subclass_id, inventory_type, equipment_slot, armor, required_level, sell_price_copper, source_product, source_build_id, source_locale FROM item_client_data WHERE item_id = $1 AND recipe_build_id = $2",
+      selectValues: (row) => [row.itemId, row.recipeBuildId],
+      expected: (row) => ({
+        item_id: row.itemId,
+        recipe_build_id: row.recipeBuildId,
+        display_name: row.displayName,
+        item_class_id: row.itemClassId,
+        item_subclass_id: row.itemSubClassId,
+        inventory_type: row.inventoryType,
+        equipment_slot: row.equipmentSlot ?? null,
+        armor: row.armor ?? null,
+        required_level: row.requiredLevel,
+        sell_price_copper: row.sellPriceCopper,
+        source_product: row.source.product,
+        source_build_id: row.source.build,
+        source_locale: row.source.locale,
+      }),
+      assertReferences: async (database, row) => {
+        await assertExists(
+          database,
+          "SELECT 1 AS found FROM item WHERE item_id = $1",
+          [row.itemId],
+          `Missing item ${row.itemId}.`,
+        );
+        await assertExists(
+          database,
+          "SELECT 1 AS found FROM wow_build WHERE build_id = $1",
+          [row.recipeBuildId],
+          `Missing build ${row.recipeBuildId}.`,
+        );
+      },
+    },
+    batchOptions,
+  );
+
   const itemClassifications = build.items.flatMap((item) =>
     item.classification === undefined
       ? []

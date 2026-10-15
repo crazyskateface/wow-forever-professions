@@ -60,7 +60,24 @@ function sampleDataset(): ImportedBuildDataset {
             thresholds: { orange: 150, yellow: 170, green: 180, gray: 190 },
             reagents: [
               {
-                item: { id: "heavy-leather", gameId: 4234, name: "Heavy Leather" },
+                item: {
+                  id: "heavy-leather",
+                  gameId: 4234,
+                  name: "Heavy Leather",
+                  itemClassId: 7,
+                  itemSubClassId: 6,
+                  inventoryType: "INVTYPE_NON_EQUIP_IGNORE",
+                  clientData: {
+                    displayName: "Heavy Leather",
+                    requiredLevel: 0,
+                    sellPriceCopper: 15,
+                    source: {
+                      product: "wow_classic_beta",
+                      build: "1.60.1.70374",
+                      locale: "enUS",
+                    },
+                  },
+                },
                 quantity: 5,
               },
               {
@@ -207,6 +224,8 @@ async function clearLocalRows(pool: Pool): Promise<void> {
     await client.query("DELETE FROM recipe_version");
     await client.query("DELETE FROM verification");
     await client.query("DELETE FROM recipe");
+    await client.query("DELETE FROM item_client_data");
+    await client.query("DELETE FROM item_classification");
     await client.query("DELETE FROM item");
     await client.query("DELETE FROM profession");
     await client.query("DELETE FROM data_source");
@@ -262,8 +281,9 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     recipe_metadata: string;
     comparisons: string;
     recipe_changes: string;
+    item_client_data: string;
   }>(
-    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
+    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM item_client_data) AS item_client_data, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
   );
   const row = counts.rows[0]!;
 
@@ -275,6 +295,7 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     "SELECT COUNT(*) AS count FROM provenance p LEFT JOIN recipe_version rv ON rv.recipe_version_id = p.recipe_version_id LEFT JOIN data_source s ON s.source_id = p.source_id LEFT JOIN verification v ON v.verification_id = p.verification_id WHERE rv.recipe_version_id IS NULL OR s.source_id IS NULL OR v.verification_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_comparison c LEFT JOIN wow_build b ON b.build_id = c.base_build_id LEFT JOIN wow_build t ON t.build_id = c.target_build_id WHERE b.build_id IS NULL OR t.build_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_change rc LEFT JOIN recipe_comparison c ON c.comparison_id = rc.comparison_id LEFT JOIN profession p ON p.profession_id = rc.profession_id WHERE c.comparison_id IS NULL OR p.profession_id IS NULL",
+    "SELECT COUNT(*) AS count FROM item_client_data icd LEFT JOIN item i ON i.item_id = icd.item_id LEFT JOIN wow_build b ON b.build_id = icd.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
   ] as const;
   let orphanCount = 0;
   for (const orphanQuery of orphanQueries) {
@@ -292,6 +313,7 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     outputs: Number(row.outputs),
     comparisons: Number(row.comparisons),
     recipeChanges: Number(row.recipe_changes),
+    itemClientData: Number(row.item_client_data),
     orphans: orphanCount,
   };
 }

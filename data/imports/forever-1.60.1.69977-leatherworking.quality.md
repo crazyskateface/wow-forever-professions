@@ -11,6 +11,14 @@ Professions: 1 · Recipes: 603 · Items: 760
 
 - unverified: 603
 
+## Item client data
+
+- Client-enriched items: 630/760
+- Equipment slots: 452/760
+- Armor values: 442/760
+- Required levels: 630/760
+- Vendor sell prices: 630/760
+
 ## Canonical route metadata
 
 - Known learning rank: 484/603

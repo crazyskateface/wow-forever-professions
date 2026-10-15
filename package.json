@@ -17,6 +17,7 @@
     "build": "pnpm -r --if-present build",
     "data:audit": "pnpm --filter @forever-professions/ingestion audit:build",
     "data:convert:professiondb": "pnpm --filter @forever-professions/ingestion convert:professiondb",
+    "data:enrich:client": "pnpm --filter @forever-professions/ingestion enrich:client-data",
     "data:import": "pnpm --filter @forever-professions/ingestion import:client-data",
     "data:import:local": "pnpm --filter @forever-professions/ingestion import:local",
     "guide:validate": "pnpm --filter @forever-professions/api validate:guide",

@@ -6,6 +6,8 @@ import { promisify } from "node:util";
 import {
   importedBuildDatasetSchema,
   type ImportedBuildDataset,
+  type ItemClientData,
+  type ItemClientSource,
   type ItemClassification,
 } from "@forever-professions/contracts";
 
@@ -33,9 +35,16 @@ interface WowdataCascInfo {
   readonly buildName: string;
 }
 
-interface WowdataItemRow {
+interface WowdataItemIconRow {
   readonly ID: number;
   readonly IconFileDataID: number;
+}
+
+interface WowdataItemMetadataRow {
+  readonly ID: number;
+  readonly ClassID: number;
+  readonly SubclassID: number;
+  readonly InventoryType: number;
 }
 
 interface WowdataRowsResult {
@@ -56,12 +65,51 @@ interface WowdataAppearanceRow {
 interface WowdataItemClassificationReferenceRow {
   readonly ID: number;
   readonly ItemNameDescriptionID: number;
+  readonly Display_lang: string;
+  readonly InventoryType: number;
+  readonly ItemLevel: number;
+  readonly OverallQualityID: number;
+  readonly RequiredLevel: number;
+  readonly SellPrice: number;
 }
 
 interface WowdataItemNameDescriptionRow {
   readonly ID: number;
   readonly Description_lang: string;
   readonly Color: number;
+}
+
+interface WowdataItemArmorTotalRow {
+  readonly ItemLevel: number;
+  readonly Cloth: number;
+  readonly Leather: number;
+  readonly Mail: number;
+  readonly Plate: number;
+}
+
+interface WowdataItemArmorQualityRow {
+  readonly ID: number;
+  readonly Qualitymod: readonly number[];
+}
+
+interface WowdataArmorLocationRow {
+  readonly ID: number;
+  readonly Clothmodifier: number;
+  readonly Leathermodifier: number;
+  readonly Chainmodifier: number;
+  readonly Platemodifier: number;
+}
+
+interface WowdataItemArmorShieldRow {
+  readonly ItemLevel: number;
+  readonly Quality: readonly number[];
+}
+
+export interface EnrichedItemClientRecord {
+  readonly itemClassId: number;
+  readonly itemSubClassId: number;
+  readonly inventoryType: string;
+  readonly clientData: ItemClientData;
 }
 
 export interface ItemIconManifestEntry {
@@ -99,18 +147,61 @@ export interface ExtractItemIconsResult {
   readonly manifestPath: string;
 }
 
-export interface EnrichItemClassificationsOptions {
+export interface EnrichItemClientDataOptions {
   readonly dataset: ImportedBuildDataset;
   readonly wowInstallationRoot: string;
   readonly wowdataExecutable?: string;
 }
 
-export interface EnrichItemClassificationsResult {
+export interface EnrichItemClientDataResult {
   readonly dataset: ImportedBuildDataset;
   readonly assetBuild: string;
+  readonly enrichedItems: number;
   readonly classifiedItems: number;
   readonly classificationLabels: readonly string[];
 }
+
+const INVENTORY_TYPES: Readonly<Record<number, {
+  readonly token: string;
+  readonly equipmentSlot?: string;
+}>> = {
+  0: { token: "INVTYPE_NON_EQUIP_IGNORE" },
+  1: { token: "INVTYPE_HEAD", equipmentSlot: "Head" },
+  2: { token: "INVTYPE_NECK", equipmentSlot: "Neck" },
+  3: { token: "INVTYPE_SHOULDER", equipmentSlot: "Shoulder" },
+  4: { token: "INVTYPE_BODY", equipmentSlot: "Shirt" },
+  5: { token: "INVTYPE_CHEST", equipmentSlot: "Chest" },
+  6: { token: "INVTYPE_WAIST", equipmentSlot: "Waist" },
+  7: { token: "INVTYPE_LEGS", equipmentSlot: "Legs" },
+  8: { token: "INVTYPE_FEET", equipmentSlot: "Feet" },
+  9: { token: "INVTYPE_WRIST", equipmentSlot: "Wrist" },
+  10: { token: "INVTYPE_HAND", equipmentSlot: "Hands" },
+  11: { token: "INVTYPE_FINGER", equipmentSlot: "Finger" },
+  12: { token: "INVTYPE_TRINKET", equipmentSlot: "Trinket" },
+  13: { token: "INVTYPE_WEAPON", equipmentSlot: "One-Hand" },
+  14: { token: "INVTYPE_SHIELD", equipmentSlot: "Off Hand" },
+  15: { token: "INVTYPE_RANGED", equipmentSlot: "Ranged" },
+  16: { token: "INVTYPE_CLOAK", equipmentSlot: "Back" },
+  17: { token: "INVTYPE_2HWEAPON", equipmentSlot: "Two-Hand" },
+  18: { token: "INVTYPE_BAG", equipmentSlot: "Bag" },
+  19: { token: "INVTYPE_TABARD", equipmentSlot: "Tabard" },
+  20: { token: "INVTYPE_ROBE", equipmentSlot: "Chest" },
+  21: { token: "INVTYPE_WEAPONMAINHAND", equipmentSlot: "Main Hand" },
+  22: { token: "INVTYPE_WEAPONOFFHAND", equipmentSlot: "Off Hand" },
+  23: { token: "INVTYPE_HOLDABLE", equipmentSlot: "Held In Off-hand" },
+  24: { token: "INVTYPE_AMMO", equipmentSlot: "Ammo" },
+  25: { token: "INVTYPE_THROWN", equipmentSlot: "Thrown" },
+  26: { token: "INVTYPE_RANGEDRIGHT", equipmentSlot: "Ranged" },
+  27: { token: "INVTYPE_QUIVER", equipmentSlot: "Quiver" },
+  28: { token: "INVTYPE_RELIC", equipmentSlot: "Relic" },
+  29: { token: "INVTYPE_PROFESSION_TOOL", equipmentSlot: "Profession Tool" },
+  30: { token: "INVTYPE_PROFESSION_ACCESSORY", equipmentSlot: "Profession Accessory" },
+  31: { token: "INVTYPE_PROFESSION_GEAR", equipmentSlot: "Profession Gear" },
+  32: { token: "INVTYPE_EQUIPABLESPELL_OFFENSIVE", equipmentSlot: "Offensive Spell" },
+  33: { token: "INVTYPE_EQUIPABLESPELL_UTILITY", equipmentSlot: "Utility Spell" },
+  34: { token: "INVTYPE_EQUIPABLESPELL_DEFENSIVE", equipmentSlot: "Defensive Spell" },
+  35: { token: "INVTYPE_EQUIPABLESPELL_WEAPON", equipmentSlot: "Weapon Spell" },
+};
 
 function positiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
@@ -118,6 +209,207 @@ function positiveInteger(value: unknown): value is number {
 
 function integer(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value);
+}
+
+function nonnegativeInteger(value: unknown): value is number {
+  return integer(value) && value >= 0;
+}
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function rowsFromWowdata(value: unknown, table: string): readonly Record<string, unknown>[] {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("rows" in value) ||
+    !Array.isArray((value as { readonly rows?: unknown }).rows)
+  ) {
+    throw new Error(`wowdata ${table} query did not return a rows array.`);
+  }
+  return (value as WowdataRowsResult).rows;
+}
+
+function numberArray(value: unknown): readonly number[] | undefined {
+  return Array.isArray(value) && value.every(finiteNumber) ? value : undefined;
+}
+
+function calculateItemArmor(
+  item: Pick<WowdataItemMetadataRow, "ClassID" | "SubclassID" | "InventoryType">,
+  sparse: Pick<WowdataItemClassificationReferenceRow, "ItemLevel" | "OverallQualityID">,
+  armorTotalByLevel: ReadonlyMap<number, WowdataItemArmorTotalRow>,
+  armorQualityByLevel: ReadonlyMap<number, WowdataItemArmorQualityRow>,
+  armorLocationByInventoryType: ReadonlyMap<number, WowdataArmorLocationRow>,
+  shieldArmorByLevel: ReadonlyMap<number, WowdataItemArmorShieldRow>,
+): number | undefined {
+  if (item.ClassID !== 4) return undefined;
+
+  if (item.SubclassID === 6) {
+    const shieldArmor = shieldArmorByLevel.get(sparse.ItemLevel)?.Quality[
+      sparse.OverallQualityID
+    ];
+    return finiteNumber(shieldArmor) && shieldArmor > 0
+      ? Math.floor(shieldArmor + 0.5)
+      : undefined;
+  }
+
+  const armorColumn = {
+    1: "Cloth",
+    2: "Leather",
+    3: "Mail",
+    4: "Plate",
+  }[item.SubclassID] as keyof Pick<
+    WowdataItemArmorTotalRow,
+    "Cloth" | "Leather" | "Mail" | "Plate"
+  > | undefined;
+  const locationColumn = {
+    1: "Clothmodifier",
+    2: "Leathermodifier",
+    3: "Chainmodifier",
+    4: "Platemodifier",
+  }[item.SubclassID] as keyof Pick<
+    WowdataArmorLocationRow,
+    "Clothmodifier" | "Leathermodifier" | "Chainmodifier" | "Platemodifier"
+  > | undefined;
+  if (armorColumn === undefined || locationColumn === undefined) return undefined;
+
+  const totalArmor = armorTotalByLevel.get(sparse.ItemLevel)?.[armorColumn];
+  const qualityModifier = armorQualityByLevel.get(sparse.ItemLevel)?.Qualitymod[
+    sparse.OverallQualityID
+  ];
+  const locationModifier = armorLocationByInventoryType.get(item.InventoryType)?.[
+    locationColumn
+  ];
+  if (
+    !finiteNumber(totalArmor) ||
+    !finiteNumber(qualityModifier) ||
+    !finiteNumber(locationModifier)
+  ) {
+    return undefined;
+  }
+  const armor = totalArmor * qualityModifier * locationModifier;
+  return armor > 0 ? Math.floor(armor + 0.5) : undefined;
+}
+
+export function parseWowdataItemClientData(
+  itemRowsValue: unknown,
+  sparseRowsValue: unknown,
+  armorTotalRowsValue: unknown,
+  armorQualityRowsValue: unknown,
+  armorLocationRowsValue: unknown,
+  shieldArmorRowsValue: unknown,
+  source: ItemClientSource,
+): Map<number, EnrichedItemClientRecord> {
+  const items = new Map<number, WowdataItemMetadataRow>();
+  for (const value of rowsFromWowdata(itemRowsValue, "Item")) {
+    const row = value as Partial<WowdataItemMetadataRow>;
+    if (
+      positiveInteger(row.ID) &&
+      nonnegativeInteger(row.ClassID) &&
+      nonnegativeInteger(row.SubclassID) &&
+      nonnegativeInteger(row.InventoryType)
+    ) {
+      items.set(row.ID, row as WowdataItemMetadataRow);
+    }
+  }
+
+  const armorTotalByLevel = new Map<number, WowdataItemArmorTotalRow>();
+  for (const value of rowsFromWowdata(armorTotalRowsValue, "ItemArmorTotal")) {
+    const row = value as Partial<WowdataItemArmorTotalRow>;
+    if (
+      nonnegativeInteger(row.ItemLevel) &&
+      finiteNumber(row.Cloth) &&
+      finiteNumber(row.Leather) &&
+      finiteNumber(row.Mail) &&
+      finiteNumber(row.Plate)
+    ) {
+      armorTotalByLevel.set(row.ItemLevel, row as WowdataItemArmorTotalRow);
+    }
+  }
+
+  const armorQualityByLevel = new Map<number, WowdataItemArmorQualityRow>();
+  for (const value of rowsFromWowdata(armorQualityRowsValue, "ItemArmorQuality")) {
+    const row = value as Partial<WowdataItemArmorQualityRow>;
+    const qualityModifiers = numberArray(row.Qualitymod);
+    if (nonnegativeInteger(row.ID) && qualityModifiers !== undefined) {
+      armorQualityByLevel.set(row.ID, {
+        ID: row.ID,
+        Qualitymod: qualityModifiers,
+      });
+    }
+  }
+
+  const armorLocationByInventoryType = new Map<number, WowdataArmorLocationRow>();
+  for (const value of rowsFromWowdata(armorLocationRowsValue, "ArmorLocation")) {
+    const row = value as Partial<WowdataArmorLocationRow>;
+    if (
+      nonnegativeInteger(row.ID) &&
+      finiteNumber(row.Clothmodifier) &&
+      finiteNumber(row.Leathermodifier) &&
+      finiteNumber(row.Chainmodifier) &&
+      finiteNumber(row.Platemodifier)
+    ) {
+      armorLocationByInventoryType.set(row.ID, row as WowdataArmorLocationRow);
+    }
+  }
+
+  const shieldArmorByLevel = new Map<number, WowdataItemArmorShieldRow>();
+  for (const value of rowsFromWowdata(shieldArmorRowsValue, "ItemArmorShield")) {
+    const row = value as Partial<WowdataItemArmorShieldRow>;
+    const qualityValues = numberArray(row.Quality);
+    if (nonnegativeInteger(row.ItemLevel) && qualityValues !== undefined) {
+      shieldArmorByLevel.set(row.ItemLevel, {
+        ItemLevel: row.ItemLevel,
+        Quality: qualityValues,
+      });
+    }
+  }
+
+  const result = new Map<number, EnrichedItemClientRecord>();
+  for (const value of rowsFromWowdata(sparseRowsValue, "ItemSparse")) {
+    const row = value as Partial<WowdataItemClassificationReferenceRow>;
+    const displayName = typeof row.Display_lang === "string" ? row.Display_lang.trim() : "";
+    const item = positiveInteger(row.ID) ? items.get(row.ID) : undefined;
+    if (
+      item === undefined ||
+      displayName.length === 0 ||
+      !nonnegativeInteger(row.ItemLevel) ||
+      !nonnegativeInteger(row.OverallQualityID) ||
+      !nonnegativeInteger(row.RequiredLevel) ||
+      !nonnegativeInteger(row.SellPrice)
+    ) {
+      continue;
+    }
+    const inventory = INVENTORY_TYPES[item.InventoryType] ?? {
+      token: `INVTYPE_${item.InventoryType}`,
+    };
+    const sparse = row as WowdataItemClassificationReferenceRow;
+    const armor = calculateItemArmor(
+      item,
+      sparse,
+      armorTotalByLevel,
+      armorQualityByLevel,
+      armorLocationByInventoryType,
+      shieldArmorByLevel,
+    );
+    result.set(item.ID, {
+      itemClassId: item.ClassID,
+      itemSubClassId: item.SubclassID,
+      inventoryType: inventory.token,
+      clientData: {
+        displayName,
+        ...(inventory.equipmentSlot === undefined
+          ? {}
+          : { equipmentSlot: inventory.equipmentSlot }),
+        ...(armor === undefined ? {} : { armor }),
+        requiredLevel: sparse.RequiredLevel,
+        sellPriceCopper: sparse.SellPrice,
+        source,
+      },
+    });
+  }
+  return result;
 }
 
 export function collectDatasetGameItemIds(dataset: ImportedBuildDataset): number[] {
@@ -144,7 +436,7 @@ export function parseWowdataItemRows(value: unknown): Map<number, number> {
   const result = new Map<number, number>();
   for (const row of rows) {
     if (typeof row !== "object" || row === null) continue;
-    const { ID, IconFileDataID } = row as Partial<WowdataItemRow>;
+    const { ID, IconFileDataID } = row as Partial<WowdataItemIconRow>;
     if (positiveInteger(ID) && positiveInteger(IconFileDataID)) {
       result.set(ID, IconFileDataID);
     }
@@ -298,11 +590,11 @@ async function readExistingManifest(path: string): Promise<ItemIconManifest | un
   }
 }
 
-export async function enrichItemClassifications({
+export async function enrichItemClientData({
   dataset,
   wowInstallationRoot,
   wowdataExecutable = defaultWowdataExecutable(),
-}: EnrichItemClassificationsOptions): Promise<EnrichItemClassificationsResult> {
+}: EnrichItemClientDataOptions): Promise<EnrichItemClientDataResult> {
   const resolvedClientRoot = resolve(wowInstallationRoot);
   const targetArguments = wowdataTargetArguments(resolvedClientRoot);
   const itemIds = collectDatasetGameItemIds(dataset);
@@ -317,10 +609,11 @@ export async function enrichItemClassifications({
     resolvedClientRoot,
     cascInfo.buildName,
   );
+  const clientItemRows: Record<string, unknown>[] = [];
   const itemRows: Record<string, unknown>[] = [];
   const descriptionIds = new Set<number>();
   for (const batch of chunks(itemIds, ITEM_QUERY_BATCH_SIZE)) {
-    const result = await runWowdata<WowdataRowsResult>(
+    const sparseResult = await runWowdata<WowdataRowsResult>(
       wowdataExecutable,
       [
         "db2",
@@ -329,18 +622,33 @@ export async function enrichItemClassifications({
         "--ids",
         batch.join(","),
         "--fields",
-        "ID,ItemNameDescriptionID",
+        "ID,Display_lang,InventoryType,ItemLevel,OverallQualityID,RequiredLevel,SellPrice,ItemNameDescriptionID",
         ...pinnedTargetArguments,
       ],
       "wowdata db2 rows ItemSparse",
     );
-    itemRows.push(...result.rows);
-    for (const value of result.rows) {
+    itemRows.push(...sparseResult.rows);
+    for (const value of sparseResult.rows) {
       const row = value as Partial<WowdataItemClassificationReferenceRow>;
       if (positiveInteger(row.ItemNameDescriptionID)) {
         descriptionIds.add(row.ItemNameDescriptionID);
       }
     }
+    const itemResult = await runWowdata<WowdataRowsResult>(
+      wowdataExecutable,
+      [
+        "db2",
+        "rows",
+        "Item",
+        "--ids",
+        batch.join(","),
+        "--fields",
+        "ID,ClassID,SubclassID,InventoryType",
+        ...pinnedTargetArguments,
+      ],
+      "wowdata db2 rows Item",
+    );
+    clientItemRows.push(...itemResult.rows);
   }
 
   const descriptionRows: Record<string, unknown>[] = [];
@@ -372,6 +680,99 @@ export async function enrichItemClassifications({
     { rows: descriptionRows },
     source,
   );
+  const armorTotalRows = await runWowdata<WowdataRowsResult>(
+    wowdataExecutable,
+    [
+      "db2",
+      "stream",
+      "ItemArmorTotal",
+      "--limit",
+      "1000000",
+      "--fields",
+      "ID,ItemLevel,Cloth,Leather,Mail,Plate",
+      "--format",
+      "json",
+      ...pinnedTargetArguments,
+    ],
+    "wowdata db2 stream ItemArmorTotal",
+  );
+  const armorQualityRows = await runWowdata<WowdataRowsResult>(
+    wowdataExecutable,
+    [
+      "db2",
+      "stream",
+      "ItemArmorQuality",
+      "--limit",
+      "1000000",
+      "--fields",
+      "ID,Qualitymod",
+      "--format",
+      "json",
+      ...pinnedTargetArguments,
+    ],
+    "wowdata db2 stream ItemArmorQuality",
+  );
+  const armorLocationRows = await runWowdata<WowdataRowsResult>(
+    wowdataExecutable,
+    [
+      "db2",
+      "stream",
+      "ArmorLocation",
+      "--limit",
+      "1000000",
+      "--fields",
+      "ID,Clothmodifier,Leathermodifier,Chainmodifier,Platemodifier",
+      "--format",
+      "json",
+      ...pinnedTargetArguments,
+    ],
+    "wowdata db2 stream ArmorLocation",
+  );
+  const shieldArmorRows = await runWowdata<WowdataRowsResult>(
+    wowdataExecutable,
+    [
+      "db2",
+      "stream",
+      "ItemArmorShield",
+      "--limit",
+      "1000000",
+      "--fields",
+      "ID,ItemLevel,Quality",
+      "--format",
+      "json",
+      ...pinnedTargetArguments,
+    ],
+    "wowdata db2 stream ItemArmorShield",
+  );
+  const clientData = parseWowdataItemClientData(
+    { rows: clientItemRows },
+    { rows: itemRows },
+    armorTotalRows,
+    armorQualityRows,
+    armorLocationRows,
+    shieldArmorRows,
+    source,
+  );
+  const enrichItem = <Item extends { readonly gameId?: number | undefined }>(
+    item: Item,
+  ) => {
+    const {
+      clientData: _previousClientData,
+      classification: _previousClassification,
+      ...baseItem
+    } = item as Item & {
+      readonly clientData?: unknown;
+      readonly classification?: unknown;
+    };
+    if (item.gameId === undefined) return baseItem;
+    const enriched = clientData.get(item.gameId);
+    const classification = classifications.get(item.gameId);
+    return {
+      ...baseItem,
+      ...(enriched === undefined ? {} : enriched),
+      ...(classification === undefined ? {} : { classification }),
+    };
+  };
   const enriched = importedBuildDatasetSchema.parse({
     ...dataset,
     professions: dataset.professions.map((profession) => ({
@@ -380,25 +781,11 @@ export async function enrichItemClassifications({
         ...recipe,
         reagents: recipe.reagents.map((entry) => ({
           ...entry,
-          item: entry.item.gameId === undefined
-            ? entry.item
-            : {
-                ...entry.item,
-                ...(classifications.get(entry.item.gameId) === undefined
-                  ? {}
-                  : { classification: classifications.get(entry.item.gameId) }),
-              },
+          item: enrichItem(entry.item),
         })),
         outputs: recipe.outputs.map((entry) => ({
           ...entry,
-          item: entry.item.gameId === undefined
-            ? entry.item
-            : {
-                ...entry.item,
-                ...(classifications.get(entry.item.gameId) === undefined
-                  ? {}
-                  : { classification: classifications.get(entry.item.gameId) }),
-              },
+          item: enrichItem(entry.item),
         })),
       })),
     })),
@@ -407,6 +794,7 @@ export async function enrichItemClassifications({
   return {
     dataset: enriched,
     assetBuild: cascInfo.buildName,
+    enrichedItems: clientData.size,
     classifiedItems: classifications.size,
     classificationLabels: [...new Set(
       [...classifications.values()].map(({ label }) => label),

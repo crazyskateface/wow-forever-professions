@@ -66,6 +66,21 @@ describe("build normalization", () => {
         locale: "enUS",
       },
     };
+    Object.assign(dataset.professions[0]!.recipes[0]!.reagents[0]!.item, {
+      itemClassId: 7,
+      itemSubClassId: 6,
+      inventoryType: "INVTYPE_NON_EQUIP_IGNORE",
+      clientData: {
+        displayName: "Heavy Leather",
+        requiredLevel: 0,
+        sellPriceCopper: 15,
+        source: {
+          product: "wow_classic_beta",
+          build: "1.60.1.70374",
+          locale: "enUS",
+        },
+      },
+    });
     const normalized = normalizeBuildDataset(dataset);
 
     expect(normalized.recipeVersions[0]?.id).toBe("heavy-armor-kit@11.2.7.65000");
@@ -86,6 +101,16 @@ describe("build normalization", () => {
       id: 14483,
       label: "Scarce",
       color: -7885825,
+      source: {
+        product: "wow_classic_beta",
+        build: "1.60.1.70374",
+        locale: "enUS",
+      },
+    });
+    expect(normalized.items.find(({ id }) => id === "heavy-leather")?.clientData).toEqual({
+      displayName: "Heavy Leather",
+      requiredLevel: 0,
+      sellPriceCopper: 15,
       source: {
         product: "wow_classic_beta",
         build: "1.60.1.70374",

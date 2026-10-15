@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import {
   applyRecipeOverrides,
   convertProfessionDbSnapshot,
-  enrichItemClassifications,
+  enrichItemClientData,
   extractItemIcons,
   normalizeScriptArguments,
   parseRawDatasetBytes,
@@ -121,13 +121,13 @@ const resolvedRecipeOverrides = await recipeOverrides;
 const overridden = resolvedRecipeOverrides === undefined
   ? { dataset: converted.dataset, appliedRecipeIds: [] }
   : applyRecipeOverrides(converted.dataset, resolvedRecipeOverrides);
-const classificationResult = wowInstallationRoot === undefined
+const clientDataResult = wowInstallationRoot === undefined
   ? undefined
-  : await enrichItemClassifications({
+  : await enrichItemClientData({
       dataset: overridden.dataset,
       wowInstallationRoot,
     });
-const finalDataset = classificationResult?.dataset ?? overridden.dataset;
+const finalDataset = clientDataResult?.dataset ?? overridden.dataset;
 const finalRecipes = finalDataset.professions.flatMap(({ recipes }) => recipes);
 
 await mkdir(dirname(resolvedOutputPath), { recursive: true });
@@ -154,13 +154,14 @@ process.stdout.write(
       verification.notes?.includes("Output quantity is provisionally one") ?? false,
     ).length,
     appliedRecipeOverrides: overridden.appliedRecipeIds.length,
-    ...(classificationResult === undefined
+    ...(clientDataResult === undefined
       ? {}
       : {
-          itemClassifications: {
-            assetBuild: classificationResult.assetBuild,
-            classifiedItems: classificationResult.classifiedItems,
-            labels: classificationResult.classificationLabels,
+          itemClientData: {
+            assetBuild: clientDataResult.assetBuild,
+            enrichedItems: clientDataResult.enrichedItems,
+            classifiedItems: clientDataResult.classifiedItems,
+            classificationLabels: clientDataResult.classificationLabels,
           },
         }),
     ...(iconResult === undefined ? {} : { itemIcons: iconResult }),

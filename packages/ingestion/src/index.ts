@@ -77,7 +77,8 @@ function registerItem(items: Map<string, ItemModel>, item: ItemModel): void {
     existing.itemClassId !== item.itemClassId ||
     existing.itemSubClassId !== item.itemSubClassId ||
     existing.inventoryType !== item.inventoryType ||
-    JSON.stringify(existing.classification) !== JSON.stringify(item.classification)
+    JSON.stringify(existing.classification) !== JSON.stringify(item.classification) ||
+    JSON.stringify(existing.clientData) !== JSON.stringify(item.clientData)
   ) {
     throw new Error(`Item ${item.id} has conflicting definitions in the same build.`);
   }
