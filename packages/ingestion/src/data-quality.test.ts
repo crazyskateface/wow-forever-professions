@@ -69,6 +69,13 @@ describe("imported build data-quality reporting", () => {
       items: 2,
       sourceKinds: { "client-data": 1 },
       verificationStatuses: { unverified: 1 },
+      itemMetadata: {
+        clientDataItems: 0,
+        equipmentSlotItems: 0,
+        armorItems: 0,
+        requiredLevelItems: 0,
+        sellPriceItems: 0,
+      },
       canonicalMetadata: {
         knownLearnSkillRecipes: 0,
         knownAcquisitionRecipes: 0,
@@ -97,6 +104,7 @@ describe("imported build data-quality reporting", () => {
     expect(renderDataQualityMarkdown(report)).toContain(
       "WARNING · missing-item-name (1)",
     );
+    expect(renderDataQualityMarkdown(report)).toContain("Client-enriched items: 0/2");
   });
 
   it("enforces review metadata conventions in the audit", () => {

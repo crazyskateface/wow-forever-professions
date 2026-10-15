@@ -130,15 +130,26 @@ export const professionModelSchema = z.object({
   name: z.string().min(1),
 });
 
+export const itemClientSourceSchema = z.object({
+  product: z.string().min(1),
+  build: z.string().min(1),
+  locale: z.string().min(1),
+});
+
 export const itemClassificationSchema = z.object({
   id: z.number().int().positive(),
   label: z.string().min(1),
   color: z.number().int(),
-  source: z.object({
-    product: z.string().min(1),
-    build: z.string().min(1),
-    locale: z.string().min(1),
-  }),
+  source: itemClientSourceSchema,
+});
+
+export const itemClientDataSchema = z.object({
+  displayName: z.string().min(1),
+  equipmentSlot: z.string().min(1).optional(),
+  armor: z.number().int().nonnegative().optional(),
+  requiredLevel: z.number().int().nonnegative(),
+  sellPriceCopper: z.number().int().nonnegative(),
+  source: itemClientSourceSchema,
 });
 
 export const itemModelSchema = z.object({
@@ -149,6 +160,20 @@ export const itemModelSchema = z.object({
   itemSubClassId: z.number().int().nonnegative().optional(),
   inventoryType: z.string().min(1).optional(),
   classification: itemClassificationSchema.optional(),
+  clientData: itemClientDataSchema.optional(),
+}).superRefine((item, context) => {
+  if (
+    item.clientData !== undefined &&
+    (item.itemClassId === undefined ||
+      item.itemSubClassId === undefined ||
+      item.inventoryType === undefined)
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["clientData"],
+      message: "Client-enriched items require class, subclass, and inventory type metadata.",
+    });
+  }
 });
 
 export const recipeModelSchema = z.object({
@@ -583,6 +608,7 @@ export const reagentSchema = z.object({
   itemSubClassId: z.number().int().nonnegative().optional(),
   inventoryType: z.string().min(1).optional(),
   classification: itemClassificationSchema.optional(),
+  clientData: itemClientDataSchema.optional(),
   quantity: z.number().int().positive(),
 });
 
@@ -594,6 +620,7 @@ export const fixtureRecipeOutputSchema = z.object({
   itemSubClassId: z.number().int().nonnegative().optional(),
   inventoryType: z.string().min(1).optional(),
   classification: itemClassificationSchema.optional(),
+  clientData: itemClientDataSchema.optional(),
   quantity: z.number().int().positive(),
 });
 
@@ -681,6 +708,8 @@ export type ImportedRecipeOverride = z.infer<typeof importedRecipeOverrideSchema
 export type ImportedRecipeOverrides = z.infer<typeof importedRecipeOverridesSchema>;
 export type ImportedProfession = z.infer<typeof importedProfessionSchema>;
 export type ImportedRecipe = z.infer<typeof importedRecipeSchema>;
+export type ItemClientData = z.infer<typeof itemClientDataSchema>;
+export type ItemClientSource = z.infer<typeof itemClientSourceSchema>;
 export type ItemClassification = z.infer<typeof itemClassificationSchema>;
 export type ItemModel = z.infer<typeof itemModelSchema>;
 export type NormalizedBuild = z.infer<typeof normalizedBuildSchema>;

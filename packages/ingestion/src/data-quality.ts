@@ -20,6 +20,13 @@ export interface DataQualityReport {
   readonly items: number;
   readonly sourceKinds: Readonly<Record<string, number>>;
   readonly verificationStatuses: Readonly<Record<string, number>>;
+  readonly itemMetadata: {
+    readonly clientDataItems: number;
+    readonly equipmentSlotItems: number;
+    readonly armorItems: number;
+    readonly requiredLevelItems: number;
+    readonly sellPriceItems: number;
+  };
   readonly canonicalMetadata: {
     readonly knownLearnSkillRecipes: number;
     readonly knownAcquisitionRecipes: number;
@@ -98,12 +105,13 @@ function routeCoverageFor(
 export function auditImportedBuildDataset(input: ImportedBuildDataset): DataQualityReport {
   const dataset = importedBuildDatasetSchema.parse(input);
   const recipes = dataset.professions.flatMap((profession) => profession.recipes);
-  const itemIds = new Set(
+  const itemById = new Map(
     recipes.flatMap((recipe) => [
-      ...recipe.reagents.map(({ item }) => item.id),
-      ...recipe.outputs.map(({ item }) => item.id),
+      ...recipe.reagents.map(({ item }) => [item.id, item] as const),
+      ...recipe.outputs.map(({ item }) => [item.id, item] as const),
     ]),
   );
+  const items = [...itemById.values()];
   const sourceById = new Map(dataset.sources.map((source) => [source.id, source] as const));
   const unverified: string[] = [];
   const rejected: string[] = [];
@@ -272,9 +280,22 @@ export function auditImportedBuildDataset(input: ImportedBuildDataset): DataQual
     buildId: dataset.build.id,
     professions: dataset.professions.length,
     recipes: recipes.length,
-    items: itemIds.size,
+    items: itemById.size,
     sourceKinds: counts(dataset.sources.map(({ kind }) => kind)),
     verificationStatuses: counts(recipes.map(({ verification }) => verification.status)),
+    itemMetadata: {
+      clientDataItems: items.filter(({ clientData }) => clientData !== undefined).length,
+      equipmentSlotItems: items.filter(
+        ({ clientData }) => clientData?.equipmentSlot !== undefined,
+      ).length,
+      armorItems: items.filter(({ clientData }) => clientData?.armor !== undefined).length,
+      requiredLevelItems: items.filter(
+        ({ clientData }) => clientData?.requiredLevel !== undefined,
+      ).length,
+      sellPriceItems: items.filter(
+        ({ clientData }) => clientData?.sellPriceCopper !== undefined,
+      ).length,
+    },
     canonicalMetadata: {
       knownLearnSkillRecipes: recipes.filter(({ metadata }) => metadata.learnSkill !== null).length,
       knownAcquisitionRecipes: recipes.filter(
@@ -327,6 +348,14 @@ export function renderDataQualityMarkdown(report: DataQualityReport): string {
     ...Object.entries(report.verificationStatuses).map(
       ([status, count]) => `- ${status}: ${count}`,
     ),
+    "",
+    "## Item client data",
+    "",
+    `- Client-enriched items: ${report.itemMetadata.clientDataItems}/${report.items}`,
+    `- Equipment slots: ${report.itemMetadata.equipmentSlotItems}/${report.items}`,
+    `- Armor values: ${report.itemMetadata.armorItems}/${report.items}`,
+    `- Required levels: ${report.itemMetadata.requiredLevelItems}/${report.items}`,
+    `- Vendor sell prices: ${report.itemMetadata.sellPriceItems}/${report.items}`,
     "",
     "## Canonical route metadata",
     "",

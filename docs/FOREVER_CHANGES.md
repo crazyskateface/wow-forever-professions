@@ -242,7 +242,7 @@ Deterministic coverage includes:
   metadata becomes available.
 - Continue improving Forever-specific acquisition, availability, output quantity, and
   verification evidence; the accuracy of a change is bounded by its source data.
-- Revalidate migrations 017–022 against live Aurora DSQL before production promotion.
+- Revalidate migrations 017–023 against live Aurora DSQL before production promotion.
 
 ## Product rule
 

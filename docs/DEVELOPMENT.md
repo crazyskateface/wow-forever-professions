@@ -107,8 +107,8 @@ serves the latest stored comparison of the requested comparison type.
   row ID.
 - Comparisons store Unchanged records too, allowing summaries to be reconstructed
   exactly. The UI hides them by default.
-- Enriching an item with icon or item-name-description metadata is not a gameplay
-  recipe change and must not turn a recipe into Updated.
+- Enriching an item with icon, item-name-description, or tooltip metadata is not a
+  gameplay recipe change and must not turn a recipe into Updated.
 - Forever's `Scarce` designation comes from client
   `ItemSparse.ItemNameDescriptionID → ItemNameDescription`. Do not maintain a list of
   item names. Store generic classification metadata and let the optimizer interpret
@@ -116,6 +116,9 @@ serves the latest stored comparison of the requested comparison type.
 - Classification records are scoped to the recipe build and also retain their actual
   client source product/build/locale because enrichment may come from a newer client
   than the recipe archive.
+- Tooltip records are also recipe-build scoped and retain their actual client source.
+  A missing `ItemSparse` row stays missing; do not backfill name, level, armor, or sell
+  price from another game version.
 - Missing auction prices are unavailable, never zero.
 
 ## Item assets
@@ -136,9 +139,11 @@ armor, stats, binding, quality, character-level requirements, or vendor prices w
 those fields are absent from the imported data.
 
 The converter queries the installed client with `wowdata`. It resolves `latest` once,
-then pins all DB2 and icon reads to the returned build. Equipment without a direct
-`Item.IconFileDataID` falls back through `ItemModifiedAppearance` and
-`ItemAppearance.DefaultIconFileDataID`.
+then pins all DB2 and icon reads to the returned build. It joins `Item` and
+`ItemSparse` for names, item types, slots, required levels, and sell prices. Base
+armor comes from `ItemArmorTotal`, `ItemArmorQuality`, and `ArmorLocation`; shields
+come from `ItemArmorShield`. Equipment without a direct `Item.IconFileDataID` falls
+back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID`.
 
 ## Forever Changes behavior
 
@@ -216,7 +221,7 @@ misclassify that host-level temp failure as a product test failure.
   requests.
 - The add-on collection approach is deferred; the current pipeline relies on source
   archives, installed-client DB2 data, reviewed overrides, and quality reporting.
-- Aurora DSQL migrations 017–022 have not yet completed the same live revalidation as
+- Aurora DSQL migrations 017–023 have not yet completed the same live revalidation as
   migrations 001–016.
 
 ## Documentation maintenance

@@ -220,7 +220,7 @@ async function main(): Promise<void> {
     });
     const rows = await verifyLiveDatabase(writer);
 
-    if (rows.tables !== 15 || rows.indexes < 7 || rows.builds !== 1 || rows.recipeVersions !== 1) {
+    if (rows.tables !== 16 || rows.indexes < 7 || rows.builds !== 1 || rows.recipeVersions !== 1) {
       throw new Error(`Unexpected live DSQL row or schema counts: ${JSON.stringify(rows)}`);
     }
 

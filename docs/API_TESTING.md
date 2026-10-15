@@ -21,7 +21,9 @@ pnpm dev:api
 ```
 
 The API reports `PostgreSQL catalog` on startup. This mode serves the 603-recipe
-Leatherworking catalog and stored recipe comparison.
+Leatherworking catalog and stored recipe comparison. Reagent and output records also
+include build-scoped `clientData` when available: display name, equipment slot, armor,
+required level, sell price in integer copper, and client source metadata.
 
 ### Fixture-only API
 
