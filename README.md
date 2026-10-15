@@ -105,21 +105,27 @@ data.
   `ItemSparse.ItemNameDescriptionID → ItemNameDescription`, preserving the source
   product, client build, and locale. The current Leatherworking set contains three
   `Scarce` reagents and four `Crafted` outputs from client build `1.60.1.70374`.
+- Imports build-scoped item display names, equipment slots, armor, required levels,
+  and vendor sell prices from the same pinned client. Armor is derived from the
+  client's armor-total, quality, location, and shield tables instead of guessed from
+  an item name.
 - Extracts local client icons through `wowdata`, including the equipment-appearance
   fallback path, and writes a build-stamped manifest.
 - Produces a repeatable quality audit instead of filling unknown facts with guesses.
 
 ## Current data boundary
 
-The bundled target is Forever build `1.60.1.69977`; client-derived icons and item-name
-descriptions come from installed beta client build `1.60.1.70374`. The Classic Era
-baseline is build `1.15.9.69722`.
+The bundled target is Forever build `1.60.1.69977`; client-derived icons, item-name
+descriptions, and tooltip attributes come from installed beta client build
+`1.60.1.70374`. The Classic Era baseline is build `1.15.9.69722`.
 
 The data is useful but not authoritative:
 
 - all 603 Forever recipes are still marked unverified;
 - 484 recipes have supported Forever learning ranks and 119 remain unknown;
 - 589 acquisition and availability states remain unknown;
+- 630 of 760 referenced items have client tooltip attributes; the other 130 have no
+  `ItemSparse` row in the pinned client build and remain explicitly unenriched;
 - 90 recipes reference at least one item missing an English name in the source
   snapshot;
 - 595 output quantities remain provisional after reviewed overrides.
@@ -134,8 +140,8 @@ recipes with unknown learning ranks cannot enter a leveling route.
 - pnpm `11.19.0`
 - Docker Desktop for the full local catalog and comparison workflow
 - AWS credentials only for deployment or live DSQL validation
-- `wowdata` and a local Forever client only when regenerating icons and client item
-  classifications
+- `wowdata` and a local Forever client only when regenerating icons, client item
+  classifications, or tooltip attributes
 
 ## Full local start
 
@@ -217,6 +223,14 @@ manifest, and icons with:
 
 ```text
 pnpm data:convert:professiondb <ProfessionDB-root> <ItemDB-root> data/imports/forever-1.60.1.69977-leatherworking.json Forever - data/imports/forever-leatherworking-overrides.json "C:\World of Warcraft" apps/web/public/icons/items
+pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
+```
+
+When the source snapshot is already current, refresh only its pinned client metadata
+without the addon archives:
+
+```text
+pnpm data:enrich:client data/imports/forever-1.60.1.69977-leatherworking.json "C:\World of Warcraft"
 pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
 ```
 
