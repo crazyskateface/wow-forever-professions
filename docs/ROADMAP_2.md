@@ -927,6 +927,12 @@ It should not be required to use the site.
 
 # Phase 16 — Production Polish
 
+Status: started on October 15, 2026. The application now has a shared site footer and
+directly addressable Privacy Policy, Terms of Use, and Contact pages. The contact flow
+uses the public project issue tracker. Shareable route state, profession-specific
+URLs, SEO recipe pages, operational telemetry, and broader responsive/accessibility
+verification remain future work.
+
 Add:
 
 - shareable guide URLs

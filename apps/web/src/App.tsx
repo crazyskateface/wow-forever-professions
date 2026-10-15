@@ -37,6 +37,7 @@ import { leatherworkingFixture } from "@forever-professions/fixtures";
 import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
+import { SiteFooter } from "./SiteFooter.js";
 import {
   getItemRarityNameClass,
   hasProvisionalOutputQuantity,
@@ -1621,6 +1622,7 @@ export function App() {
           )}
         </main>
       </div>
+      <SiteFooter />
     </div>
   );
 }

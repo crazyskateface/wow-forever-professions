@@ -156,6 +156,15 @@ armor comes from `ItemArmorTotal`, `ItemArmorQuality`, and `ArmorLocation`; shie
 come from `ItemArmorShield`. Equipment without a direct `Item.IconFileDataID` falls
 back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID`.
 
+## Static site pages
+
+`apps/web/src/main.tsx` resolves `/privacy`, `/terms`, and `/contact` before mounting
+the planner. Their content and metadata live in `StaticPage.tsx`, while both the
+planner and static pages reuse `SiteFooter.tsx`. Navigation uses ordinary links so
+direct loads, refreshes, and browser history work without a client router dependency.
+The CloudFront distribution already maps 403 and 404 responses to `index.html`; keep
+that SPA fallback when changing hosting or these clean paths will fail on direct load.
+
 ## Forever Changes behavior
 
 The comparison engine tracks name, reagents, outputs, four thresholds, learning rank,

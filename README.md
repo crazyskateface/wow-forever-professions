@@ -102,6 +102,15 @@ data.
 - Saves a Legacy profession bonus for future modeling but does not apply it until the
   underlying Forever behavior is verified.
 
+### Site information and support
+
+- Includes a shared site footer with direct links to privacy, terms, contact, and the
+  public source repository.
+- Serves readable, responsive Privacy Policy, Terms of Use, and Contact pages at
+  `/privacy`, `/terms`, and `/contact` through the existing SPA fallback.
+- Uses the public GitHub issue tracker for bug reports, data corrections, and feature
+  requests without inventing an unsupported private contact channel.
+
 ### Reproducible client-data pipeline
 
 - Converts LibProfessionDB v1.9.1 and LibItemDB v1.4.1 Lua literals without executing
