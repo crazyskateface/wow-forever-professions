@@ -487,6 +487,17 @@ h1, h2, h3, p { margin-top: 0; }
 .chart-threshold.yellow { fill: var(--yellow); }
 .chart-threshold.green { fill: var(--green); }
 .chart-threshold.gray { fill: var(--gray); text-anchor: end; }
+.chart-threshold.cap { fill: var(--lime); text-anchor: end; }
+.skill-cap-note { margin-top: 10px; padding-top: 12px; display: flex; align-items: flex-start; gap: 10px; color: var(--muted); border-top: 1px solid var(--line); font-size: 11px; line-height: 1.45; }
+.skill-cap-note > span { width: 20px; height: 20px; flex: 0 0 auto; display: grid; place-items: center; color: #15171b; border-radius: 50%; background: #aab0bb; font-weight: 900; }
+.skill-cap-note > div { min-width: 0; }
+.skill-cap-note p { margin: 1px 0 0; }
+.skill-cap-note details { margin-top: 7px; }
+.skill-cap-note summary { width: max-content; color: #d6dae1; cursor: pointer; font-weight: 800; }
+.skill-cap-note dl { margin: 9px 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.skill-cap-note dl div { display: flex; flex-direction: column; gap: 2px; }
+.skill-cap-note dt { color: var(--muted-2); font-size: 10px; font-weight: 800; }
+.skill-cap-note dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; font-weight: 800; }
 .outcome-panel { display: flex; flex-direction: column; }
 .outcome-feature { flex: 1; min-height: 190px; padding: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-bottom: 1px solid var(--line); background: radial-gradient(circle at 50% 45%, rgba(200, 240, 0, .09), transparent 57%); }
 .outcome-feature > span { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }

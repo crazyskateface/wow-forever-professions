@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 import {
   optimizeLevelingRoute,
   type RouteRecipe,
@@ -22,9 +23,42 @@ const changingChanceRecipe: RouteRecipe = {
 const routeDataset = {
   professionId: "leatherworking",
   buildId: "1.60.1.69977",
+  maxBaseSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
 } as const;
 
 describe("leveling route optimizer", () => {
+  it("rejects a normal leveling target above the configured base skill cap", () => {
+    expect(() =>
+      optimizeLevelingRoute({
+        ...routeDataset,
+        startSkill: 299,
+        targetSkill: FOREVER_BUILD_CONFIG.maxBaseSkill + 1,
+        objective: "crafts",
+        recipes: [changingChanceRecipe],
+      }),
+    ).toThrow(/base profession cap/);
+  });
+
+  it("keeps recipes with above-cap fade thresholds usable below the cap", () => {
+    const result = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 299,
+      targetSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
+      objective: "crafts",
+      recipes: [{
+        ...changingChanceRecipe,
+        learnSkill: 280,
+        thresholds: { orange: 280, yellow: 300, green: 320, gray: 340 },
+      }],
+    });
+
+    expect(result).toMatchObject({
+      status: "complete",
+      steps: [{ skill: 299, skillUpProbability: 1 }],
+      targetSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
+    });
+  });
+
   it("recalculates expected crafts and cost at every skill", () => {
     const result = optimizeLevelingRoute({
       ...routeDataset,

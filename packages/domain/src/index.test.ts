@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  FOREVER_BUILD_CONFIG,
   assessDataQuality,
+  getRecipeSkillCapStatus,
   getExpectedCraftsForSkillUp,
   getRecipeDifficulty,
   getSkillUpProbability,
@@ -29,6 +31,56 @@ describe("skill-up probability", () => {
   it("returns infinite expected crafts when a skill-up is impossible", () => {
     expect(getExpectedCraftsForSkillUp(0)).toBe(Number.POSITIVE_INFINITY);
     expect(getExpectedCraftsForSkillUp(0.25)).toBe(4);
+  });
+
+  it("continues evaluating raw thresholds above the base profession cap", () => {
+    const rawThresholds = { orange: 280, yellow: 300, green: 320, gray: 340 };
+
+    expect(getSkillUpProbability(299, rawThresholds)).toBe(1);
+    expect(getSkillUpProbability(320, rawThresholds)).toBe(0.5);
+    expect(rawThresholds).toEqual({
+      orange: 280,
+      yellow: 300,
+      green: 320,
+      gray: 340,
+    });
+  });
+});
+
+describe("profession base skill cap", () => {
+  it("classifies thresholds below, at, and above the configured cap", () => {
+    const maxBaseSkill = FOREVER_BUILD_CONFIG.maxBaseSkill;
+
+    expect(
+      getRecipeSkillCapStatus(
+        { orange: 260, yellow: 270, green: 280, gray: 290 },
+        260,
+        maxBaseSkill,
+      ),
+    ).toEqual({
+      hasThresholdAboveCap: false,
+      requiredSkillAboveCap: false,
+    });
+    expect(
+      getRecipeSkillCapStatus(
+        { orange: 270, yellow: 280, green: 290, gray: maxBaseSkill },
+        maxBaseSkill,
+        maxBaseSkill,
+      ),
+    ).toEqual({
+      hasThresholdAboveCap: false,
+      requiredSkillAboveCap: false,
+    });
+    expect(
+      getRecipeSkillCapStatus(
+        { orange: 280, yellow: 300, green: 320, gray: 340 },
+        315,
+        maxBaseSkill,
+      ),
+    ).toEqual({
+      hasThresholdAboveCap: true,
+      requiredSkillAboveCap: true,
+    });
   });
 });
 

@@ -2,6 +2,7 @@ import type {
   RouteObjective,
   ShoppingStrategy,
 } from "@forever-professions/contracts";
+import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 
 export type PlayerFaction = "alliance" | "horde";
 export type ChangeFilter =
@@ -62,7 +63,7 @@ export const DEFAULT_PERSONALIZATION: PersonalizationPreferences = {
   version: 1,
   currentSkill: 1,
   routeStartSkill: 1,
-  targetSkill: 300,
+  targetSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
   routeObjective: "crafts",
   shoppingStrategy: "cheapest",
   trainerOnly: false,
@@ -134,7 +135,7 @@ export function parsePersonalization(value: unknown): PersonalizationPreferences
     value.routeStartSkill,
     DEFAULT_PERSONALIZATION.routeStartSkill,
     0,
-    300,
+    FOREVER_BUILD_CONFIG.maxBaseSkill,
   );
   const changeFilters = isRecord(value.changeFilters) ? value.changeFilters : {};
 
@@ -144,7 +145,7 @@ export function parsePersonalization(value: unknown): PersonalizationPreferences
       value.currentSkill,
       DEFAULT_PERSONALIZATION.currentSkill,
       0,
-      300,
+      FOREVER_BUILD_CONFIG.maxBaseSkill,
     ),
     routeStartSkill,
     targetSkill: Math.max(
@@ -153,7 +154,7 @@ export function parsePersonalization(value: unknown): PersonalizationPreferences
         value.targetSkill,
         DEFAULT_PERSONALIZATION.targetSkill,
         0,
-        300,
+        FOREVER_BUILD_CONFIG.maxBaseSkill,
       ),
     ),
     routeObjective: oneOf(

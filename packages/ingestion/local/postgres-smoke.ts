@@ -1,17 +1,17 @@
-import { readdir, readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
 import type { ImportedBuildDataset } from "@forever-professions/contracts";
 import {
+  applySqlMigrations,
   ingestBuildDataset,
+  loadSqlMigrations,
   normalizeBuildDataset,
   SqlRecipeChangeReader,
   type RawDatasetPutInput,
   type RawDatasetPutStatus,
   type RawDatasetStore,
   type SqlExecutor,
+  type SqlMigrationRunner,
   type SqlQueryResult,
-  type TransactionRunner,
 } from "../src/index.js";
 
 const defaultConnectionUrl =
@@ -193,24 +193,6 @@ class MemoryRawDatasetStore implements RawDatasetStore {
   }
 }
 
-function localizeDdl(sql: string): string {
-  return sql.replace("CREATE INDEX ASYNC IF NOT EXISTS", "CREATE INDEX IF NOT EXISTS");
-}
-
-async function applyMigrations(pool: Pool): Promise<number> {
-  const sqlDirectory = fileURLToPath(new URL("../sql/", import.meta.url));
-  const migrationFiles = (await readdir(sqlDirectory))
-    .filter((name) => name.endsWith(".sql"))
-    .sort();
-
-  for (const filename of migrationFiles) {
-    const ddl = localizeDdl(await readFile(new URL(`../sql/${filename}`, import.meta.url), "utf8"));
-    await pool.query(ddl);
-  }
-
-  return migrationFiles.length;
-}
-
 async function clearLocalRows(pool: Pool): Promise<void> {
   const client = await pool.connect();
   await client.query("BEGIN");
@@ -254,8 +236,16 @@ function createSqlExecutor(client: PoolClient): SqlExecutor {
   };
 }
 
-function createLocalTransactionRunner(pool: Pool): TransactionRunner {
+function createLocalTransactionRunner(pool: Pool): SqlMigrationRunner {
   return {
+    query: async (sql, values): Promise<SqlQueryResult> => {
+      const result =
+        values === undefined ? await pool.query(sql) : await pool.query(sql, [...values]);
+      return {
+        rowCount: result.rowCount,
+        rows: result.rows as readonly Record<string, unknown>[],
+      };
+    },
     transaction: async (work) => {
       const client = await pool.connect();
       await client.query("BEGIN");
@@ -332,7 +322,11 @@ async function main(): Promise<void> {
   const targetRawBytes = new TextEncoder().encode(JSON.stringify(targetDataset()));
 
   try {
-    const migrationsApplied = await applyMigrations(pool);
+    const migrations = await applySqlMigrations(transactionRunner, {
+      dialect: "postgres",
+      scope: "catalog",
+      migrations: await loadSqlMigrations(new URL("../sql/", import.meta.url)),
+    });
     await clearLocalRows(pool);
     const firstImport = await ingestBuildDataset({
       rawBytes,
@@ -408,7 +402,7 @@ async function main(): Promise<void> {
     process.stdout.write(
       `${JSON.stringify(
         {
-          migrationsApplied,
+          migrations,
           rawObjectKey: firstImport.rawObjectKey,
           rawObjectStatuses: [
             firstImport.rawObjectStatus,

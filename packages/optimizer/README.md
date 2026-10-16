@@ -11,6 +11,11 @@ recipe are grouped into segments while preserving the per-skill decisions for
 explanation and debugging. Returned totals are the real unpenalized expectations;
 practical friction affects selection only.
 
+Callers provide the shared build configuration's `maxBaseSkill`, and the optimizer
+rejects targets above it. This does not exclude recipes whose later yellow, green, or
+gray thresholds exceed the cap; those recipes remain candidates at usable skills
+within the normal progression range.
+
 Supported objectives and constraints:
 
 - minimum expected copper cost;

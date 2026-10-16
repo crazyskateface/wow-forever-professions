@@ -26,6 +26,8 @@ data.
 ### Leveling guide
 
 - Generates a complete current-skill → target-skill route from the loaded catalog.
+- Limits normal route targets to the current Forever base profession cap of 300,
+  configured once in the shared domain package.
 - Optimizes expected crafts, material units, or stored auction cost per skill point.
 - Uses dynamic programming with configurable recipe-switch and acquisition friction.
 - Supports known-recipe selection, trainer-only mode, faction/specialization/cooldown
@@ -44,8 +46,12 @@ data.
   selection (`?recipe=<recipe-id>`).
 - Calculates difficulty, skill-up probability, expected crafts, expected reagents,
   and stored-price cost at the selected profession skill.
-- Shows the skill curve, materials, output, acquisition facts, build, provenance,
-  and verification status.
+- Shows the skill curve only through the configured base profession cap. Recipes
+  with higher imported thresholds retain and expose those raw values in a compact
+  advanced-data note instead of extending the normal progression graph.
+- Shows materials, output, acquisition facts, build, provenance, and verification
+  status. Requirements above the base cap remain visible and are flagged as unusual
+  rather than silently rewritten.
 - Uses 760 build-stamped WebP item icons. Off-screen list and change-card images are
   browser-lazy-loaded; missing assets fall back to item initials.
 - Shows catalog-backed item details after a one-second pointer hover or when the
@@ -223,7 +229,22 @@ pnpm api:optimize -- 150 180 crafts
 pnpm api:shopping -- 33.375 cheapest  # fixture recipe IDs; fixture API only
 pnpm guide:validate               # compare the real 1–300 route with the checked-in reference
 pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
+pnpm infra:synth:staging          # strict CDK + cdk-nag validation of existing stacks
+pnpm infra:synth:production       # strict validation of isolated production stacks
+pnpm infra:synth:delivery         # validate GitHub OIDC roles and the cost guardrail
+pnpm infra:diff:staging           # requires approved non-root AWS access
+pnpm infra:diff:data:staging      # review only the stateful staging stack
+pnpm infra:deploy:data:staging    # deploy only the reviewed staging data stack
+pnpm db:migrate:dsql              # checksum-ledger catalog + pricing migrations
+pnpm db:roles:dsql                # map and verify scoped DSQL runtime roles
+pnpm infra:diff:delivery          # inspect delivery identity/budget changes
 ```
+
+Pull requests and `main` run the repository's pinned GitHub Actions validation
+workflow. AWS automation uses protected GitHub environments and short-lived OIDC
+sessions; the repository does not store AWS access keys. See
+[ops/README.md](ops/README.md) for delivery-stack deployment, environment setup, and
+the branch-protection activation sequence.
 
 See [docs/API_TESTING.md](docs/API_TESTING.md) for every endpoint and
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for setup gotchas, ownership boundaries,
@@ -313,6 +334,12 @@ fabricated data.
 - [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md): browser-local profile fields,
   runtime behavior, trust boundary, and reset/failure handling.
 - [docs/API_TESTING.md](docs/API_TESTING.md): local and deployed endpoint testing.
+- [docs/CLOUD_DEPLOYMENT_ROADMAP.md](docs/CLOUD_DEPLOYMENT_ROADMAP.md): staged AWS
+  infrastructure, data promotion, delivery, security, rollback, and launch plan.
+- [docs/CLOUD_DEPLOYMENT_DECISIONS.md](docs/CLOUD_DEPLOYMENT_DECISIONS.md): accepted
+  cloud account, ownership, domain, tagging, budget, and recovery decisions.
+- [ops/README.md](ops/README.md): stage configuration, CDK commands, bootstrap,
+  outputs, and infrastructure security checks.
 - [data/imports/README.md](data/imports/README.md): exact imported datasets, trust
   boundary, hashes, and regeneration commands.
 - [packages/ingestion/README.md](packages/ingestion/README.md): normalization,

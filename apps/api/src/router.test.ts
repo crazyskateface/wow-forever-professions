@@ -8,6 +8,7 @@ import {
   routeOptimizationResponseSchema,
   shoppingListResponseSchema,
 } from "@forever-professions/contracts";
+import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 import { leatherworkingFixture } from "@forever-professions/fixtures";
 import { routeRequest } from "./router.js";
 
@@ -295,6 +296,23 @@ describe("fixture API router", () => {
         blockedAtSkill: 190,
         reason: "no-eligible-recipe",
       },
+    });
+
+    const aboveCap = await routeRequest(
+      "POST",
+      "/api/routes/optimize",
+      {},
+      {},
+      {
+        professionId: "leatherworking",
+        startSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
+        targetSkill: FOREVER_BUILD_CONFIG.maxBaseSkill + 1,
+        objective: "crafts",
+      },
+    );
+    expect(aboveCap.statusCode).toBe(400);
+    expect(JSON.parse(aboveCap.body)).toMatchObject({
+      error: expect.stringMatching(/base profession cap/),
     });
   });
 

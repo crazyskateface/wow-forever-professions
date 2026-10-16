@@ -1,4 +1,5 @@
 export * from "./leveling-cost.js";
+export * from "./profession-cap.js";
 export * from "./skill-up.js";
 
 export type ProvenanceSource =

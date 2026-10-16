@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@forever-professions/contracts": "workspace:*",
+    "@forever-professions/domain": "workspace:*",
     "@forever-professions/fixtures": "workspace:*",
     "@forever-professions/ingestion": "workspace:*",
     "@forever-professions/optimizer": "workspace:*",

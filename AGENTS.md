@@ -134,12 +134,20 @@ imported data or regeneration workflow.
 ### Database and infrastructure
 
 - Add schema changes as new ordered migrations; never rewrite an applied migration.
+- Apply live migrations with `pnpm db:migrate:dsql`; it records normalized checksums
+  and treats any changed or missing applied migration as drift.
 - Keep migrations compatible with the repository's Aurora DSQL constraints and local
   PostgreSQL test workflow.
 - After ingestion or schema changes, import both real snapshots into disposable local
   PostgreSQL and exercise the affected API path.
 - Use AWS CDK v2 TypeScript, stable construct IDs, explicit retention/removal
   behavior, and least-privilege permissions.
+- Keep the shared `ForeverProfessionsDelivery` stack independent from application and
+  data deployments. Preserve its immutable GitHub owner/repository IDs, exact
+  environment subjects, termination protection, and monitoring-only budget.
+- Keep GitHub Actions pinned to full commit SHAs, dependency installation frozen, and
+  AWS access OIDC-only. Never add AWS access keys to repository or environment
+  secrets.
 - Never commit credentials, tokens, private endpoints, local database contents, or
   files from `.local-data/`.
 
@@ -158,6 +166,10 @@ pnpm build
 pnpm verify
 pnpm db:local:up
 pnpm db:local:test
+pnpm infra:diff:data:staging
+pnpm infra:deploy:data:staging
+pnpm db:migrate:dsql
+pnpm db:roles:dsql
 pnpm dev:api
 pnpm dev:web
 ```

@@ -31,7 +31,7 @@ visible changes so summary counts can be reconstructed exactly. Comparison and c
 use deterministic IDs, immutable idempotent inserts, DSQL-safe batches, JSON serialized as
 `TEXT`, and application-layer checks for build, comparison, and profession references.
 
-Both client-data import commands accept:
+Both build import commands accept:
 
 ```text
 <target.json> --compare-against <base.json> --comparison-type classic-forever
@@ -83,6 +83,22 @@ The local importer stores exact raw bytes under ignored `.local-data/`, applies 
 
 ## Live AWS validation
 
-The `ForeverProfessionsData` stack has been validated against a real Aurora DSQL cluster through migration 016. With a short-lived AWS profile active, set `AWS_REGION`, `DSQL_ENDPOINT`, `RAW_DATA_BUCKET`, and `INGESTION_ROLE_ARN` from the stack outputs and run `pnpm db:dsql:test` from the repository root. The command now applies all 24 migrations, waits for asynchronous indexes outside a transaction, configures the IAM-to-database-role mapping, assumes the scoped ingestion role, and imports its non-authoritative validation fixture twice. Migrations 017–024 still require live DSQL revalidation before a production deployment.
+The staging `ForeverProfessionsData` stack was validated through all 24 catalog migrations and all three pricing migrations on October 16, 2026. `pnpm db:migrate:dsql` assumes the stack's short-lived migration role, creates the migration ledger, verifies every recorded checksum before applying new DDL, and waits for asynchronous jobs outside transactions. Its immediate replay skipped all 27 recorded migrations.
 
-To ingest a transformed client export into Aurora DSQL, use `pnpm data:import <path-to-json>`. The file must satisfy the imported-build contract and contain at least one `client-data` source. The bundled LibProfessionDB-derived Leatherworking build is real client data, but it remains unverified rather than being misrepresented as authoritative.
+Read `DSQL_ENDPOINT`, `RAW_DATA_BUCKET`, `INGESTION_ROLE_ARN`,
+`MIGRATION_ROLE_ARN`, and `PRICING_WRITER_ROLE_ARN` from the data-stack outputs;
+read `APPLICATION_READER_ROLE_ARN` from the application stack's
+`ApiFunctionRoleArn`. Set `AWS_REGION` and a short-lived base identity that may assume
+the output roles. The live order is:
+
+```text
+pnpm db:migrate:dsql
+pnpm db:roles:dsql
+pnpm data:import <base.json>
+pnpm data:import <target.json> --compare-against <base.json> --comparison-type classic-forever
+pnpm data:release:dsql <target.json> --compare-against <base.json> --comparison-type classic-forever
+```
+
+Use `pnpm db:roles:dsql` after migrations to idempotently map and verify the ingestion, application-reader, and pricing-writer roles. To ingest any schema-valid build snapshot into Aurora DSQL, use `pnpm data:import <path-to-json>`; this supports the Classic fallback baseline as well as client-data targets. After importing both builds and their comparison, `pnpm data:release:dsql <target> --compare-against <base> --comparison-type classic-forever` verifies source hashes and live row counts, rejects error-level audit findings, and stores an immutable machine audit beside its deterministic data-release manifest.
+
+The bundled LibProfessionDB-derived Leatherworking build is real client data, but it remains unverified rather than being misrepresented as authoritative. The staging Phase 3 proof produced release `c45372dc8b6264dec83d1275d5691ed0`; the release audit records 314 Classic recipes, 603 Forever recipes, 603 comparison rows, and 630 target items with client data and quality.

@@ -27,10 +27,12 @@ import {
   type ShoppingStrategy,
 } from "@forever-professions/contracts";
 import {
+  FOREVER_BUILD_CONFIG,
   assessDataQuality,
   getExpectedCraftsForSkillUp,
   getExpectedReagentQuantity,
   getRecipeDifficulty,
+  getRecipeSkillCapStatus,
   getSkillUpProbability,
 } from "@forever-professions/domain";
 import { leatherworkingFixture } from "@forever-professions/fixtures";
@@ -52,13 +54,13 @@ import {
   type PlayerFaction,
 } from "./personalization.js";
 import { createRequestGuard } from "./request-guard.js";
+import { buildSkillChartData } from "./skill-chart.js";
 
 type WorkspaceView = "calculator" | "planner";
 type RecipeListView = "guide" | "recipes" | "changes";
 type CatalogState = "loading" | "ready" | "fixture" | "fallback";
 
 const MIN_PROFESSION_SKILL = 0;
-const MAX_PROFESSION_SKILL = 300;
 const RECIPE_ROW_HEIGHT = 78;
 const KNOWN_RECIPE_ROW_HEIGHT = 48;
 const VIRTUAL_OVERSCAN = 5;
@@ -351,25 +353,38 @@ function DataQualityNotice({ build, recipe }: { build: string; recipe: Recipe })
   );
 }
 
-function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
-  const points = useMemo(() => {
-    const { orange, gray } = recipe.thresholds;
-    const width = Math.max(1, gray - orange);
-    return Array.from({ length: width + 1 }, (_, index) => {
-      const level = orange + index;
-      const x = 28 + (index / width) * 384;
-      const y = 172 - getSkillUpProbability(level, recipe.thresholds) * 136;
-      return `${x},${y}`;
-    }).join(" ");
-  }, [recipe]);
-
-  const range = Math.max(1, recipe.thresholds.gray - recipe.thresholds.orange);
-  const chartSkill = Math.min(
-    recipe.thresholds.gray,
-    Math.max(recipe.thresholds.orange, skill),
+function SkillChart({
+  maxBaseSkill,
+  recipe,
+  skill,
+}: {
+  maxBaseSkill: number;
+  recipe: Recipe;
+  skill: number;
+}) {
+  const chart = useMemo(
+    () => buildSkillChartData(recipe.thresholds, maxBaseSkill),
+    [maxBaseSkill, recipe.thresholds],
   );
-  const markerX = 28 + ((chartSkill - recipe.thresholds.orange) / range) * 384;
+  const range = Math.max(1, chart.endSkill - chart.startSkill);
+  const xForSkill = (value: number) =>
+    28 + ((value - chart.startSkill) / range) * 384;
+  const points = chart.points
+    .map(({ probability, skill: pointSkill }) =>
+      `${xForSkill(pointSkill)},${172 - probability * 136}`,
+    )
+    .join(" ");
+  const chartSkill = Math.min(
+    chart.endSkill,
+    Math.max(chart.startSkill, skill),
+  );
+  const markerX = xForSkill(chartSkill);
   const markerY = 172 - getSkillUpProbability(skill, recipe.thresholds) * 136;
+  const capStatus = getRecipeSkillCapStatus(
+    recipe.thresholds,
+    recipe.learnSkill,
+    maxBaseSkill,
+  );
 
   return (
     <div className="chart-wrap">
@@ -378,7 +393,7 @@ function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
         <span className="chart-live">Current · {skill}</span>
       </div>
       <svg
-        aria-label={`Skill-up chance curve for ${recipe.name}`}
+        aria-label={`Skill-up chance curve for ${recipe.name}, ending at skill ${chart.endSkill}`}
         className="skill-chart"
         role="img"
         viewBox="0 0 440 205"
@@ -401,20 +416,41 @@ function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
         <polyline className="chart-line" points={points} />
         <line className="chart-marker-line" x1={markerX} x2={markerX} y1="28" y2="172" />
         <circle className="chart-marker" cx={markerX} cy={markerY} r="6" />
-        {Object.entries(recipe.thresholds).map(([label, value]) => {
-          const x = 28 + ((value - recipe.thresholds.orange) / range) * 384;
+        {chart.ticks.map(({ kind, label, skill: tickSkill }) => {
+          const x = xForSkill(tickSkill);
           return (
-            <text className={`chart-threshold ${label}`} key={label} x={x} y="197">
-              {value}
+            <text className={`chart-threshold ${kind}`} key={`${kind}-${tickSkill}`} x={x} y="197">
+              {label}
             </text>
           );
         })}
       </svg>
+      {capStatus.hasThresholdAboveCap ? (
+        <div className="skill-cap-note" role="note">
+          <span aria-hidden="true">i</span>
+          <div>
+            <p>
+              Client data contains skill thresholds above the current Forever
+              profession cap of {maxBaseSkill}.
+            </p>
+            <details>
+              <summary>View imported thresholds</summary>
+              <dl>
+                <div><dt>Orange</dt><dd>{recipe.thresholds.orange}</dd></div>
+                <div><dt>Yellow</dt><dd>{recipe.thresholds.yellow}</dd></div>
+                <div><dt>Green</dt><dd>{recipe.thresholds.green}</dd></div>
+                <div><dt>Gray</dt><dd>{recipe.thresholds.gray}</dd></div>
+              </dl>
+            </details>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 export function App() {
+  const maxBaseSkill = FOREVER_BUILD_CONFIG.maxBaseSkill;
   const [initialPreferences] = useState(readPersonalization);
   const [profession, setProfession] = useState<ProfessionFixture>(leatherworkingFixture);
   const [catalogState, setCatalogState] = useState<CatalogState>("loading");
@@ -881,6 +917,11 @@ export function App() {
   );
   const recipeRequiredSkill = recipe.learnSkill ?? recipe.thresholds.orange;
   const recipeIsAboveCurrentSkill = skill < recipeRequiredSkill;
+  const recipeCapStatus = getRecipeSkillCapStatus(
+    recipe.thresholds,
+    recipe.learnSkill,
+    maxBaseSkill,
+  );
 
   useEffect(() => {
     if (
@@ -1006,7 +1047,24 @@ export function App() {
 
   function nudgeSkill(amount: number): void {
     setSkill((current) =>
-      Math.min(MAX_PROFESSION_SKILL, Math.max(MIN_PROFESSION_SKILL, current + amount)),
+      Math.min(maxBaseSkill, Math.max(MIN_PROFESSION_SKILL, current + amount)),
+    );
+  }
+
+  function updateRouteStartSkill(value: number): void {
+    const nextStartSkill = Math.min(
+      maxBaseSkill,
+      Math.max(MIN_PROFESSION_SKILL, Math.round(value)),
+    );
+    setRouteStartSkill(nextStartSkill);
+    setRouteTargetSkill((current) =>
+      Math.max(nextStartSkill, Math.min(maxBaseSkill, current)),
+    );
+  }
+
+  function updateRouteTargetSkill(value: number): void {
+    setRouteTargetSkill(
+      Math.min(maxBaseSkill, Math.max(routeStartSkill, Math.round(value))),
     );
   }
 
@@ -1209,12 +1267,12 @@ export function App() {
               <div className="rail-label-row">
                 <span>Current skill</span>
                 <span>
-                  {recipeListView === "guide" ? currentGuideSkill : skill} / {recipeListView === "guide" ? guideTargetSkill : MAX_PROFESSION_SKILL}
+                  {recipeListView === "guide" ? currentGuideSkill : skill} / {recipeListView === "guide" ? guideTargetSkill : maxBaseSkill}
                 </span>
               </div>
               <input
                 aria-label={recipeListView === "guide" ? "Current leveling skill" : "Current skill for changed recipes"}
-                max={recipeListView === "guide" ? guideTargetSkill : MAX_PROFESSION_SKILL}
+                max={recipeListView === "guide" ? guideTargetSkill : maxBaseSkill}
                 min={recipeListView === "guide" ? guideStartSkill : MIN_PROFESSION_SKILL}
                 onChange={(event) => setSkill(Number(event.target.value))}
                 step={1}
@@ -1224,10 +1282,10 @@ export function App() {
             </div>
           ) : recipeListView === "recipes" ? (
             <div className="rail-skill">
-              <div className="rail-label-row"><span>Calculator skill</span><span>{skill} / {MAX_PROFESSION_SKILL}</span></div>
+              <div className="rail-label-row"><span>Calculator skill</span><span>{skill} / {maxBaseSkill}</span></div>
               <input
                 aria-label="Current profession skill"
-                max={MAX_PROFESSION_SKILL}
+                max={maxBaseSkill}
                 min={MIN_PROFESSION_SKILL}
                 onChange={(event) => setSkill(Number(event.target.value))}
                 step={1}
@@ -1449,10 +1507,15 @@ export function App() {
                 <div className="skill-requirement-warning" role="status">
                   <span aria-hidden="true">!</span>
                   <div>
-                    <strong>Not available at your current skill</strong>
+                    <strong>
+                      {recipeCapStatus.requiredSkillAboveCap
+                        ? "Requirement exceeds the current base cap"
+                        : "Not available at your current skill"}
+                    </strong>
                     <p>
-                      <span className={getItemRarityNameClass(recipeOutputQualityId(recipe))}>{recipe.name}</span> requires {profession.name} {recipeRequiredSkill}. Your
-                      current skill is {skill}.
+                      <span className={getItemRarityNameClass(recipeOutputQualityId(recipe))}>{recipe.name}</span> requires {profession.name} {recipeRequiredSkill}. {recipeCapStatus.requiredSkillAboveCap
+                        ? `This exceeds the current base profession cap of ${maxBaseSkill} and may depend on special mechanics or incomplete Forever data.`
+                        : `Your current skill is ${skill}.`}
                     </p>
                   </div>
                 </div>
@@ -1460,7 +1523,7 @@ export function App() {
 
               <section className="calculator-card" aria-label="Skill-up calculator">
                 <div className="calculator-grid">
-                  <SkillChart recipe={recipe} skill={skill} />
+                  <SkillChart maxBaseSkill={maxBaseSkill} recipe={recipe} skill={skill} />
                   <div className="outcome-panel">
                     <div className="outcome-feature"><span>Skill-up chance</span><strong>{Math.round(calculation.probability * 100)}<small>%</small></strong><p>per craft at skill {skill}</p></div>
                     <div className="outcome-row"><span>Expected attempts</span><strong>{formatNumber(calculation.expectedCrafts)}</strong></div>
@@ -1523,8 +1586,8 @@ export function App() {
               ) : null}
               <form className="route-form" onSubmit={submitRoute}>
                 <div className="route-field-grid">
-                  <label><span>Starting skill</span><input min="0" onChange={(event) => setRouteStartSkill(Number(event.target.value))} type="number" value={routeStartSkill} /></label>
-                  <label><span>Target skill</span><input min={routeStartSkill} onChange={(event) => setRouteTargetSkill(Number(event.target.value))} type="number" value={routeTargetSkill} /></label>
+                  <label><span>Starting skill</span><input max={maxBaseSkill} min={MIN_PROFESSION_SKILL} onChange={(event) => updateRouteStartSkill(Number(event.target.value))} type="number" value={routeStartSkill} /></label>
+                  <label><span>Target skill</span><input max={maxBaseSkill} min={routeStartSkill} onChange={(event) => updateRouteTargetSkill(Number(event.target.value))} type="number" value={routeTargetSkill} /></label>
                   <label><span>Optimize for</span><select onChange={(event) => setRouteObjective(event.target.value as RouteObjective)} value={routeObjective}><option value="cost">Expected cost</option><option value="crafts">Expected crafts</option><option value="materials">Material units</option></select></label>
                 </div>
                 <fieldset className="known-recipes">

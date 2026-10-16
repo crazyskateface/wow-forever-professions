@@ -5,6 +5,7 @@ import {
   type RouteOptimizationRequest,
   type RouteOptimizationResponse,
 } from "@forever-professions/contracts";
+import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 import {
   optimizeLevelingRoute,
   type RouteRecipe,
@@ -15,6 +16,13 @@ export class RoutePricingUnavailableError extends Error {
   constructor(message = "Auction pricing is required for cost optimization.") {
     super(message);
     this.name = "RoutePricingUnavailableError";
+  }
+}
+
+export class RouteSkillCapExceededError extends Error {
+  constructor(maxBaseSkill = FOREVER_BUILD_CONFIG.maxBaseSkill) {
+    super(`Target skill cannot exceed the current base profession cap of ${maxBaseSkill}.`);
+    this.name = "RouteSkillCapExceededError";
   }
 }
 
@@ -50,6 +58,10 @@ export async function optimizeFixtureRoute(
   profession: ProfessionFixture,
   pricing?: CurrentAuctionPriceReader,
 ): Promise<RouteOptimizationResponse> {
+  if (request.targetSkill > FOREVER_BUILD_CONFIG.maxBaseSkill) {
+    throw new RouteSkillCapExceededError();
+  }
+
   const pricesByGameItemId = new Map<number, number>();
   let attribution: AuctionPriceAttribution | undefined;
 
@@ -150,6 +162,7 @@ export async function optimizeFixtureRoute(
     result: optimizeLevelingRoute({
       professionId: profession.id,
       buildId: profession.build,
+      maxBaseSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
       startSkill: request.startSkill,
       targetSkill: request.targetSkill,
       objective: request.objective,

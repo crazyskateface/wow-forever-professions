@@ -59,6 +59,15 @@ Applications may depend on shared packages. Shared packages must not depend on a
 application. In particular, the UI never decides which recipe is optimal and the API
 never calls AH Ledger in a user request.
 
+### Profession progression cap
+
+`packages/domain/src/profession-cap.ts` owns the current Forever build's base
+profession cap. The web skill controls and probability graph, browser preferences,
+API route guard, and optimizer all consume that shared value. The cap limits normal
+user-facing progression only: imported recipe thresholds remain unchanged, and the
+pure skill-up math can still evaluate raw above-cap values for diagnostics and future
+mechanics.
+
 ## Local runtime
 
 Services use fixed local ports:
@@ -164,6 +173,38 @@ planner and static pages reuse `SiteFooter.tsx`. Navigation uses ordinary links 
 direct loads, refreshes, and browser history work without a client router dependency.
 The CloudFront distribution already maps 403 and 404 responses to `index.html`; keep
 that SPA fallback when changing hosting or these clean paths will fail on direct load.
+
+## Cloud infrastructure configuration
+
+The CDK app has typed `staging` and `production` configuration in
+`ops/lib/deployment-config.ts`. Staging deliberately preserves the existing stack
+names, SSM paths, scheduler name, and stateful logical IDs. Production uses separate
+stack names, parameters, schedules, buckets, roles, and DSQL storage in the same
+accepted account and region.
+
+Strict synthesis runs `cdk-nag`. Suppressions are construct-scoped, carry an explicit
+reason, and are emitted into CloudFormation metadata for review. Staging retains logs
+for 7 days; production retains them for 14 days. Both application and data stacks use
+termination protection.
+
+Use the root `infra:synth:*`, `infra:diff:*`, and `infra:deploy:*` commands rather than
+reconstructing CDK context by hand. The default workspace synth targets staging for
+compatibility with the existing deployment. Read `ops/README.md` for the exact stage
+mapping and bootstrap rules. Never run bootstrap, diff, or deploy through the AWS root
+identity.
+
+The independently deployed `ForeverProfessionsDelivery` stack owns the account's
+GitHub OIDC provider, immutable-repository trust policies, stage delivery roles, and
+the USD 10 monitoring budget. The roles may assume only the named modern CDK bootstrap
+roles, publish to the stage's generated site-bucket prefix, invalidate CloudFront
+distributions with matching application/stage tags, and assume the stage ingestion
+role. GitHub environment variables contain role ARNs and account metadata only; never
+replace OIDC with long-lived AWS secrets.
+
+The validation workflow uses exact action commit SHAs and the repository-pinned Node
+and pnpm versions. Keep `Verify repository` as the required `main` check after the
+workflow is published. Both GitHub environments admit only `main`, production requires
+a human approval, and AWS workflow concurrency is keyed by environment.
 
 ## Forever Changes behavior
 

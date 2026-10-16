@@ -25,6 +25,7 @@ import type { CurrentAuctionPriceReader } from "@forever-professions/pricing";
 import {
   optimizeFixtureRoute,
   RoutePricingUnavailableError,
+  RouteSkillCapExceededError,
 } from "./optimize-route.js";
 import {
   buildFixtureShoppingList,
@@ -112,6 +113,9 @@ export async function routeRequest(
         await optimizeFixtureRoute(request.data, profession, dependencies.pricing),
       );
     } catch (error) {
+      if (error instanceof RouteSkillCapExceededError) {
+        return json(400, { error: error.message });
+      }
       if (error instanceof RoutePricingUnavailableError) {
         return json(503, { error: error.message });
       }

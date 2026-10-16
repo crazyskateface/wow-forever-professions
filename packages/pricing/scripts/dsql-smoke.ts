@@ -1,10 +1,9 @@
-import { readdir, readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
 import type { AuctionPriceObservation } from "@forever-professions/contracts";
 import {
+  applySqlMigrations,
   createAuroraDsqlTransactionRunner,
-  type ClosableTransactionRunner,
+  loadSqlMigrations,
   type SqlQueryResult,
   type TransactionRunner,
 } from "@forever-professions/ingestion";
@@ -33,26 +32,6 @@ async function executeOne(
   values?: readonly unknown[],
 ): Promise<SqlQueryResult> {
   return runner.transaction((database) => database.query(sql, values));
-}
-
-async function applySchema(runner: ClosableTransactionRunner): Promise<number> {
-  const directory = fileURLToPath(new URL("../sql/", import.meta.url));
-  const migrations = (await readdir(directory))
-    .filter((file) => file.endsWith(".sql"))
-    .sort();
-  for (const file of migrations) {
-    const sql = await readFile(new URL(`../sql/${file}`, import.meta.url), "utf8");
-    const result = await executeOne(runner, sql);
-    const jobId = result.rows[0]?.job_id;
-    if (typeof jobId === "string" && jobId.length > 0) {
-      const wait = await runner.query("CALL sys.wait_for_job($1)", [jobId]);
-      const completed = Object.values(wait.rows[0] ?? {}).find(
-        (value): value is boolean => typeof value === "boolean",
-      );
-      if (completed === false) throw new Error(`Migration ${file} did not complete.`);
-    }
-  }
-  return migrations.length;
 }
 
 async function ensureDatabaseRole(
@@ -110,20 +89,33 @@ async function main(): Promise<void> {
   const region = requiredEnvironment("AWS_REGION");
   const workerRoleArn = requiredEnvironment("PRICING_WRITER_ROLE_ARN");
   const testRoleArn = requiredEnvironment("PRICING_TEST_ROLE_ARN");
+  const migrationRoleArn = requiredEnvironment("MIGRATION_ROLE_ARN");
   const readerRoleArn = optionalRoleArn("APPLICATION_READER_ROLE_ARN");
-  for (const roleArn of [workerRoleArn, testRoleArn]) {
+  for (const roleArn of [workerRoleArn, testRoleArn, migrationRoleArn]) {
     if (!roleArnPattern.test(roleArn)) throw new Error("Pricing writer role ARN is invalid.");
   }
 
+  const adminCredentials = fromTemporaryCredentials({
+    clientConfig: { region },
+    params: {
+      RoleArn: migrationRoleArn,
+      RoleSessionName: "ForeverProfessionsPricingValidationAdmin",
+    },
+  });
   const admin = createAuroraDsqlTransactionRunner({
     host: endpoint,
     user: "admin",
     region,
+    credentials: adminCredentials,
     maxConnections: 2,
   });
-  let migrationsApplied: number;
+  let migrations;
   try {
-    migrationsApplied = await applySchema(admin);
+    migrations = await applySqlMigrations(admin, {
+      dialect: "aurora-dsql",
+      scope: "pricing",
+      migrations: await loadSqlMigrations(new URL("../sql/", import.meta.url)),
+    });
     await configureRoles(admin, [workerRoleArn, testRoleArn], readerRoleArn);
   } finally {
     await admin.end();
@@ -188,7 +180,7 @@ async function main(): Promise<void> {
     process.stdout.write(
       `${JSON.stringify(
         {
-          migrationsApplied,
+          migrations,
           markets: (await repository.listMarkets()).length,
           observations: stored.length,
           readerRoleConfigured: readerRoleArn !== undefined,
