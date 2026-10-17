@@ -89,7 +89,7 @@ jobs:
         run: >-
           pnpm --filter @forever-professions/ops exec cdk deploy --all --strict
           --require-approval never
-          --outputs-file "cdk-outputs.${DEPLOYMENT_STAGE}.json"
+          --outputs-file "${GITHUB_WORKSPACE}/cdk-outputs.${DEPLOYMENT_STAGE}.json"
           -c "stage=${DEPLOYMENT_STAGE}"
 
       - name: Read application outputs
