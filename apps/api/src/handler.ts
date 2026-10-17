@@ -27,6 +27,12 @@ const database =
 const pricing = database ? new DsqlAuctionPricingRepository(database) : undefined;
 const catalog = database ? new SqlRecipeCatalogReader(database) : undefined;
 const changes = database ? new SqlRecipeChangeReader(database) : undefined;
+const readiness = database
+  ? async () => {
+      await database.query("SELECT 1 AS ready");
+    }
+  : undefined;
+const corsOrigin = process.env.API_CORS_ORIGIN?.trim();
 
 export async function handler(
   event: APIGatewayProxyEventV2,
@@ -50,6 +56,8 @@ export async function handler(
       ...(catalog === undefined ? {} : { catalog }),
       ...(changes === undefined ? {} : { changes }),
       ...(pricing === undefined ? {} : { pricing }),
+      ...(readiness === undefined ? {} : { readiness }),
+      ...(corsOrigin === undefined || corsOrigin.length === 0 ? {} : { corsOrigin }),
     },
     body,
   );

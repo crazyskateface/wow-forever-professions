@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { Fragment, useEffect, useMemo, type ReactNode } from "react";
 import type {
   RecipeChange,
   RecipeChangeCounts,
@@ -7,7 +7,7 @@ import type {
 } from "@forever-professions/contracts";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltipSummary } from "./ItemTooltip.js";
-import type { ItemTooltipData } from "./item-tooltip.js";
+import { getItemRarityNameClass, type ItemTooltipData } from "./item-tooltip.js";
 import {
   DEFAULT_CHANGE_FILTERS,
   type ChangeFilter,
@@ -27,9 +27,11 @@ interface ForeverChangesProps {
   readonly currentSkill: number;
   readonly error: string | undefined;
   readonly filters: ForeverChangeFilters;
+  readonly itemQualityById: ReadonlyMap<string, number>;
   readonly loading: boolean;
   readonly onFiltersChange: (filters: ForeverChangeFilters) => void;
   readonly onRetry: () => void;
+  readonly recipeTooltipBySpellId: ReadonlyMap<number, ItemTooltipData>;
   readonly search: string;
   readonly summary: RecipeChangeCounts | undefined;
 }
@@ -148,7 +150,8 @@ function formatFieldValue(
   field: string,
   value: unknown,
   snapshot: RecipeComparisonSnapshot | undefined,
-): string {
+  itemQualityById: ReadonlyMap<string, number>,
+): ReactNode {
   if (field === "orangeSkill" && snapshot?.orangeSkillKnown === false) {
     return "Unknown (source value is unanchored)";
   }
@@ -171,24 +174,36 @@ function formatFieldValue(
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (Array.isArray(value)) {
     if (value.length === 0) return "None";
-    return value
-      .map((entry) => {
-        if (typeof entry !== "object" || entry === null) return String(entry);
-        const item = entry as Record<string, unknown>;
-        const name = typeof item.name === "string" ? item.name : "Item";
-        if (typeof item.quantity === "number") return `${item.quantity}× ${name}`;
-        if (
-          typeof item.minimumQuantity === "number" &&
-          typeof item.maximumQuantity === "number"
-        ) {
-          const quantity = item.minimumQuantity === item.maximumQuantity
-            ? item.minimumQuantity
-            : `${item.minimumQuantity}–${item.maximumQuantity}`;
-          return `${quantity}× ${name}`;
-        }
-        return name;
-      })
-      .join(", ");
+    return value.map((entry, index) => {
+      if (typeof entry !== "object" || entry === null) {
+        return <Fragment key={index}>{index > 0 ? ", " : ""}{String(entry)}</Fragment>;
+      }
+      const item = entry as Record<string, unknown>;
+      const name = typeof item.name === "string" ? item.name : "Item";
+      const itemId = typeof item.itemId === "string" ? item.itemId : undefined;
+      let quantity = "";
+      if (typeof item.quantity === "number") quantity = `${item.quantity}× `;
+      if (
+        typeof item.minimumQuantity === "number" &&
+        typeof item.maximumQuantity === "number"
+      ) {
+        const outputQuantity = item.minimumQuantity === item.maximumQuantity
+          ? item.minimumQuantity
+          : `${item.minimumQuantity}–${item.maximumQuantity}`;
+        quantity = `${outputQuantity}× `;
+      }
+      return (
+        <Fragment key={itemId ?? index}>
+          {index > 0 ? ", " : ""}
+          {quantity}
+          <span className={getItemRarityNameClass(
+            itemId === undefined ? undefined : itemQualityById.get(itemId)
+          )}>
+            {name}
+          </span>
+        </Fragment>
+      );
+    });
   }
   return JSON.stringify(value);
 }
@@ -225,11 +240,20 @@ export function RecipeChangeBadge({ changeType }: { readonly changeType: RecipeC
   );
 }
 
-function changeTooltipItem(change: RecipeChange): ItemTooltipData {
+export function changeTooltipItem(
+  change: RecipeChange,
+  recipeTooltipBySpellId: ReadonlyMap<number, ItemTooltipData>,
+  itemQualityById: ReadonlyMap<string, number>,
+): ItemTooltipData {
+  const catalogItem = recipeTooltipBySpellId.get(change.identity.spellId);
+  if (catalogItem !== undefined) return catalogItem;
+
   const snapshot = change.target ?? change.base;
   const output = snapshot?.outputs[0];
+  const qualityId = output === undefined ? undefined : itemQualityById.get(output.itemId);
   return {
     name: output?.name ?? change.name,
+    ...(qualityId === undefined ? {} : { qualityId }),
     ...(output?.gameItemId === undefined ? {} : { gameItemId: output.gameItemId }),
     ...(output?.itemClassId === undefined ? {} : { itemClassId: output.itemClassId }),
     ...(output?.itemSubClassId === undefined ? {} : { itemSubClassId: output.itemSubClassId }),
@@ -246,17 +270,26 @@ function changeTooltipItem(change: RecipeChange): ItemTooltipData {
 function ChangeCard({
   change,
   currentSkill,
+  itemQualityById,
+  recipeTooltipBySpellId,
 }: {
   readonly change: RecipeChange;
   readonly currentSkill: number;
+  readonly itemQualityById: ReadonlyMap<string, number>;
+  readonly recipeTooltipBySpellId: ReadonlyMap<number, ItemTooltipData>;
 }) {
   const changedFields = Object.entries(change.changedFields);
   const snapshot = change.target ?? change.base;
   const skillAvailability = skillAvailabilityFor(change, currentSkill);
+  const tooltipItem = changeTooltipItem(
+    change,
+    recipeTooltipBySpellId,
+    itemQualityById,
+  );
 
   return (
     <details className={`change-card change-card-${change.changeType.toLowerCase()}`}>
-      <ItemTooltipSummary item={changeTooltipItem(change)}>
+      <ItemTooltipSummary item={tooltipItem}>
         <ItemIcon
           className="change-card-icon"
           gameItemId={snapshot?.outputs[0]?.gameItemId}
@@ -273,7 +306,7 @@ function ChangeCard({
               </span>
             ) : null}
           </span>
-          <strong>{change.name}</strong>
+          <strong className={getItemRarityNameClass(tooltipItem.qualityId)}>{change.name}</strong>
           <small>
             {change.changeType === "NEW"
               ? "New in Forever"
@@ -298,8 +331,8 @@ function ChangeCard({
             {changedFields.map(([field, values]) => values === undefined ? null : (
               <div className="field-comparison-row" key={field} role="row">
                 <strong role="cell">{FIELD_LABELS[field] ?? field}</strong>
-                <span role="cell">{formatFieldValue(field, values.before, change.base)}</span>
-                <span role="cell">{formatFieldValue(field, values.after, change.target)}</span>
+                <span role="cell">{formatFieldValue(field, values.before, change.base, itemQualityById)}</span>
+                <span role="cell">{formatFieldValue(field, values.after, change.target, itemQualityById)}</span>
               </div>
             ))}
           </div>
@@ -307,15 +340,15 @@ function ChangeCard({
           <div className="snapshot-grid">
             <div>
               <span>Learned at</span>
-              <strong>{formatFieldValue("learnSkill", snapshot?.learnSkill, snapshot)}</strong>
+              <strong>{formatFieldValue("learnSkill", snapshot?.learnSkill, snapshot, itemQualityById)}</strong>
             </div>
             <div>
               <span>Orange from</span>
-              <strong>{formatFieldValue("orangeSkill", snapshot?.orangeSkill, snapshot)}</strong>
+              <strong>{formatFieldValue("orangeSkill", snapshot?.orangeSkill, snapshot, itemQualityById)}</strong>
             </div>
             <div>
               <span>Source</span>
-              <strong>{formatFieldValue("acquisition", snapshot?.acquisition, snapshot)}</strong>
+              <strong>{formatFieldValue("acquisition", snapshot?.acquisition, snapshot, itemQualityById)}</strong>
             </div>
             <div>
               <span>Availability</span>
@@ -338,9 +371,11 @@ export function ForeverChanges({
   currentSkill,
   error,
   filters,
+  itemQualityById,
   loading,
   onFiltersChange,
   onRetry,
+  recipeTooltipBySpellId,
   search,
   summary,
 }: ForeverChangesProps) {
@@ -542,7 +577,9 @@ export function ForeverChanges({
             <ChangeCard
               change={change}
               currentSkill={currentSkill}
+              itemQualityById={itemQualityById}
               key={`${change.identity.professionId}-${change.identity.spellId}`}
+              recipeTooltipBySpellId={recipeTooltipBySpellId}
             />
           ))}
         </div>

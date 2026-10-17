@@ -1,19 +1,17 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { Pool, type PoolClient } from "pg";
 import {
+  applySqlMigrations,
+  createPostgresTransactionRunner,
   ingestBuildDataset,
+  loadSqlMigrations,
   normalizeBuildDataset,
   parseBuildImportScriptArguments,
   parseRawDatasetBytes,
   type RawDatasetPutInput,
   type RawDatasetPutStatus,
   type RawDatasetStore,
-  type SqlExecutor,
-  type SqlQueryResult,
-  type TransactionRunner,
 } from "../src/index.js";
 
 const defaultConnectionUrl =
@@ -29,50 +27,6 @@ function localConnectionUrl(): string {
     throw new Error("The local importer only connects to forever_professions_local on localhost.");
   }
   return value;
-}
-
-function createSqlExecutor(client: PoolClient): SqlExecutor {
-  return {
-    query: async (sql, values): Promise<SqlQueryResult> => {
-      const result = values === undefined
-        ? await client.query(sql)
-        : await client.query(sql, [...values]);
-      return {
-        rowCount: result.rowCount,
-        rows: result.rows as readonly Record<string, unknown>[],
-      };
-    },
-  };
-}
-
-function createLocalTransactionRunner(pool: Pool): TransactionRunner {
-  return {
-    transaction: async (work) => {
-      const client = await pool.connect();
-      await client.query("BEGIN");
-      try {
-        const result = await work(createSqlExecutor(client));
-        await client.query("COMMIT");
-        return result;
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
-      }
-    },
-  };
-}
-
-async function applyMigrations(pool: Pool): Promise<number> {
-  const sqlDirectory = fileURLToPath(new URL("../sql/", import.meta.url));
-  const files = (await readdir(sqlDirectory)).filter((name) => name.endsWith(".sql")).sort();
-  for (const filename of files) {
-    const ddl = (await readFile(new URL(`../sql/${filename}`, import.meta.url), "utf8"))
-      .replace("CREATE INDEX ASYNC IF NOT EXISTS", "CREATE INDEX IF NOT EXISTS");
-    await pool.query(ddl);
-  }
-  return files.length;
 }
 
 class FileRawDatasetStore implements RawDatasetStore {
@@ -111,14 +65,21 @@ const comparisonBase = compareAgainst
       parseRawDatasetBytes(await readFile(resolve(invocationDirectory, compareAgainst.path))),
     )
   : undefined;
-const pool = new Pool({ connectionString: localConnectionUrl(), max: 3 });
+const runner = createPostgresTransactionRunner({
+  connectionString: localConnectionUrl(),
+  maxConnections: 3,
+});
 
 try {
-  const migrationsApplied = await applyMigrations(pool);
+  const migrations = await applySqlMigrations(runner, {
+    dialect: "postgres",
+    scope: "catalog",
+    migrations: await loadSqlMigrations(new URL("../sql/", import.meta.url)),
+  });
   const result = await ingestBuildDataset({
     rawBytes,
     rawStore: new FileRawDatasetStore(resolve(invocationDirectory, ".local-data")),
-    transactionRunner: createLocalTransactionRunner(pool),
+    transactionRunner: runner,
     ...(comparisonBase === undefined || compareAgainst === undefined
       ? {}
       : {
@@ -127,14 +88,14 @@ try {
           ],
         }),
   });
-  const counts = await pool.query(
+  const counts = await runner.query(
     "SELECT (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM provenance) AS provenance_records",
   );
   process.stdout.write(
     `${JSON.stringify(
       {
         sourceFile: resolvedInputPath,
-        migrationsApplied,
+        migrations,
         ...result,
         stored: counts.rows[0],
       },
@@ -143,5 +104,5 @@ try {
     )}\n`,
   );
 } finally {
-  await pool.end();
+  await runner.end();
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { leatherworkingFixture } from "@forever-professions/fixtures";
+import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 import {
   getScarceLevelingReagentItemIds,
   optimizeFixtureRoute,
@@ -16,6 +17,20 @@ describe("leveling route application policy", () => {
       locale: "enUS",
     },
   } as const;
+
+  it("rejects route targets above the current base profession cap", async () => {
+    await expect(
+      optimizeFixtureRoute(
+        {
+          professionId: leatherworkingFixture.id,
+          startSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
+          targetSkill: FOREVER_BUILD_CONFIG.maxBaseSkill + 1,
+          objective: "crafts",
+        },
+        leatherworkingFixture,
+      ),
+    ).rejects.toThrow(/base profession cap/);
+  });
 
   it("uses imported client classification and avoids scarce reagents when possible", async () => {
     const baseRecipe = leatherworkingFixture.recipes[0]!;

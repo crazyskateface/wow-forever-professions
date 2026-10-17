@@ -15,10 +15,13 @@ web client stores one versioned JSON profile under the local-storage key
 - the Legacy profession skill-bonus input;
 - Forever Changes profession, change-type, item-type, and skill-availability filters.
 
-The selected market is used for recipe prices, cost optimization, and shopping-list
-requests. The selected faction is sent to the optimizer as an eligibility constraint.
+The internal market is selected from the active region and faction and is used for
+recipe prices, cost optimization, and shopping-list requests. The market remains in
+the stored profile for request stability, but its direct selector is hidden until
+live market choices are ready for users. The selected faction is sent to the optimizer
+as an eligibility constraint.
 The browser restores saved route settings when it generates the initial guide.
-Changing region, market, or faction cancels in-flight planning requests and clears
+Changing region or faction cancels in-flight planning requests and clears
 route and shopping results that were calculated with the previous profile. The
 session's known-recipe selection is preserved so the next route rebuild uses the
 player's active choices.

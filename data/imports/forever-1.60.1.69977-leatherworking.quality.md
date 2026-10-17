@@ -14,6 +14,7 @@ Professions: 1 · Recipes: 603 · Items: 760
 ## Item client data
 
 - Client-enriched items: 630/760
+- Item rarities: 630/760
 - Equipment slots: 452/760
 - Armor values: 443/760
 - Required levels: 630/760

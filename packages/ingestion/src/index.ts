@@ -15,14 +15,17 @@ export * from "./catalog.js";
 export * from "./cli.js";
 export * from "./dsql.js";
 export * from "./data-quality.js";
+export * from "./database-roles.js";
 export * from "./import.js";
 export * from "./item-icons.js";
+export * from "./migrations.js";
 export * from "./professiondb.js";
 export * from "./overrides.js";
 export * from "./postgres.js";
 export * from "./raw-store.js";
 export * from "./recipe-change-store.js";
 export * from "./recipe-changes.js";
+export * from "./release-validation.js";
 export * from "./writer.js";
 
 const SAFE_KEY_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;

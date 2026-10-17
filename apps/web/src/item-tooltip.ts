@@ -8,6 +8,7 @@ export interface ItemTooltipDetail {
 export interface ItemTooltipData {
   readonly name: string;
   readonly gameItemId?: number;
+  readonly qualityId?: number;
   readonly itemClassId?: number;
   readonly itemSubClassId?: number;
   readonly inventoryType?: string;
@@ -20,6 +21,19 @@ export interface ItemTooltipData {
   };
   readonly details?: readonly ItemTooltipDetail[];
 }
+
+export interface ItemQualityPresentation {
+  readonly label: string;
+  readonly token: "poor" | "common" | "uncommon" | "rare" | "epic";
+}
+
+const ITEM_QUALITIES: Readonly<Record<number, ItemQualityPresentation>> = {
+  0: { label: "Poor", token: "poor" },
+  1: { label: "Common", token: "common" },
+  2: { label: "Uncommon", token: "uncommon" },
+  3: { label: "Rare", token: "rare" },
+  4: { label: "Epic", token: "epic" },
+};
 
 const ITEM_CLASS_LABELS: Readonly<Record<number, string>> = {
   0: "Consumable",
@@ -96,6 +110,17 @@ const INVENTORY_TYPE_LABELS: Readonly<Record<string, string>> = {
   INVTYPE_WRISTS: "Wrists",
   INVTYPE_2HWEAPON: "Two-Hand",
 };
+
+export function getItemQuality(
+  qualityId: number | undefined,
+): ItemQualityPresentation | undefined {
+  return qualityId === undefined ? undefined : ITEM_QUALITIES[qualityId];
+}
+
+export function getItemRarityNameClass(qualityId: number | undefined): string {
+  const quality = getItemQuality(qualityId);
+  return `item-rarity-name${quality ? ` item-quality-${quality.token}` : ""}`;
+}
 
 export function getItemCategoryLabel(item: ItemTooltipData): string | undefined {
   if (item.itemClassId === 4 && item.itemSubClassId !== undefined) {

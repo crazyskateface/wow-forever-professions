@@ -71,6 +71,7 @@ describe("imported build data-quality reporting", () => {
       verificationStatuses: { unverified: 1 },
       itemMetadata: {
         clientDataItems: 0,
+        qualityItems: 0,
         equipmentSlotItems: 0,
         armorItems: 0,
         requiredLevelItems: 0,

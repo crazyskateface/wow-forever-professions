@@ -5,6 +5,7 @@ import {
   healthResponseSchema,
   professionFixtureSchema,
   professionsResponseSchema,
+  readinessResponseSchema,
   recipeChangesQuerySchema,
   recipeChangesResponseSchema,
   recipeChangesSummaryQuerySchema,
@@ -25,6 +26,7 @@ import type { CurrentAuctionPriceReader } from "@forever-professions/pricing";
 import {
   optimizeFixtureRoute,
   RoutePricingUnavailableError,
+  RouteSkillCapExceededError,
 } from "./optimize-route.js";
 import {
   buildFixtureShoppingList,
@@ -38,21 +40,12 @@ export interface ApiResponse {
   readonly body: string;
 }
 
-const headers = {
-  "access-control-allow-headers": "content-type",
-  "access-control-allow-methods": "GET,POST,OPTIONS",
-  "access-control-allow-origin": "*",
-  "content-type": "application/json; charset=utf-8",
-} as const;
-
-function json(statusCode: number, value: unknown): ApiResponse {
-  return { statusCode, headers, body: JSON.stringify(value) };
-}
-
 export interface ApiDependencies {
   readonly catalog?: RecipeCatalogReader;
   readonly changes?: RecipeChangeReader;
   readonly pricing?: CurrentAuctionPriceReader;
+  readonly readiness?: () => Promise<void>;
+  readonly corsOrigin?: string;
 }
 
 function optionalQueryValue(value: string | undefined): string | undefined {
@@ -93,6 +86,21 @@ export async function routeRequest(
   body?: unknown,
 ): Promise<ApiResponse> {
   const normalizedPath = path === "/api" ? "/" : path.replace(/^\/api(?=\/)/, "");
+  const headers = {
+    "content-type": "application/json; charset=utf-8",
+    ...(dependencies.corsOrigin === undefined
+      ? {}
+      : {
+          "access-control-allow-headers": "content-type",
+          "access-control-allow-methods": "GET,POST,OPTIONS",
+          "access-control-allow-origin": dependencies.corsOrigin,
+        }),
+  };
+  const json = (statusCode: number, value: unknown): ApiResponse => ({
+    statusCode,
+    headers,
+    body: JSON.stringify(value),
+  });
 
   if (method === "OPTIONS") {
     return { statusCode: 204, headers, body: "" };
@@ -112,6 +120,9 @@ export async function routeRequest(
         await optimizeFixtureRoute(request.data, profession, dependencies.pricing),
       );
     } catch (error) {
+      if (error instanceof RouteSkillCapExceededError) {
+        return json(400, { error: error.message });
+      }
       if (error instanceof RoutePricingUnavailableError) {
         return json(503, { error: error.message });
       }
@@ -158,6 +169,24 @@ export async function routeRequest(
         timestamp: new Date().toISOString(),
       }),
     );
+  }
+
+  if (normalizedPath === "/ready") {
+    const response = (status: "ready" | "unavailable") =>
+      readinessResponseSchema.parse({
+        service: "forever-professions-api",
+        status,
+        timestamp: new Date().toISOString(),
+      });
+    if (dependencies.readiness === undefined) {
+      return json(503, response("unavailable"));
+    }
+    try {
+      await dependencies.readiness();
+      return json(200, response("ready"));
+    } catch {
+      return json(503, response("unavailable"));
+    }
   }
 
   if (normalizedPath === "/professions") {

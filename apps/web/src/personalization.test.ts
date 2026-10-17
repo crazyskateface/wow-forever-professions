@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 import {
   DEFAULT_PERSONALIZATION,
   PERSONALIZATION_STORAGE_KEY,
@@ -61,7 +62,7 @@ describe("browser personalization", () => {
       }),
     ).toEqual({
       version: 1,
-      currentSkill: 300,
+      currentSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
       routeStartSkill: 225,
       targetSkill: 225,
       routeObjective: "crafts",

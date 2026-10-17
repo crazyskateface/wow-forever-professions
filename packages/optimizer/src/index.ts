@@ -1,4 +1,5 @@
 import {
+  assertTargetSkillWithinBaseCap,
   evaluateRecipeAtSkill,
   validateLevelingRecipe,
   type LevelingRecipeAcquisition,
@@ -76,6 +77,7 @@ const RECIPE_ACQUISITIONS = [
 export interface OptimizeRouteInput {
   readonly professionId: string;
   readonly buildId: string;
+  readonly maxBaseSkill: number;
   readonly startSkill: number;
   readonly targetSkill: number;
   readonly objective: RouteObjective;
@@ -717,6 +719,7 @@ export function optimizeLevelingRoute(
   input: OptimizeRouteInput,
 ): RouteOptimizationResult {
   assertSkillRange(input.startSkill, input.targetSkill);
+  assertTargetSkillWithinBaseCap(input.targetSkill, input.maxBaseSkill);
   validateRecipes(input.recipes);
   const policy = resolvePolicy(input.policy);
   const scarceItemIds = new Set(input.scarceItemIds ?? []);

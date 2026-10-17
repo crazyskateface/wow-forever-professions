@@ -27,17 +27,21 @@ import {
   type ShoppingStrategy,
 } from "@forever-professions/contracts";
 import {
+  FOREVER_BUILD_CONFIG,
   assessDataQuality,
   getExpectedCraftsForSkillUp,
   getExpectedReagentQuantity,
   getRecipeDifficulty,
+  getRecipeSkillCapStatus,
   getSkillUpProbability,
 } from "@forever-professions/domain";
 import { leatherworkingFixture } from "@forever-professions/fixtures";
 import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
+import { SiteFooter } from "./SiteFooter.js";
 import {
+  getItemRarityNameClass,
   hasProvisionalOutputQuantity,
   type ItemTooltipData,
 } from "./item-tooltip.js";
@@ -50,13 +54,13 @@ import {
   type PlayerFaction,
 } from "./personalization.js";
 import { createRequestGuard } from "./request-guard.js";
+import { buildSkillChartData } from "./skill-chart.js";
 
 type WorkspaceView = "calculator" | "planner";
 type RecipeListView = "guide" | "recipes" | "changes";
 type CatalogState = "loading" | "ready" | "fixture" | "fallback";
 
 const MIN_PROFESSION_SKILL = 0;
-const MAX_PROFESSION_SKILL = 300;
 const RECIPE_ROW_HEIGHT = 78;
 const KNOWN_RECIPE_ROW_HEIGHT = 48;
 const VIRTUAL_OVERSCAN = 5;
@@ -206,11 +210,16 @@ function acquisitionLabel(recipe: Recipe): string {
 
 type TooltipRecipeItem = Recipe["outputs"][number] | Recipe["reagents"][number];
 
+function recipeOutputQualityId(recipe: Recipe | undefined): number | undefined {
+  return recipe?.outputs[0]?.clientData?.qualityId;
+}
+
 function tooltipItemData(item: TooltipRecipeItem): Omit<ItemTooltipData, "details"> {
   const clientData = item.clientData;
   return {
     name: clientData?.displayName ?? item.name,
     ...(item.gameItemId === undefined ? {} : { gameItemId: item.gameItemId }),
+    ...(clientData?.qualityId === undefined ? {} : { qualityId: clientData.qualityId }),
     ...(item.itemClassId === undefined ? {} : { itemClassId: item.itemClassId }),
     ...(item.itemSubClassId === undefined ? {} : { itemSubClassId: item.itemSubClassId }),
     ...(item.inventoryType === undefined ? {} : { inventoryType: item.inventoryType }),
@@ -344,25 +353,38 @@ function DataQualityNotice({ build, recipe }: { build: string; recipe: Recipe })
   );
 }
 
-function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
-  const points = useMemo(() => {
-    const { orange, gray } = recipe.thresholds;
-    const width = Math.max(1, gray - orange);
-    return Array.from({ length: width + 1 }, (_, index) => {
-      const level = orange + index;
-      const x = 28 + (index / width) * 384;
-      const y = 172 - getSkillUpProbability(level, recipe.thresholds) * 136;
-      return `${x},${y}`;
-    }).join(" ");
-  }, [recipe]);
-
-  const range = Math.max(1, recipe.thresholds.gray - recipe.thresholds.orange);
-  const chartSkill = Math.min(
-    recipe.thresholds.gray,
-    Math.max(recipe.thresholds.orange, skill),
+function SkillChart({
+  maxBaseSkill,
+  recipe,
+  skill,
+}: {
+  maxBaseSkill: number;
+  recipe: Recipe;
+  skill: number;
+}) {
+  const chart = useMemo(
+    () => buildSkillChartData(recipe.thresholds, maxBaseSkill),
+    [maxBaseSkill, recipe.thresholds],
   );
-  const markerX = 28 + ((chartSkill - recipe.thresholds.orange) / range) * 384;
+  const range = Math.max(1, chart.endSkill - chart.startSkill);
+  const xForSkill = (value: number) =>
+    28 + ((value - chart.startSkill) / range) * 384;
+  const points = chart.points
+    .map(({ probability, skill: pointSkill }) =>
+      `${xForSkill(pointSkill)},${172 - probability * 136}`,
+    )
+    .join(" ");
+  const chartSkill = Math.min(
+    chart.endSkill,
+    Math.max(chart.startSkill, skill),
+  );
+  const markerX = xForSkill(chartSkill);
   const markerY = 172 - getSkillUpProbability(skill, recipe.thresholds) * 136;
+  const capStatus = getRecipeSkillCapStatus(
+    recipe.thresholds,
+    recipe.learnSkill,
+    maxBaseSkill,
+  );
 
   return (
     <div className="chart-wrap">
@@ -371,7 +393,7 @@ function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
         <span className="chart-live">Current · {skill}</span>
       </div>
       <svg
-        aria-label={`Skill-up chance curve for ${recipe.name}`}
+        aria-label={`Skill-up chance curve for ${recipe.name}, ending at skill ${chart.endSkill}`}
         className="skill-chart"
         role="img"
         viewBox="0 0 440 205"
@@ -394,20 +416,41 @@ function SkillChart({ recipe, skill }: { recipe: Recipe; skill: number }) {
         <polyline className="chart-line" points={points} />
         <line className="chart-marker-line" x1={markerX} x2={markerX} y1="28" y2="172" />
         <circle className="chart-marker" cx={markerX} cy={markerY} r="6" />
-        {Object.entries(recipe.thresholds).map(([label, value]) => {
-          const x = 28 + ((value - recipe.thresholds.orange) / range) * 384;
+        {chart.ticks.map(({ kind, label, skill: tickSkill }) => {
+          const x = xForSkill(tickSkill);
           return (
-            <text className={`chart-threshold ${label}`} key={label} x={x} y="197">
-              {value}
+            <text className={`chart-threshold ${kind}`} key={`${kind}-${tickSkill}`} x={x} y="197">
+              {label}
             </text>
           );
         })}
       </svg>
+      {capStatus.hasThresholdAboveCap ? (
+        <div className="skill-cap-note" role="note">
+          <span aria-hidden="true">i</span>
+          <div>
+            <p>
+              Client data contains skill thresholds above the current Forever
+              profession cap of {maxBaseSkill}.
+            </p>
+            <details>
+              <summary>View imported thresholds</summary>
+              <dl>
+                <div><dt>Orange</dt><dd>{recipe.thresholds.orange}</dd></div>
+                <div><dt>Yellow</dt><dd>{recipe.thresholds.yellow}</dd></div>
+                <div><dt>Green</dt><dd>{recipe.thresholds.green}</dd></div>
+                <div><dt>Gray</dt><dd>{recipe.thresholds.gray}</dd></div>
+              </dl>
+            </details>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 export function App() {
+  const maxBaseSkill = FOREVER_BUILD_CONFIG.maxBaseSkill;
   const [initialPreferences] = useState(readPersonalization);
   const [profession, setProfession] = useState<ProfessionFixture>(leatherworkingFixture);
   const [catalogState, setCatalogState] = useState<CatalogState>("loading");
@@ -798,6 +841,29 @@ export function App() {
     );
     return [...matches].sort((left, right) => left.name.localeCompare(right.name));
   }, [profession.recipes, search]);
+  const recipeById = useMemo(
+    () => new Map(profession.recipes.map((candidate) => [candidate.id, candidate] as const)),
+    [profession.recipes],
+  );
+  const recipeTooltipBySpellId = useMemo(() => {
+    const tooltips = new Map<number, ItemTooltipData>();
+    for (const candidate of profession.recipes) {
+      if (candidate.spellId !== null) {
+        tooltips.set(candidate.spellId, outputTooltipItem(candidate, profession.name));
+      }
+    }
+    return tooltips;
+  }, [profession.name, profession.recipes]);
+  const itemQualityById = useMemo(() => {
+    const qualities = new Map<string, number>();
+    for (const candidate of profession.recipes) {
+      for (const item of [...candidate.reagents, ...candidate.outputs]) {
+        const qualityId = item.clientData?.qualityId;
+        if (qualityId !== undefined) qualities.set(item.itemId, qualityId);
+      }
+    }
+    return qualities;
+  }, [profession.recipes]);
   const recipeChangeTypes = useMemo(() => {
     const changes = new Map<string, RecipeChangeType>();
     for (const change of recipeChanges) {
@@ -851,6 +917,11 @@ export function App() {
   );
   const recipeRequiredSkill = recipe.learnSkill ?? recipe.thresholds.orange;
   const recipeIsAboveCurrentSkill = skill < recipeRequiredSkill;
+  const recipeCapStatus = getRecipeSkillCapStatus(
+    recipe.thresholds,
+    recipe.learnSkill,
+    maxBaseSkill,
+  );
 
   useEffect(() => {
     if (
@@ -907,10 +978,6 @@ export function App() {
     ].sort(),
     [markets, region],
   );
-  const regionMarkets = useMemo(
-    () => markets.filter((market) => market.region.toLowerCase() === region),
-    [markets, region],
-  );
   const selectedMarket = markets.find(({ id }) => id === marketId);
   const marketLabel = selectedMarket?.label ?? marketId;
 
@@ -953,14 +1020,6 @@ export function App() {
     if (nextMarket !== undefined) setMarketId(nextMarket.id);
   }
 
-  function selectMarket(nextMarketId: string): void {
-    invalidatePlanningResults();
-    setMarketId(nextMarketId);
-    const nextMarket = markets.find(({ id }) => id === nextMarketId);
-    if (nextMarket === undefined) return;
-    setRegion(nextMarket.region.toLowerCase());
-  }
-
   function resetPersonalization(): void {
     invalidatePlanningResults();
     clearPersonalization();
@@ -988,7 +1047,24 @@ export function App() {
 
   function nudgeSkill(amount: number): void {
     setSkill((current) =>
-      Math.min(MAX_PROFESSION_SKILL, Math.max(MIN_PROFESSION_SKILL, current + amount)),
+      Math.min(maxBaseSkill, Math.max(MIN_PROFESSION_SKILL, current + amount)),
+    );
+  }
+
+  function updateRouteStartSkill(value: number): void {
+    const nextStartSkill = Math.min(
+      maxBaseSkill,
+      Math.max(MIN_PROFESSION_SKILL, Math.round(value)),
+    );
+    setRouteStartSkill(nextStartSkill);
+    setRouteTargetSkill((current) =>
+      Math.max(nextStartSkill, Math.min(maxBaseSkill, current)),
+    );
+  }
+
+  function updateRouteTargetSkill(value: number): void {
+    setRouteTargetSkill(
+      Math.min(maxBaseSkill, Math.max(routeStartSkill, Math.round(value))),
     );
   }
 
@@ -1153,21 +1229,6 @@ export function App() {
               </label>
             </div>
             <label className="personalization-field">
-              <span>Auction market</span>
-              <select
-                disabled={marketsLoading || regionMarkets.length === 0}
-                onChange={(event) => selectMarket(event.target.value)}
-                value={regionMarkets.some(({ id }) => id === marketId) ? marketId : ""}
-              >
-                {regionMarkets.length === 0 ? (
-                  <option value="">{marketsLoading ? "Loading markets…" : "No market available"}</option>
-                ) : null}
-                {regionMarkets.map((market) => (
-                  <option key={market.id} value={market.id}>{market.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="personalization-field">
               <span>Legacy profession bonus</span>
               <input
                 max="100"
@@ -1206,12 +1267,12 @@ export function App() {
               <div className="rail-label-row">
                 <span>Current skill</span>
                 <span>
-                  {recipeListView === "guide" ? currentGuideSkill : skill} / {recipeListView === "guide" ? guideTargetSkill : MAX_PROFESSION_SKILL}
+                  {recipeListView === "guide" ? currentGuideSkill : skill} / {recipeListView === "guide" ? guideTargetSkill : maxBaseSkill}
                 </span>
               </div>
               <input
                 aria-label={recipeListView === "guide" ? "Current leveling skill" : "Current skill for changed recipes"}
-                max={recipeListView === "guide" ? guideTargetSkill : MAX_PROFESSION_SKILL}
+                max={recipeListView === "guide" ? guideTargetSkill : maxBaseSkill}
                 min={recipeListView === "guide" ? guideStartSkill : MIN_PROFESSION_SKILL}
                 onChange={(event) => setSkill(Number(event.target.value))}
                 step={1}
@@ -1221,10 +1282,10 @@ export function App() {
             </div>
           ) : recipeListView === "recipes" ? (
             <div className="rail-skill">
-              <div className="rail-label-row"><span>Calculator skill</span><span>{skill} / {MAX_PROFESSION_SKILL}</span></div>
+              <div className="rail-label-row"><span>Calculator skill</span><span>{skill} / {maxBaseSkill}</span></div>
               <input
                 aria-label="Current profession skill"
-                max={MAX_PROFESSION_SKILL}
+                max={maxBaseSkill}
                 min={MIN_PROFESSION_SKILL}
                 onChange={(event) => setSkill(Number(event.target.value))}
                 step={1}
@@ -1314,7 +1375,7 @@ export function App() {
                       <span className="guide-step-title">
                         <ItemIcon className="guide-item-icon" gameItemId={guideRecipe.outputs[0]?.gameItemId} name={guideRecipe.name} />
                         <span>
-                          <strong>{guideRecipe.name}</strong>
+                          <strong className={getItemRarityNameClass(recipeOutputQualityId(guideRecipe))}>{guideRecipe.name}</strong>
                           <small className={`guide-source source-${guideRecipe.acquisition}`}>
                             {acquisitionLabel(guideRecipe)}
                           </small>
@@ -1341,7 +1402,7 @@ export function App() {
                                 onClick={() => openRouteRecipe(alternative.recipeId)}
                                 type="button"
                               >
-                                <span>{alternativeRecipe.name}</span>
+                                <span className={getItemRarityNameClass(recipeOutputQualityId(alternativeRecipe))}>{alternativeRecipe.name}</span>
                                 <small>{alternative.startSkill} – {alternative.endSkill}</small>
                               </button>
                             );
@@ -1365,7 +1426,7 @@ export function App() {
                   <ItemTooltipButton aria-current={candidate.id === recipe.id ? "true" : undefined} className={candidate.id === recipe.id ? "recipe active" : "recipe"} item={outputTooltipItem(candidate, profession.name)} onClick={() => selectRecipe(candidate)} type="button">
                     <span className={`recipe-stripe stripe-${index}`} aria-hidden="true" />
                     <ItemIcon className={`item-icon item-${index}`} gameItemId={candidate.outputs[0]?.gameItemId} name={candidate.name} />
-                    <span className="recipe-copy"><strong>{candidate.name}</strong><small>{candidate.reagents.length} reagents · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>{getRecipeChangeType(candidate) ? <RecipeChangeBadge changeType={getRecipeChangeType(candidate)!} /> : null}</span>
+                    <span className="recipe-copy"><strong className={getItemRarityNameClass(recipeOutputQualityId(candidate))}>{candidate.name}</strong><small>{candidate.reagents.length} reagents · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>{getRecipeChangeType(candidate) ? <RecipeChangeBadge changeType={getRecipeChangeType(candidate)!} /> : null}</span>
                     <span className={`recipe-level ${getRecipeDifficulty(skill, candidate.thresholds)}`}>
                       {candidate.thresholds.orange}
                     </span>
@@ -1403,9 +1464,11 @@ export function App() {
               currentSkill={skill}
               error={changesError}
               filters={changeFilters}
+              itemQualityById={itemQualityById}
               loading={changesLoading}
               onFiltersChange={setChangeFilters}
               onRetry={() => setChangesReload((value) => value + 1)}
+              recipeTooltipBySpellId={recipeTooltipBySpellId}
               search={search}
               summary={changeSummary}
             />
@@ -1419,7 +1482,7 @@ export function App() {
                   <div>
                     <div className="breadcrumb">{profession.name}</div>
                     <div className="recipe-name-row">
-                      <h1 id="recipe-title">{recipe.name}</h1>
+                      <h1 className={getItemRarityNameClass(recipeOutputQualityId(recipe))} id="recipe-title">{recipe.name}</h1>
                       <span
                         aria-label={`${calculation.difficulty} difficulty`}
                         className={`difficulty-dot ${calculation.difficulty}`}
@@ -1444,10 +1507,15 @@ export function App() {
                 <div className="skill-requirement-warning" role="status">
                   <span aria-hidden="true">!</span>
                   <div>
-                    <strong>Not available at your current skill</strong>
+                    <strong>
+                      {recipeCapStatus.requiredSkillAboveCap
+                        ? "Requirement exceeds the current base cap"
+                        : "Not available at your current skill"}
+                    </strong>
                     <p>
-                      {recipe.name} requires {profession.name} {recipeRequiredSkill}. Your
-                      current skill is {skill}.
+                      <span className={getItemRarityNameClass(recipeOutputQualityId(recipe))}>{recipe.name}</span> requires {profession.name} {recipeRequiredSkill}. {recipeCapStatus.requiredSkillAboveCap
+                        ? `This exceeds the current base profession cap of ${maxBaseSkill} and may depend on special mechanics or incomplete Forever data.`
+                        : `Your current skill is ${skill}.`}
                     </p>
                   </div>
                 </div>
@@ -1455,7 +1523,7 @@ export function App() {
 
               <section className="calculator-card" aria-label="Skill-up calculator">
                 <div className="calculator-grid">
-                  <SkillChart recipe={recipe} skill={skill} />
+                  <SkillChart maxBaseSkill={maxBaseSkill} recipe={recipe} skill={skill} />
                   <div className="outcome-panel">
                     <div className="outcome-feature"><span>Skill-up chance</span><strong>{Math.round(calculation.probability * 100)}<small>%</small></strong><p>per craft at skill {skill}</p></div>
                     <div className="outcome-row"><span>Expected attempts</span><strong>{formatNumber(calculation.expectedCrafts)}</strong></div>
@@ -1486,7 +1554,7 @@ export function App() {
                           <ItemTooltip item={reagentTooltipItem(reagent, price)} pinnable>
                             <ItemIcon className={`item-icon reagent-${index}`} gameItemId={reagent.gameItemId} name={reagent.name} />
                           </ItemTooltip>
-                          <span><strong>{reagent.name}</strong><small>Item {reagent.gameItemId ?? "—"}</small></span>
+                          <span><strong className={getItemRarityNameClass(reagent.clientData?.qualityId)}>{reagent.name}</strong><small>Item {reagent.gameItemId ?? "—"}</small></span>
                         </span>
                         <strong>{formatNumber(expectedQuantity)}</strong>
                         <span className="source-pill"><i aria-hidden="true" /> Auction house</span>
@@ -1518,8 +1586,8 @@ export function App() {
               ) : null}
               <form className="route-form" onSubmit={submitRoute}>
                 <div className="route-field-grid">
-                  <label><span>Starting skill</span><input min="0" onChange={(event) => setRouteStartSkill(Number(event.target.value))} type="number" value={routeStartSkill} /></label>
-                  <label><span>Target skill</span><input min={routeStartSkill} onChange={(event) => setRouteTargetSkill(Number(event.target.value))} type="number" value={routeTargetSkill} /></label>
+                  <label><span>Starting skill</span><input max={maxBaseSkill} min={MIN_PROFESSION_SKILL} onChange={(event) => updateRouteStartSkill(Number(event.target.value))} type="number" value={routeStartSkill} /></label>
+                  <label><span>Target skill</span><input max={maxBaseSkill} min={routeStartSkill} onChange={(event) => updateRouteTargetSkill(Number(event.target.value))} type="number" value={routeTargetSkill} /></label>
                   <label><span>Optimize for</span><select onChange={(event) => setRouteObjective(event.target.value as RouteObjective)} value={routeObjective}><option value="cost">Expected cost</option><option value="crafts">Expected crafts</option><option value="materials">Material units</option></select></label>
                 </div>
                 <fieldset className="known-recipes">
@@ -1571,7 +1639,7 @@ export function App() {
                           type="checkbox"
                         />
                         <span>
-                          <strong>{candidate.name}</strong>
+                          <strong className={getItemRarityNameClass(recipeOutputQualityId(candidate))}>{candidate.name}</strong>
                           <small>{candidate.id} · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>
                         </span>
                       </label>
@@ -1590,7 +1658,7 @@ export function App() {
                 <div className="route-result" aria-live="polite">
                   <div className="route-summary"><article><span>Expected crafts</span><strong>{formatNumber(routeResponse.result.totals.expectedCrafts)}</strong></article><article><span>Material units</span><strong>{formatNumber(routeResponse.result.totals.expectedMaterials)}</strong></article><article><span>Expected cost</span><strong>{routeResponse.result.totals.expectedCostCopper === undefined ? "—" : formatCopper(routeResponse.result.totals.expectedCostCopper)}</strong></article></div>
                   {routeResponse.result.status === "blocked" ? <p className="route-warning">Route blocked at skill {routeResponse.result.blockedAtSkill}: {routeResponse.result.reason === "missing-price-data" ? "one or more required prices are unavailable." : "no eligible recipe covers this skill."}</p> : null}
-                  <ol className="route-segments">{routeResponse.result.segments.map((segment) => <li key={`${segment.recipeId}-${segment.startSkill}`}><span className="route-range">{segment.startSkill} → {segment.endSkill}</span><div><strong>{segment.recipeName}</strong><small>{formatNumber(segment.expectedCrafts)} crafts · {formatNumber(segment.expectedMaterials)} materials</small></div><button onClick={() => openRouteRecipe(segment.recipeId)} type="button">Open recipe</button></li>)}</ol>
+                  <ol className="route-segments">{routeResponse.result.segments.map((segment) => <li key={`${segment.recipeId}-${segment.startSkill}`}><span className="route-range">{segment.startSkill} → {segment.endSkill}</span><div><strong className={getItemRarityNameClass(recipeOutputQualityId(recipeById.get(segment.recipeId)))}>{segment.recipeName}</strong><small>{formatNumber(segment.expectedCrafts)} crafts · {formatNumber(segment.expectedMaterials)} materials</small></div><button onClick={() => openRouteRecipe(segment.recipeId)} type="button">Open recipe</button></li>)}</ol>
                   {routeResponse.attribution ? <a className="attribution" href={routeResponse.attribution.url} rel="noreferrer" target="_blank">{routeResponse.attribution.text}</a> : null}
 
                   <section className="shopping-list" aria-labelledby="shopping-title">
@@ -1601,10 +1669,10 @@ export function App() {
                       <div className="shopping-result" aria-live="polite">
                         <div className="shopping-total"><span>{shoppingResponse.plan.status === "complete" ? "Expected total" : "Known subtotal"}</span><strong>{formatCopper(shoppingResponse.plan.expectedCostCopper ?? shoppingResponse.plan.knownSubtotalCopper)}</strong></div>
                         <div className="shopping-columns">
-                          <div><h3>Buy</h3>{shoppingResponse.plan.purchases.length === 0 ? <p className="empty-list">Nothing to buy.</p> : <ul>{shoppingResponse.plan.purchases.map((purchase) => <li key={purchase.itemId}><span>{purchase.itemName}<small>{formatCopper(purchase.unitPriceCopper)} each</small></span><strong>{formatNumber(purchase.quantity)} · {formatCopper(purchase.expectedCostCopper)}</strong></li>)}</ul>}</div>
-                          <div><h3>Craft intermediates</h3>{shoppingResponse.plan.crafts.length === 0 ? <p className="empty-list">No intermediate crafts chosen.</p> : <ul>{shoppingResponse.plan.crafts.map((craft) => <li key={`${craft.recipeId}-${craft.outputItemId}`}><span>{craft.recipeName}<small>{craft.outputItemName}</small></span><strong>{formatNumber(craft.expectedCrafts)} crafts</strong></li>)}</ul>}</div>
+                          <div><h3>Buy</h3>{shoppingResponse.plan.purchases.length === 0 ? <p className="empty-list">Nothing to buy.</p> : <ul>{shoppingResponse.plan.purchases.map((purchase) => <li key={purchase.itemId}><span className={getItemRarityNameClass(itemQualityById.get(purchase.itemId))}>{purchase.itemName}<small>{formatCopper(purchase.unitPriceCopper)} each</small></span><strong>{formatNumber(purchase.quantity)} · {formatCopper(purchase.expectedCostCopper)}</strong></li>)}</ul>}</div>
+                          <div><h3>Craft intermediates</h3>{shoppingResponse.plan.crafts.length === 0 ? <p className="empty-list">No intermediate crafts chosen.</p> : <ul>{shoppingResponse.plan.crafts.map((craft) => <li key={`${craft.recipeId}-${craft.outputItemId}`}><span className={getItemRarityNameClass(itemQualityById.get(craft.outputItemId))}>{craft.recipeName}<small className={getItemRarityNameClass(itemQualityById.get(craft.outputItemId))}>{craft.outputItemName}</small></span><strong>{formatNumber(craft.expectedCrafts)} crafts</strong></li>)}</ul>}</div>
                         </div>
-                        {shoppingResponse.plan.unresolved.length > 0 ? <div className="shopping-warning"><strong>Needs attention</strong><ul>{shoppingResponse.plan.unresolved.map((item) => <li key={`${item.itemId}-${item.reason}`}>{item.itemName}: {formatNumber(item.quantity)} ({item.reason.replaceAll("-", " ")})</li>)}</ul></div> : null}
+                        {shoppingResponse.plan.unresolved.length > 0 ? <div className="shopping-warning"><strong>Needs attention</strong><ul>{shoppingResponse.plan.unresolved.map((item) => <li key={`${item.itemId}-${item.reason}`}><span className={getItemRarityNameClass(itemQualityById.get(item.itemId))}>{item.itemName}</span>: {formatNumber(item.quantity)} ({item.reason.replaceAll("-", " ")})</li>)}</ul></div> : null}
                         {shoppingResponse.plan.cycles.length > 0 ? <p className="shopping-warning">Recursive crafting cycle blocked: {shoppingResponse.plan.cycles.map((cycle) => cycle.join(" → ")).join("; ")}</p> : null}
                       </div>
                     ) : null}
@@ -1617,6 +1685,7 @@ export function App() {
           )}
         </main>
       </div>
+      <SiteFooter />
     </div>
   );
 }

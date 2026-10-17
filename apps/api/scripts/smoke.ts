@@ -3,6 +3,7 @@ export {};
 const baseUrl = process.argv[2] ?? process.env.API_BASE_URL ?? "http://127.0.0.1:3001";
 const requests = [
   { method: "GET", path: "/api/health" },
+  { method: "GET", path: "/api/ready" },
   { method: "GET", path: "/api/professions" },
   { method: "GET", path: "/api/professions/leatherworking/recipes" },
   { method: "GET", path: "/api/recipes/heavy-armor-kit" },

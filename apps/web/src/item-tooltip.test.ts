@@ -3,6 +3,8 @@ import {
   formatTooltipSellPrice,
   getInventoryTypeLabel,
   getItemCategoryLabel,
+  getItemQuality,
+  getItemRarityNameClass,
   hasProvisionalOutputQuantity,
   ITEM_TOOLTIP_HOVER_DELAY_MS,
 } from "./item-tooltip.js";
@@ -23,6 +25,20 @@ describe("item tooltip data", () => {
     expect(getItemCategoryLabel({ name: "Unknown Item" })).toBeUndefined();
     expect(getInventoryTypeLabel("INVTYPE_NON_EQUIP_IGNORE")).toBeUndefined();
     expect(getInventoryTypeLabel("INVTYPE_CLOAK")).toBe("Back");
+  });
+
+  it("maps client quality IDs to recognizable item rarities", () => {
+    expect([0, 1, 2, 3, 4].map((qualityId) => getItemQuality(qualityId))).toEqual([
+      { label: "Poor", token: "poor" },
+      { label: "Common", token: "common" },
+      { label: "Uncommon", token: "uncommon" },
+      { label: "Rare", token: "rare" },
+      { label: "Epic", token: "epic" },
+    ]);
+    expect(getItemQuality(undefined)).toBeUndefined();
+    expect(getItemQuality(99)).toBeUndefined();
+    expect(getItemRarityNameClass(3)).toBe("item-rarity-name item-quality-rare");
+    expect(getItemRarityNameClass(undefined)).toBe("item-rarity-name");
   });
 
   it("formats vendor prices like an in-game tooltip", () => {

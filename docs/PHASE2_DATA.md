@@ -1,9 +1,10 @@
 # Phase 2 data foundation
 
 Current-state note: this document records the original Phase 2 delivery. The schema
-has since grown to 22 ingestion migrations and 15 ingestion tables, including recipe
-metadata, deterministic build comparisons, field-level recipe changes, and
-build-scoped item-name-description classifications. See `packages/ingestion/README.md`
+has since grown to 24 ingestion migrations and 17 ingestion tables, including recipe
+metadata, deterministic build comparisons, field-level recipe changes,
+build-scoped item-name-description classifications, tooltip attributes, and item
+rarities. See `packages/ingestion/README.md`
 and `docs/DEVELOPMENT.md` for the current workflow.
 
 Phase 2 turns one mutable recipe list into an append-only sequence of build snapshots. A stable recipe identity can have many recipe versions, and every version keeps its thresholds, reagents, outputs, provenance, and verification state.
@@ -24,7 +25,7 @@ The schema files under `packages/ingestion/sql` contain one DDL statement each a
 
 The normalizer is pure and AWS-independent. The writer is backed by the official Aurora DSQL Node connector, which supplies IAM token management and whole-transaction OCC retries. All SQL values are bound parameters. Inserts are resumable and verify that existing keys still contain the expected immutable data. Raw uploads use the AWS SDK S3 client, a SHA-256 checksum, and `If-None-Match: *` to prevent replacement.
 
-The `ForeverProfessionsData` development stack was deployed in `us-east-1` and validated on October 8, 2026. That live validation covered migrations 001–016. The harness applies every DDL file independently, invokes `CALL sys.wait_for_job` outside a transaction for asynchronous indexes, maps the scoped IAM ingestion role to `forever_professions_ingestion`, and imports the same fixture twice. The current command discovers and applies all 23 migrations, but migrations 017–023 still require the same live DSQL revalidation before production promotion.
+The `ForeverProfessionsData` development stack was deployed in `us-east-1` and initially validated through migration 016 on October 8, 2026. Phase 3 revalidated all 24 catalog migrations plus the three pricing migrations on October 16, 2026. The production runner now records normalized SHA-256 checksums in `schema_migration`, stops on drift, invokes `CALL sys.wait_for_job` outside a transaction, and skips the complete applied set on replay.
 
 The live run verifies IAM authentication, asynchronous index completion, the scoped application role, S3 conditional writes, DSQL-compatible transaction boundaries, and resumable imports. It does not inject an OCC conflict or establish production performance limits; those remain operational tests rather than blockers for the Phase 2 data foundation.
 

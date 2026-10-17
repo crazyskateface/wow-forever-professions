@@ -31,17 +31,19 @@ async function main(): Promise<void> {
   const accountId = roleArnPattern.exec(ingestionRoleArn)?.[1];
   if (!accountId) throw new Error("INGESTION_ROLE_ARN must be an IAM role ARN in the aws partition.");
 
-  const absoluteInputPath = resolve(inputPath);
+  const invocationDirectory = process.env.INIT_CWD
+    ? resolve(process.env.INIT_CWD)
+    : process.cwd();
+  const absoluteInputPath = resolve(invocationDirectory, inputPath);
   const rawBytes = await readFile(absoluteInputPath);
   const comparisonBase = compareAgainst
     ? normalizeBuildDataset(
-        parseRawDatasetBytes(await readFile(resolve(compareAgainst.path))),
+        parseRawDatasetBytes(
+          await readFile(resolve(invocationDirectory, compareAgainst.path)),
+        ),
       )
     : undefined;
-  const imported = parseRawDatasetBytes(rawBytes);
-  if (!imported.sources.some(({ kind }) => kind === "client-data")) {
-    throw new Error("A client-data import must declare at least one client-data source.");
-  }
+  parseRawDatasetBytes(rawBytes);
 
   const credentials = fromTemporaryCredentials({
     clientConfig: { region },

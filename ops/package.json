@@ -3,8 +3,27 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "bootstrap": "pnpm bootstrap:staging && pnpm bootstrap:production",
+    "bootstrap:staging": "cdk bootstrap aws://370979476195/us-east-1 --qualifier fpstage --toolkit-stack-name CDKToolkit-fpstage --strict --termination-protection",
+    "bootstrap:production": "cdk bootstrap aws://370979476195/us-east-1 --qualifier fpprod --toolkit-stack-name CDKToolkit-fpprod --strict --termination-protection",
     "build": "tsc -p tsconfig.json",
-    "synth": "cdk synth --strict",
+    "configure:github": "tsx scripts/configure-github-phase2.ts",
+    "configure:github:protect": "tsx scripts/configure-github-phase2.ts --enable-branch-protection",
+    "deploy:delivery": "cdk deploy ForeverProfessionsDelivery --strict --require-approval broadening --app \"node ./node_modules/tsx/dist/cli.mjs bin/delivery.ts\"",
+    "deploy:data:production": "cdk deploy ForeverProfessionsDataProduction --strict --require-approval broadening --outputs-file cdk-outputs.production.json -c stage=production",
+    "deploy:data:staging": "cdk deploy ForeverProfessionsData --strict --require-approval broadening --outputs-file cdk-outputs.staging.json -c stage=staging",
+    "deploy:production": "cdk deploy --all --strict --require-approval broadening --outputs-file cdk-outputs.production.json -c stage=production",
+    "deploy:staging": "cdk deploy --all --strict --require-approval broadening --outputs-file cdk-outputs.staging.json -c stage=staging",
+    "diff:production": "cdk diff -c stage=production",
+    "diff:staging": "cdk diff -c stage=staging",
+    "diff:data:production": "cdk diff ForeverProfessionsDataProduction -c stage=production",
+    "diff:data:staging": "cdk diff ForeverProfessionsData -c stage=staging",
+    "diff:delivery": "cdk diff ForeverProfessionsDelivery --app \"node ./node_modules/tsx/dist/cli.mjs bin/delivery.ts\"",
+    "synth": "pnpm synth:staging && pnpm synth:production && pnpm synth:delivery",
+    "synth:delivery": "cdk synth ForeverProfessionsDelivery --strict --app \"node ./node_modules/tsx/dist/cli.mjs bin/delivery.ts\"",
+    "synth:production": "cdk synth --strict -c stage=production",
+    "synth:staging": "cdk synth --strict -c stage=staging",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -14,8 +33,10 @@
   "devDependencies": {
     "@types/node": "26.6.4",
     "aws-cdk": "2.1144.0",
+    "cdk-nag": "^3.0.2",
     "esbuild": "0.28.2",
     "tsx": "4.23.15",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
   }
 }

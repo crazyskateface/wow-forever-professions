@@ -146,6 +146,7 @@ describe("item icon extraction", () => {
       inventoryType: "INVTYPE_CLOAK",
       clientData: {
         displayName: "Fine Leather Cloak",
+        qualityId: 2,
         equipmentSlot: "Back",
         armor: 14,
         requiredLevel: 10,
@@ -155,12 +156,14 @@ describe("item icon extraction", () => {
     });
     expect(records.get(2318)?.clientData).toEqual({
       displayName: "Light Leather",
+      qualityId: 1,
       requiredLevel: 0,
       sellPriceCopper: 15,
       source,
     });
     expect(records.get(9999)?.clientData).toEqual({
       displayName: "Test Robe",
+      qualityId: 2,
       equipmentSlot: "Chest",
       armor: 44,
       requiredLevel: 10,

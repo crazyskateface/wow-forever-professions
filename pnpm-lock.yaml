@@ -20,6 +20,9 @@ importers:
       '@forever-professions/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@forever-professions/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@forever-professions/fixtures':
         specifier: workspace:*
         version: link:../../data/fixtures
@@ -133,6 +136,9 @@ importers:
       aws-cdk:
         specifier: 2.1144.0
         version: 2.1144.0
+      cdk-nag:
+        specifier: ^3.0.2
+        version: 3.0.2(aws-cdk-lib@2.272.0(constructs@10.8.1))(constructs@10.8.1)
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
@@ -142,6 +148,9 @@ importers:
       typescript:
         specifier: 7.0.2
         version: 7.0.2
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@types/node@26.6.4)(vite@8.3.3(@types/node@26.6.4)(esbuild@0.28.2)(tsx@4.23.15))
 
   packages/contracts:
     dependencies:
@@ -861,6 +870,13 @@ packages:
 
   bowser@2.14.1:
     resolution: {integrity: sha512-tzPjzCxygAKWFOJP011oxFHs57HzIhOEracIgAePE4pqB3LikALKnSzUyU4MGs9/iCEUuHlAJTjTc5M+u7YEGg==}
+
+  cdk-nag@3.0.2:
+    resolution: {integrity: sha512-mmrspXnYRK5RmBTfEu5EQZmTwGxaVCESJ5GXbQq62eOkVFd4vc4MuIfSbav74K4J7irXQVJaY3d5js0kVQMWdA==}
+    engines: {node: '>= 18.12.0'}
+    peerDependencies:
+      aws-cdk-lib: ^2.257.0
+      constructs: ^10.5.1
 
   chai@6.3.0:
     resolution: {integrity: sha512-XWAtwJ6OHO+tj0EKCs0Y2UamnyOxseZWltU4x2U2wh8g4AigdjwvtUjvLP2tqkA/avxHEtzxNaqGq/YGNwckKg==}
@@ -1828,6 +1844,11 @@ snapshots:
   aws-cdk@2.1144.0: {}
 
   bowser@2.14.1: {}
+
+  cdk-nag@3.0.2(aws-cdk-lib@2.272.0(constructs@10.8.1))(constructs@10.8.1):
+    dependencies:
+      aws-cdk-lib: 2.272.0(constructs@10.8.1)
+      constructs: 10.8.1
 
   chai@6.3.0: {}
 

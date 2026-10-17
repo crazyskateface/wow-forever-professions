@@ -6,6 +6,7 @@ import {
   Fn,
   RemovalPolicy,
   Stack,
+  Validations,
   type StackProps,
 } from "aws-cdk-lib";
 import path from "node:path";
@@ -19,15 +20,20 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import type { Construct } from "constructs";
+import type { DeploymentConfig } from "./deployment-config";
 
-export const DATA_CLUSTER_ENDPOINT_PARAMETER_NAME =
-  "/forever-professions/data/dsql-endpoint";
-export const DATA_CLUSTER_IDENTIFIER_PARAMETER_NAME =
-  "/forever-professions/data/dsql-identifier";
+export interface ForeverProfessionsDataStackProps extends StackProps {
+  readonly deployment: DeploymentConfig;
+}
 
 export class ForeverProfessionsDataStack extends Stack {
-  constructor(scope: Construct, id: string, props?: StackProps) {
-    super(scope, id, props);
+  constructor(
+    scope: Construct,
+    id: string,
+    props: ForeverProfessionsDataStackProps,
+  ) {
+    const { deployment, ...stackProps } = props;
+    super(scope, id, stackProps);
 
     const rawDataBucket = new s3.Bucket(this, "RawDataBucket", {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -36,6 +42,11 @@ export class ForeverProfessionsDataStack extends Stack {
       objectOwnership: s3.ObjectOwnership.BUCKET_OWNER_ENFORCED,
       removalPolicy: RemovalPolicy.RETAIN,
       versioned: true,
+    });
+    Validations.of(rawDataBucket).acknowledge({
+      id: "AwsSolutions::AwsSolutions-S1",
+      reason:
+        "The retained raw-data bucket is private, accepts writes only from the scoped ingestion role, and keeps immutable source objects. S3 access logging is deferred with the low-cost observability work in deployment roadmap Phase 6.",
     });
 
     const dataCluster = new dsql.CfnCluster(this, "DataCluster", {
@@ -48,7 +59,7 @@ export class ForeverProfessionsDataStack extends Stack {
     dataCluster.applyRemovalPolicy(RemovalPolicy.RETAIN);
 
     const ingestionRole = new iam.CfnRole(this, "IngestionRole", {
-      description: "Scoped local-development access for the Phase 2 ingestion pipeline.",
+      description: "Scoped write access for the Forever Professions ingestion pipeline.",
       maxSessionDuration: Duration.hours(1).toSeconds(),
       assumeRolePolicyDocument: {
         Version: "2012-10-17",
@@ -64,7 +75,7 @@ export class ForeverProfessionsDataStack extends Stack {
       },
       policies: [
         {
-          policyName: "Phase2DataWrite",
+          policyName: "CatalogDataWrite",
           policyDocument: {
             Version: "2012-10-17",
             Statement: [
@@ -76,7 +87,10 @@ export class ForeverProfessionsDataStack extends Stack {
               {
                 Effect: "Allow",
                 Action: "s3:PutObject",
-                Resource: `${rawDataBucket.bucketArn}/raw/*`,
+                Resource: [
+                  `${rawDataBucket.bucketArn}/raw/*`,
+                  `${rawDataBucket.bucketArn}/releases/data/*`,
+                ],
               },
             ],
           },
@@ -84,23 +98,70 @@ export class ForeverProfessionsDataStack extends Stack {
       ],
       tags: [
         { key: "Project", value: "forever-professions" },
-        { key: "Purpose", value: "phase-2-ingestion" },
+        { key: "Purpose", value: "catalog-ingestion" },
+      ],
+    });
+    Validations.of(ingestionRole).acknowledge({
+      id: "AwsSolutions-IAM5[Resource::<RawDataBucket57F26C03.Arn>/raw/*]",
+      reason:
+        "S3 object writes require an object-key wildcard; this policy is limited to the retained raw-data bucket's raw/ prefix and grants no bucket-management actions.",
+    });
+    Validations.of(ingestionRole).acknowledge({
+      id: "AwsSolutions-IAM5[Resource::<RawDataBucket57F26C03.Arn>/releases/data/*]",
+      reason:
+        "Data release audit and manifest object keys are content-qualified at runtime; this wildcard is limited to the retained raw-data bucket's releases/data/ prefix.",
+    });
+
+    const migrationRole = new iam.CfnRole(this, "MigrationRole", {
+      description:
+        "Short-lived administrative database access for reviewed schema migrations.",
+      maxSessionDuration: Duration.hours(1).toSeconds(),
+      assumeRolePolicyDocument: {
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: {
+              AWS: this.formatArn({ service: "iam", region: "", resource: "root" }),
+            },
+            Action: "sts:AssumeRole",
+          },
+        ],
+      },
+      policies: [
+        {
+          policyName: "ApplyDatabaseMigrations",
+          policyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Action: "dsql:DbConnectAdmin",
+                Resource: dataCluster.attrResourceArn,
+              },
+            ],
+          },
+        },
+      ],
+      tags: [
+        { key: "Project", value: "forever-professions" },
+        { key: "Purpose", value: "database-migrations" },
       ],
     });
 
     new ssm.StringParameter(this, "DataClusterEndpointParameter", {
-      parameterName: DATA_CLUSTER_ENDPOINT_PARAMETER_NAME,
+      parameterName: deployment.dataClusterEndpointParameterName,
       stringValue: dataCluster.attrEndpoint,
       description: "Aurora DSQL endpoint for Forever Professions application runtimes.",
     });
     new ssm.StringParameter(this, "DataClusterIdentifierParameter", {
-      parameterName: DATA_CLUSTER_IDENTIFIER_PARAMETER_NAME,
+      parameterName: deployment.dataClusterIdentifierParameterName,
       stringValue: dataCluster.ref,
       description: "Aurora DSQL cluster identifier for Forever Professions.",
     });
 
     const pricingWorkerLogGroup = new logs.LogGroup(this, "PricingWorkerLogGroup", {
-      retention: logs.RetentionDays.ONE_MONTH,
+      retention: deployment.logRetention,
       removalPolicy: RemovalPolicy.DESTROY,
     });
     const auctionMarketId = new CfnParameter(this, "AuctionMarketId", {
@@ -136,6 +197,16 @@ export class ForeverProfessionsDataStack extends Stack {
         PRICING_DATABASE_ROLE: "forever_professions_pricing_writer",
       },
     });
+    Validations.of(pricingWorker).acknowledge({
+      id: "AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]",
+      reason:
+        "CDK attaches the standard Lambda basic execution policy for CloudWatch log delivery; application and database permissions remain separate and resource-scoped.",
+    });
+    Validations.of(pricingWorker).acknowledge({
+      id: "AwsSolutions-IAM5[Resource::*]",
+      reason:
+        "Active X-Ray tracing requires xray:PutTraceSegments and xray:PutTelemetryRecords on Resource * because those write APIs do not support resource-level permissions.",
+    });
     pricingWorker.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["dsql:DbConnect"],
@@ -145,10 +216,16 @@ export class ForeverProfessionsDataStack extends Stack {
 
     const refreshDeadLetterQueue = new sqs.Queue(this, "PricingRefreshDeadLetterQueue", {
       encryption: sqs.QueueEncryption.SQS_MANAGED,
+      enforceSSL: true,
       retentionPeriod: Duration.days(14),
       removalPolicy: RemovalPolicy.DESTROY,
     });
-    const scheduleName = "forever-professions-auction-refresh";
+    Validations.of(refreshDeadLetterQueue).acknowledge({
+      id: "AwsSolutions::AwsSolutions-SQS3",
+      reason:
+        "This queue is itself the EventBridge Scheduler dead-letter destination, so attaching another dead-letter queue would create an unnecessary recursive failure path.",
+    });
+    const scheduleName = deployment.auctionRefreshScheduleName;
     const scheduleGroupArn = this.formatArn({
       service: "scheduler",
       resource: "schedule-group",
@@ -162,7 +239,12 @@ export class ForeverProfessionsDataStack extends Stack {
         },
       }),
     });
-    pricingWorker.grantInvoke(scheduleRole);
+    scheduleRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ["lambda:InvokeFunction"],
+        resources: [pricingWorker.functionArn],
+      }),
+    );
     refreshDeadLetterQueue.grantSendMessages(scheduleRole);
 
     const enableAuctionRefreshSchedule = new CfnParameter(
@@ -209,7 +291,7 @@ export class ForeverProfessionsDataStack extends Stack {
             maximumEventAgeInSeconds: 3600,
             maximumRetryAttempts: 2,
           },
-          input: JSON.stringify({ source: "forever-professions.schedule" }),
+          input: JSON.stringify({ source: deployment.auctionRefreshSource }),
         },
       },
     );
@@ -227,6 +309,9 @@ export class ForeverProfessionsDataStack extends Stack {
 
     new CfnOutput(this, "IngestionRoleArn", {
       value: ingestionRole.attrArn,
+    });
+    new CfnOutput(this, "MigrationRoleArn", {
+      value: migrationRole.attrArn,
     });
     new CfnOutput(this, "PricingWorkerFunctionName", {
       value: pricingWorker.functionName,

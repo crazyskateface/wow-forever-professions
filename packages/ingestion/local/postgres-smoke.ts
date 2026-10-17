@@ -1,17 +1,17 @@
-import { readdir, readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
 import type { ImportedBuildDataset } from "@forever-professions/contracts";
 import {
+  applySqlMigrations,
   ingestBuildDataset,
+  loadSqlMigrations,
   normalizeBuildDataset,
   SqlRecipeChangeReader,
   type RawDatasetPutInput,
   type RawDatasetPutStatus,
   type RawDatasetStore,
   type SqlExecutor,
+  type SqlMigrationRunner,
   type SqlQueryResult,
-  type TransactionRunner,
 } from "../src/index.js";
 
 const defaultConnectionUrl =
@@ -69,6 +69,7 @@ function sampleDataset(): ImportedBuildDataset {
                   inventoryType: "INVTYPE_NON_EQUIP_IGNORE",
                   clientData: {
                     displayName: "Heavy Leather",
+                    qualityId: 1,
                     requiredLevel: 0,
                     sellPriceCopper: 15,
                     source: {
@@ -192,24 +193,6 @@ class MemoryRawDatasetStore implements RawDatasetStore {
   }
 }
 
-function localizeDdl(sql: string): string {
-  return sql.replace("CREATE INDEX ASYNC IF NOT EXISTS", "CREATE INDEX IF NOT EXISTS");
-}
-
-async function applyMigrations(pool: Pool): Promise<number> {
-  const sqlDirectory = fileURLToPath(new URL("../sql/", import.meta.url));
-  const migrationFiles = (await readdir(sqlDirectory))
-    .filter((name) => name.endsWith(".sql"))
-    .sort();
-
-  for (const filename of migrationFiles) {
-    const ddl = localizeDdl(await readFile(new URL(`../sql/${filename}`, import.meta.url), "utf8"));
-    await pool.query(ddl);
-  }
-
-  return migrationFiles.length;
-}
-
 async function clearLocalRows(pool: Pool): Promise<void> {
   const client = await pool.connect();
   await client.query("BEGIN");
@@ -224,6 +207,7 @@ async function clearLocalRows(pool: Pool): Promise<void> {
     await client.query("DELETE FROM recipe_version");
     await client.query("DELETE FROM verification");
     await client.query("DELETE FROM recipe");
+    await client.query("DELETE FROM item_quality");
     await client.query("DELETE FROM item_client_data");
     await client.query("DELETE FROM item_classification");
     await client.query("DELETE FROM item");
@@ -252,8 +236,16 @@ function createSqlExecutor(client: PoolClient): SqlExecutor {
   };
 }
 
-function createLocalTransactionRunner(pool: Pool): TransactionRunner {
+function createLocalTransactionRunner(pool: Pool): SqlMigrationRunner {
   return {
+    query: async (sql, values): Promise<SqlQueryResult> => {
+      const result =
+        values === undefined ? await pool.query(sql) : await pool.query(sql, [...values]);
+      return {
+        rowCount: result.rowCount,
+        rows: result.rows as readonly Record<string, unknown>[],
+      };
+    },
     transaction: async (work) => {
       const client = await pool.connect();
       await client.query("BEGIN");
@@ -282,8 +274,9 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     comparisons: string;
     recipe_changes: string;
     item_client_data: string;
+    item_quality: string;
   }>(
-    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM item_client_data) AS item_client_data, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
+    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM item_client_data) AS item_client_data, (SELECT COUNT(*) FROM item_quality) AS item_quality, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
   );
   const row = counts.rows[0]!;
 
@@ -296,6 +289,7 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     "SELECT COUNT(*) AS count FROM recipe_comparison c LEFT JOIN wow_build b ON b.build_id = c.base_build_id LEFT JOIN wow_build t ON t.build_id = c.target_build_id WHERE b.build_id IS NULL OR t.build_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_change rc LEFT JOIN recipe_comparison c ON c.comparison_id = rc.comparison_id LEFT JOIN profession p ON p.profession_id = rc.profession_id WHERE c.comparison_id IS NULL OR p.profession_id IS NULL",
     "SELECT COUNT(*) AS count FROM item_client_data icd LEFT JOIN item i ON i.item_id = icd.item_id LEFT JOIN wow_build b ON b.build_id = icd.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
+    "SELECT COUNT(*) AS count FROM item_quality iq LEFT JOIN item i ON i.item_id = iq.item_id LEFT JOIN wow_build b ON b.build_id = iq.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
   ] as const;
   let orphanCount = 0;
   for (const orphanQuery of orphanQueries) {
@@ -314,6 +308,7 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     comparisons: Number(row.comparisons),
     recipeChanges: Number(row.recipe_changes),
     itemClientData: Number(row.item_client_data),
+    itemQualities: Number(row.item_quality),
     orphans: orphanCount,
   };
 }
@@ -327,7 +322,11 @@ async function main(): Promise<void> {
   const targetRawBytes = new TextEncoder().encode(JSON.stringify(targetDataset()));
 
   try {
-    const migrationsApplied = await applyMigrations(pool);
+    const migrations = await applySqlMigrations(transactionRunner, {
+      dialect: "postgres",
+      scope: "catalog",
+      migrations: await loadSqlMigrations(new URL("../sql/", import.meta.url)),
+    });
     await clearLocalRows(pool);
     const firstImport = await ingestBuildDataset({
       rawBytes,
@@ -403,7 +402,7 @@ async function main(): Promise<void> {
     process.stdout.write(
       `${JSON.stringify(
         {
-          migrationsApplied,
+          migrations,
           rawObjectKey: firstImport.rawObjectKey,
           rawObjectStatuses: [
             firstImport.rawObjectStatus,

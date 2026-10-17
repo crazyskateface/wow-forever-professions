@@ -5,6 +5,7 @@ import {
   healthResponseSchema,
   importedBuildDatasetSchema,
   professionFixtureSchema,
+  readinessResponseSchema,
   recipeOutputSchema,
   routeOptimizationRequestSchema,
   routeOptimizationResponseSchema,
@@ -22,6 +23,18 @@ describe("shared contracts", () => {
         timestamp: "2026-10-07T12:00:00.000Z",
       }),
     ).toBeDefined();
+  });
+
+  it("accepts ready and unavailable readiness responses", () => {
+    for (const status of ["ready", "unavailable"] as const) {
+      expect(
+        readinessResponseSchema.parse({
+          service: "forever-professions-api",
+          status,
+          timestamp: "2026-10-16T12:00:00.000Z",
+        }),
+      ).toBeDefined();
+    }
   });
 
   it("rejects unordered thresholds", () => {

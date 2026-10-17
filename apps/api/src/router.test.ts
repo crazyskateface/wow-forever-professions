@@ -2,18 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
   healthResponseSchema,
   professionFixtureSchema,
+  readinessResponseSchema,
   recipeChangesResponseSchema,
   recipeChangesSummaryResponseSchema,
   recipesResponseSchema,
   routeOptimizationResponseSchema,
   shoppingListResponseSchema,
 } from "@forever-professions/contracts";
+import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 import { leatherworkingFixture } from "@forever-professions/fixtures";
 import { routeRequest } from "./router.js";
 
 describe("fixture API router", () => {
   it("answers browser preflight for POST routes", async () => {
-    const response = await routeRequest("OPTIONS", "/api/routes/optimize");
+    const response = await routeRequest("OPTIONS", "/api/routes/optimize", {}, {
+      corsOrigin: "*",
+    });
     expect(response).toMatchObject({
       statusCode: 204,
       headers: {
@@ -25,10 +29,54 @@ describe("fixture API router", () => {
     });
   });
 
+  it("omits cross-origin headers unless an origin is explicitly configured", async () => {
+    const response = await routeRequest("GET", "/api/health");
+    expect(response.headers).not.toHaveProperty("access-control-allow-origin");
+  });
+
   it("returns a contract-valid health response", async () => {
     const response = await routeRequest("GET", "/health");
     expect(response.statusCode).toBe(200);
     expect(() => healthResponseSchema.parse(JSON.parse(response.body))).not.toThrow();
+  });
+
+  it("reports readiness without exposing dependency details", async () => {
+    let checks = 0;
+    const ready = await routeRequest("GET", "/api/ready", {}, {
+      readiness: async () => {
+        checks += 1;
+      },
+    });
+    expect(ready.statusCode).toBe(200);
+    expect(readinessResponseSchema.parse(JSON.parse(ready.body))).toMatchObject({
+      status: "ready",
+    });
+    expect(checks).toBe(1);
+
+    const unavailable = await routeRequest("GET", "/api/ready", {}, {
+      readiness: async () => {
+        throw new Error("sensitive database detail");
+      },
+    });
+    expect(unavailable.statusCode).toBe(503);
+    expect(readinessResponseSchema.parse(JSON.parse(unavailable.body))).toMatchObject({
+      status: "unavailable",
+    });
+    expect(unavailable.body).not.toContain("sensitive");
+  });
+
+  it("returns explicit errors when optional comparison and pricing dependencies are absent", async () => {
+    const changes = await routeRequest("GET", "/api/recipe-changes");
+    expect(changes.statusCode).toBe(503);
+    expect(JSON.parse(changes.body)).toEqual({
+      error: "Recipe changes are not configured.",
+    });
+
+    const markets = await routeRequest("GET", "/api/auction/markets");
+    expect(markets.statusCode).toBe(503);
+    expect(JSON.parse(markets.body)).toEqual({
+      error: "Auction pricing is not configured.",
+    });
   });
 
   it("returns fixture recipes for a known profession", async () => {
@@ -295,6 +343,23 @@ describe("fixture API router", () => {
         blockedAtSkill: 190,
         reason: "no-eligible-recipe",
       },
+    });
+
+    const aboveCap = await routeRequest(
+      "POST",
+      "/api/routes/optimize",
+      {},
+      {},
+      {
+        professionId: "leatherworking",
+        startSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
+        targetSkill: FOREVER_BUILD_CONFIG.maxBaseSkill + 1,
+        objective: "crafts",
+      },
+    );
+    expect(aboveCap.statusCode).toBe(400);
+    expect(JSON.parse(aboveCap.body)).toMatchObject({
+      error: expect.stringMatching(/base profession cap/),
     });
   });
 

@@ -9,6 +9,12 @@ export const healthResponseSchema = z.object({
   timestamp: z.iso.datetime(),
 });
 
+export const readinessResponseSchema = z.object({
+  service: z.literal("forever-professions-api"),
+  status: z.enum(["ready", "unavailable"]),
+  timestamp: z.iso.datetime(),
+});
+
 export const errorResponseSchema = z.object({
   error: z.string().min(1),
 });
@@ -145,6 +151,7 @@ export const itemClassificationSchema = z.object({
 
 export const itemClientDataSchema = z.object({
   displayName: z.string().min(1),
+  qualityId: z.number().int().nonnegative().optional(),
   equipmentSlot: z.string().min(1).optional(),
   armor: z.number().int().nonnegative().optional(),
   requiredLevel: z.number().int().nonnegative(),
@@ -658,6 +665,7 @@ export const professionsResponseSchema = z.array(professionSummarySchema);
 export const recipesResponseSchema = z.array(recipeSchema);
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
+export type ReadinessResponse = z.infer<typeof readinessResponseSchema>;
 export type AuctionMarket = z.infer<typeof auctionMarketSchema>;
 export type AuctionMarketsResponse = z.infer<typeof auctionMarketsResponseSchema>;
 export type AuctionPriceAttribution = z.infer<

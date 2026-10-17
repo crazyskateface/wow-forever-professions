@@ -26,6 +26,8 @@ data.
 ### Leveling guide
 
 - Generates a complete current-skill → target-skill route from the loaded catalog.
+- Limits normal route targets to the current Forever base profession cap of 300,
+  configured once in the shared domain package.
 - Optimizes expected crafts, material units, or stored auction cost per skill point.
 - Uses dynamic programming with configurable recipe-switch and acquisition friction.
 - Supports known-recipe selection, trainer-only mode, faction/specialization/cooldown
@@ -44,15 +46,22 @@ data.
   selection (`?recipe=<recipe-id>`).
 - Calculates difficulty, skill-up probability, expected crafts, expected reagents,
   and stored-price cost at the selected profession skill.
-- Shows the skill curve, materials, output, acquisition facts, build, provenance,
-  and verification status.
+- Shows the skill curve only through the configured base profession cap. Recipes
+  with higher imported thresholds retain and expose those raw values in a compact
+  advanced-data note instead of extending the normal progression graph.
+- Shows materials, output, acquisition facts, build, provenance, and verification
+  status. Requirements above the base cap remain visible and are flagged as unusual
+  rather than silently rewritten.
 - Uses 760 build-stamped WebP item icons. Off-screen list and change-card images are
   browser-lazy-loaded; missing assets fall back to item initials.
 - Shows catalog-backed item details after a one-second pointer hover or when the
   owning recipe control receives keyboard focus. Calculator icons can pin the
   tooltip on click and support close-button, Escape, and outside-click dismissal.
-  Imported client metadata supplies equipment slot, armor, required level, and
-  vendor sell price when those fields are available.
+  Imported client metadata supplies in-game rarity, equipment slot, armor, required
+  level, and vendor sell price when those fields are available. Item names throughout
+  the guide, catalog, calculator, changes view, route planner, shopping list, and
+  tooltips use the familiar gray, white, green, blue, and purple rarity colors.
+  Tooltips also spell out the rarity alongside the item category.
 
 ### Forever Changes
 
@@ -99,6 +108,15 @@ data.
 - Saves a Legacy profession bonus for future modeling but does not apply it until the
   underlying Forever behavior is verified.
 
+### Site information and support
+
+- Includes a shared site footer with direct links to privacy, terms, contact, and the
+  public source repository.
+- Serves readable, responsive Privacy Policy, Terms of Use, and Contact pages at
+  `/privacy`, `/terms`, and `/contact` through the existing SPA fallback.
+- Uses the public GitHub issue tracker for bug reports, data corrections, and feature
+  requests without inventing an unsupported private contact channel.
+
 ### Reproducible client-data pipeline
 
 - Converts LibProfessionDB v1.9.1 and LibItemDB v1.4.1 Lua literals without executing
@@ -110,10 +128,10 @@ data.
   `ItemSparse.ItemNameDescriptionID → ItemNameDescription`, preserving the source
   product, client build, and locale. The current Leatherworking set contains three
   `Scarce` reagents and four `Crafted` outputs from client build `1.60.1.70374`.
-- Imports build-scoped item display names, equipment slots, armor, required levels,
-  and vendor sell prices from the same pinned client. Armor is derived from the
-  client's armor-total, quality, location, and shield tables instead of guessed from
-  an item name.
+- Imports build-scoped item display names, rarity IDs, equipment slots, armor,
+  required levels, and vendor sell prices from the same pinned client. Armor is
+  derived from the client's armor-total, quality, location, and shield tables
+  instead of guessed from an item name.
 - Extracts local client icons through `wowdata`, including the equipment-appearance
   fallback path, and writes a build-stamped manifest.
 - Produces a repeatable quality audit instead of filling unknown facts with guesses.
@@ -129,8 +147,9 @@ The data is useful but not authoritative:
 - all 603 Forever recipes are still marked unverified;
 - 484 recipes have supported Forever learning ranks and 119 remain unknown;
 - 589 acquisition and availability states remain unknown;
-- 630 of 760 referenced items have client tooltip attributes; the other 130 have no
-  `ItemSparse` row in the pinned client build and remain explicitly unenriched;
+- 630 of 760 referenced items have client tooltip attributes, including rarity; the
+  other 130 have no `ItemSparse` row in the pinned client build and remain explicitly
+  unenriched;
 - 90 recipes reference at least one item missing an English name in the source
   snapshot;
 - 595 output quantities remain provisional after reviewed overrides.
@@ -205,12 +224,33 @@ pnpm typecheck                 # all workspace typechecks
 pnpm test                      # all workspace unit tests
 pnpm build                     # all packages and apps
 pnpm api:smoke                 # fixture-oriented smoke; run API without LOCAL_DATABASE_URL
+pnpm api:smoke:cloud -- <url>  # data-driven full-contract smoke through CloudFront
 pnpm api:request -- /api/health
 pnpm api:optimize -- 150 180 crafts
 pnpm api:shopping -- 33.375 cheapest  # fixture recipe IDs; fixture API only
 pnpm guide:validate               # compare the real 1–300 route with the checked-in reference
 pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
+pnpm infra:synth:staging          # strict CDK + cdk-nag validation of existing stacks
+pnpm infra:synth:production       # strict validation of isolated production stacks
+pnpm infra:synth:delivery         # validate GitHub OIDC roles and the cost guardrail
+pnpm infra:bootstrap:staging      # create the isolated staging CDK toolkit
+pnpm infra:bootstrap:production   # create the isolated production CDK toolkit
+pnpm infra:diff:staging           # requires approved non-root AWS access
+pnpm infra:diff:data:staging      # review only the stateful staging stack
+pnpm infra:deploy:data:staging    # deploy only the reviewed staging data stack
+pnpm db:migrate:dsql              # checksum-ledger catalog + pricing migrations
+pnpm db:roles:dsql                # map and verify scoped DSQL runtime roles
+pnpm infra:diff:delivery          # inspect delivery identity/budget changes
 ```
+
+Pull requests into `stage` or `main` run the pinned GitHub Actions validation workflow.
+Feature work merges into `stage`, whose successful pushes deploy staging. Production
+receives only reviewed `stage -> main` promotions; successful `main` pushes deploy the
+approval-gated production environment. Each stage uses a distinct CDK bootstrap
+qualifier, short-lived OIDC role, and stack-scoped deploy role; staging credentials
+cannot operate the production or shared delivery stacks. The repository stores no AWS
+access keys. See [ops/README.md](ops/README.md) for delivery-stack deployment,
+environment setup, and the branch-protection activation sequence.
 
 See [docs/API_TESTING.md](docs/API_TESTING.md) for every endpoint and
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for setup gotchas, ownership boundaries,
@@ -273,6 +313,7 @@ adapters.
 
 ```text
 GET  /api/health
+GET  /api/ready
 GET  /api/professions
 GET  /api/professions/:professionId
 GET  /api/professions/:professionId/recipes
@@ -287,7 +328,11 @@ POST /api/shopping-list
 
 All request and response boundaries are validated with shared contracts. Missing
 catalog, comparison, or pricing dependencies return explicit errors rather than
-fabricated data.
+fabricated data. `/api/health` is process liveness; `/api/ready` checks the configured
+database with the application-reader identity and returns only `ready` or
+`unavailable`. Production browser requests are same-origin through CloudFront, so the
+production API emits no wildcard CORS header. Staging and local development retain
+explicit wildcard CORS for testing.
 
 ## Documentation map
 
@@ -300,6 +345,12 @@ fabricated data.
 - [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md): browser-local profile fields,
   runtime behavior, trust boundary, and reset/failure handling.
 - [docs/API_TESTING.md](docs/API_TESTING.md): local and deployed endpoint testing.
+- [docs/CLOUD_DEPLOYMENT_ROADMAP.md](docs/CLOUD_DEPLOYMENT_ROADMAP.md): staged AWS
+  infrastructure, data promotion, delivery, security, rollback, and launch plan.
+- [docs/CLOUD_DEPLOYMENT_DECISIONS.md](docs/CLOUD_DEPLOYMENT_DECISIONS.md): accepted
+  cloud account, ownership, domain, tagging, budget, and recovery decisions.
+- [ops/README.md](ops/README.md): stage configuration, CDK commands, bootstrap,
+  outputs, and infrastructure security checks.
 - [data/imports/README.md](data/imports/README.md): exact imported datasets, trust
   boundary, hashes, and regeneration commands.
 - [packages/ingestion/README.md](packages/ingestion/README.md): normalization,

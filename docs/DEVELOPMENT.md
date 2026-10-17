@@ -59,6 +59,15 @@ Applications may depend on shared packages. Shared packages must not depend on a
 application. In particular, the UI never decides which recipe is optimal and the API
 never calls AH Ledger in a user request.
 
+### Profession progression cap
+
+`packages/domain/src/profession-cap.ts` owns the current Forever build's base
+profession cap. The web skill controls and probability graph, browser preferences,
+API route guard, and optimizer all consume that shared value. The cap limits normal
+user-facing progression only: imported recipe thresholds remain unchanged, and the
+pure skill-up math can still evaluate raw above-cap values for diagnostics and future
+mechanics.
+
 ## Local runtime
 
 Services use fixed local ports:
@@ -83,6 +92,12 @@ pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --c
 
 The PostgreSQL container stores its database in `tmpfs`. Stopping/removing it clears
 normalized data. Raw objects under `.local-data/` are content-addressed and persist.
+The container includes `psql`; contributors do not need a host installation. For an
+interactive local query after `pnpm db:local:up`, run:
+
+```text
+docker compose -f docker-compose.local.yml exec postgres psql -U forever_professions -d forever_professions_local
+```
 
 ### Immutable-build regeneration gotcha
 
@@ -107,7 +122,7 @@ serves the latest stored comparison of the requested comparison type.
   row ID.
 - Comparisons store Unchanged records too, allowing summaries to be reconstructed
   exactly. The UI hides them by default.
-- Enriching an item with icon, item-name-description, or tooltip metadata is not a
+- Enriching an item with icon, item-name-description, rarity, or tooltip metadata is not a
   gameplay recipe change and must not turn a recipe into Updated.
 - Forever's `Scarce` designation comes from client
   `ItemSparse.ItemNameDescriptionID → ItemNameDescription`. Do not maintain a list of
@@ -117,8 +132,8 @@ serves the latest stored comparison of the requested comparison type.
   client source product/build/locale because enrichment may come from a newer client
   than the recipe archive.
 - Tooltip records are also recipe-build scoped and retain their actual client source.
-  A missing `ItemSparse` row stays missing; do not backfill name, level, armor, or sell
-  price from another game version.
+  A missing `ItemSparse` row stays missing; do not backfill name, rarity, level, armor,
+  or sell price from another game version.
 - Missing auction prices are unavailable, never zero.
 
 ## Item assets
@@ -133,20 +148,71 @@ Every recipe, change-card, output, and reagent icon uses the shared item-tooltip
 surface. Pointer hover opens a preview after one second and leaving the owning
 control closes that preview immediately. Focusing a recipe button or change summary
 opens the same preview for keyboard users, and Escape dismisses either mode.
+Forever Changes resolves current recipes through the calculator's catalog tooltip
+payload so the same item exposes the same fields in both views; removed recipes fall
+back to the smaller comparison snapshot because no current catalog record exists.
 Calculator output and reagent icons are also buttons that pin the tooltip, move focus
 to its close control, and restore focus when the close button or Escape dismisses it;
 an outside click also closes it. Tooltip content is limited to catalog-backed item
-class, subclass, equipment slot, armor, required level, vendor sell price,
-classification, quantity, recipe, market price, and ID facts. Do not infer binding,
-quality, stats, or any other field absent from the imported data. Provisional output
-quantities must remain visibly labeled provisional.
+class, subclass, item rarity, equipment slot, armor, required level, vendor sell
+price, classification, quantity, recipe, market price, and ID facts. Do not infer
+binding, stats, or any other field absent from the imported data. Rarity comes from
+`ItemSparse.OverallQualityID`; do not derive it from an item name or icon. Visible item
+and crafted-output names use the shared `getItemRarityNameClass` helper so the guide,
+catalog, calculator, changes view, route planner, shopping list, and tooltip stay
+consistent. Missing or unsupported quality IDs inherit the surrounding text color
+instead of being guessed. Provisional output quantities must remain visibly labeled
+provisional.
 
 The converter queries the installed client with `wowdata`. It resolves `latest` once,
 then pins all DB2 and icon reads to the returned build. It joins `Item` and
-`ItemSparse` for names, item types, slots, required levels, and sell prices. Base
+`ItemSparse` for names, rarity, item types, slots, required levels, and sell prices. Base
 armor comes from `ItemArmorTotal`, `ItemArmorQuality`, and `ArmorLocation`; shields
 come from `ItemArmorShield`. Equipment without a direct `Item.IconFileDataID` falls
 back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID`.
+
+## Static site pages
+
+`apps/web/src/main.tsx` resolves `/privacy`, `/terms`, and `/contact` before mounting
+the planner. Their content and metadata live in `StaticPage.tsx`, while both the
+planner and static pages reuse `SiteFooter.tsx`. Navigation uses ordinary links so
+direct loads, refreshes, and browser history work without a client router dependency.
+CloudFront rewrites extensionless paths to `index.html` only on the default frontend
+behavior; keep that SPA fallback when changing hosting or these clean paths will fail
+on direct load. Never restore a distribution-wide 403/404 custom error response,
+because it would turn `/api/*` errors into HTML success responses.
+
+## Cloud infrastructure configuration
+
+The CDK app has typed `staging` and `production` configuration in
+`ops/lib/deployment-config.ts`. Staging deliberately preserves the existing stack
+names, SSM paths, scheduler name, and stateful logical IDs. Production uses separate
+stack names, parameters, schedules, buckets, roles, and DSQL storage in the same
+accepted account and region.
+
+Strict synthesis runs `cdk-nag`. Suppressions are construct-scoped, carry an explicit
+reason, and are emitted into CloudFormation metadata for review. Staging retains logs
+for 7 days; production retains them for 14 days. Both application and data stacks use
+termination protection.
+
+Use the root `infra:synth:*`, `infra:diff:*`, and `infra:deploy:*` commands rather than
+reconstructing CDK context by hand. The default workspace synth targets staging for
+compatibility with the existing deployment. Read `ops/README.md` for the exact stage
+mapping and bootstrap rules. Never run bootstrap, diff, or deploy through the AWS root
+identity.
+
+The independently deployed `ForeverProfessionsDelivery` stack owns the account's
+GitHub OIDC provider, immutable-repository trust policies, stage delivery roles, and
+the USD 10 monitoring budget. The roles may assume only the named modern CDK bootstrap
+roles, publish to the stage's generated site-bucket prefix, invalidate CloudFront
+distributions with matching application/stage tags, and assume the stage ingestion
+role. GitHub environment variables contain role ARNs and account metadata only; never
+replace OIDC with long-lived AWS secrets.
+
+The validation workflow uses exact action commit SHAs and the repository-pinned Node
+and pnpm versions. Keep `Verify repository` as the required `main` check after the
+workflow is published. Both GitHub environments admit only `main`, production requires
+a human approval, and AWS workflow concurrency is keyed by environment.
 
 ## Forever Changes behavior
 
@@ -224,7 +290,7 @@ misclassify that host-level temp failure as a product test failure.
   requests.
 - The add-on collection approach is deferred; the current pipeline relies on source
   archives, installed-client DB2 data, reviewed overrides, and quality reporting.
-- Aurora DSQL migrations 017–023 have not yet completed the same live revalidation as
+- Aurora DSQL migrations 017–024 have not yet completed the same live revalidation as
   migrations 001–016.
 
 ## Documentation maintenance
