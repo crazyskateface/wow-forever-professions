@@ -122,4 +122,111 @@ describe("Forever Professions stacks", () => {
     expect(outputs).toHaveProperty("MigrationRoleArn");
     expect(outputs).toHaveProperty("PricingWorkerRoleArn");
   });
+
+  it("limits the API runtime to the application reader and its exact DSQL cluster", () => {
+    const { applicationStack } = createStacks("staging");
+    const resources = Template.fromStack(applicationStack).toJSON().Resources as Record<
+      string,
+      { Type: string; Properties?: Record<string, unknown> }
+    >;
+    const functions = Object.values(resources).filter(
+      ({ Type }) => Type === "AWS::Lambda::Function",
+    );
+    const apiFunction = functions.find((resource) => {
+      const variables = (resource.Properties?.Environment as {
+        Variables?: Record<string, unknown>;
+      } | undefined)?.Variables;
+      return variables?.DATA_DATABASE_ROLE === "forever_professions_application_reader";
+    });
+    expect(apiFunction).toBeDefined();
+
+    const dsqlStatements = Object.values(resources)
+      .filter(({ Type }) => Type === "AWS::IAM::Policy")
+      .flatMap((resource) => {
+        const policyDocument = resource.Properties?.PolicyDocument as {
+          Statement?: readonly Record<string, unknown>[];
+        } | undefined;
+        return policyDocument?.Statement ?? [];
+      })
+      .filter(({ Action }) =>
+        Array.isArray(Action)
+          ? Action.includes("dsql:DbConnect")
+          : Action === "dsql:DbConnect",
+      );
+
+    expect(dsqlStatements).toHaveLength(1);
+    expect(dsqlStatements[0]).toMatchObject({
+      Action: "dsql:DbConnect",
+      Effect: "Allow",
+    });
+    expect(JSON.stringify(dsqlStatements[0]?.Resource)).toContain(
+      ":dsql:us-east-1:370979476195:cluster/",
+    );
+    expect(dsqlStatements[0]?.Resource).not.toBe("*");
+  });
+
+  it("keeps wildcard CORS in staging and removes it from production", () => {
+    const stagingResources = Template.fromStack(
+      createStacks("staging").applicationStack,
+    ).toJSON().Resources as Record<
+      string,
+      { Type: string; Properties?: Record<string, unknown> }
+    >;
+    const stagingApi = Object.values(stagingResources).find(
+      ({ Type }) => Type === "AWS::ApiGatewayV2::Api",
+    );
+    expect(stagingApi?.Properties?.CorsConfiguration).toMatchObject({
+      AllowOrigins: ["*"],
+    });
+
+    const productionResources = Template.fromStack(
+      createStacks("production").applicationStack,
+    ).toJSON().Resources as Record<
+      string,
+      { Type: string; Properties?: Record<string, unknown> }
+    >;
+    const productionApi = Object.values(productionResources).find(
+      ({ Type }) => Type === "AWS::ApiGatewayV2::Api",
+    );
+    expect(productionApi?.Properties?.CorsConfiguration).toBeUndefined();
+
+    const productionFunctions = Object.values(productionResources).filter(
+      ({ Type }) => Type === "AWS::Lambda::Function",
+    );
+    const applicationFunction = productionFunctions.find((resource) => {
+      const variables = (resource.Properties?.Environment as {
+        Variables?: Record<string, unknown>;
+      } | undefined)?.Variables;
+      return variables?.DATA_DATABASE_ROLE === "forever_professions_application_reader";
+    });
+    const variables = (applicationFunction?.Properties?.Environment as {
+      Variables?: Record<string, unknown>;
+    } | undefined)?.Variables;
+    expect(variables).not.toHaveProperty("API_CORS_ORIGIN");
+  });
+
+  it("keeps SPA rewrites out of the API behavior", () => {
+    const resources = Template.fromStack(
+      createStacks("staging").applicationStack,
+    ).toJSON().Resources as Record<
+      string,
+      { Type: string; Properties?: Record<string, unknown> }
+    >;
+    const distribution = Object.values(resources).find(
+      ({ Type }) => Type === "AWS::CloudFront::Distribution",
+    );
+    const config = distribution?.Properties?.DistributionConfig as {
+      CustomErrorResponses?: unknown;
+      DefaultCacheBehavior?: { FunctionAssociations?: unknown };
+      CacheBehaviors?: readonly {
+        PathPattern?: string;
+        FunctionAssociations?: unknown;
+      }[];
+    } | undefined;
+
+    expect(config?.CustomErrorResponses).toBeUndefined();
+    expect(config?.DefaultCacheBehavior?.FunctionAssociations).toBeDefined();
+    expect(config?.CacheBehaviors?.find(({ PathPattern }) => PathPattern === "api/*"))
+      .not.toHaveProperty("FunctionAssociations");
+  });
 });

@@ -28,7 +28,7 @@ function gh(args: string[], input?: unknown): string {
 }
 
 function api(
-  method: "GET" | "POST" | "PUT",
+  method: "DELETE" | "GET" | "POST" | "PUT",
   path: string,
   input?: unknown,
 ): string {
@@ -46,63 +46,31 @@ function api(
   return gh(args, input);
 }
 
-function ensureMainBranchPolicy(environment: string): void {
+function ensureExclusiveBranchPolicy(environment: string, branch: string): void {
   const path =
     `repos/${GITHUB_REPOSITORY}/environments/${environment}` +
     "/deployment-branch-policies";
   const current = JSON.parse(api("GET", path)) as {
-    branch_policies?: Array<{ name: string; type?: string }>;
+    branch_policies?: Array<{ id: number; name: string; type?: string }>;
   };
+  for (const policy of current.branch_policies ?? []) {
+    if (policy.name !== branch || policy.type === "tag") {
+      api("DELETE", `${path}/${policy.id}`);
+    }
+  }
   if (
     current.branch_policies?.some(
-      (policy) => policy.name === "main" && policy.type !== "tag",
+      (policy) => policy.name === branch && policy.type !== "tag",
     )
   ) {
     return;
   }
-  api("POST", path, { name: "main", type: "branch" });
+  api("POST", path, { name: branch, type: "branch" });
 }
 
-gh(["auth", "status"]);
-
-for (const delivery of DELIVERY_STAGES) {
-  const isProduction = delivery.stage === "production";
-  api("PUT", `repos/${GITHUB_REPOSITORY}/environments/${delivery.stage}`, {
-    wait_timer: 0,
-    can_admins_bypass: false,
-    prevent_self_review: false,
-    reviewers: isProduction
-      ? [{ type: "User", id: Number(GITHUB_OWNER_ID) }]
-      : [],
-    deployment_branch_policy: {
-      protected_branches: false,
-      custom_branch_policies: true,
-    },
-  });
-  ensureMainBranchPolicy(delivery.stage);
-
-  for (const [name, value] of Object.entries({
-    AWS_ACCOUNT_ID: DEPLOYMENT_ACCOUNT_ID,
-    AWS_REGION: DEPLOYMENT_REGION,
-    AWS_DEPLOY_ROLE_ARN: delivery.roleArn,
-  })) {
-    gh([
-      "variable",
-      "set",
-      name,
-      "--repo",
-      GITHUB_REPOSITORY,
-      "--env",
-      delivery.stage,
-      "--body",
-      value,
-    ]);
-  }
-}
-
-if (enableBranchProtection) {
+function protectBranch(branch: string): void {
   const checkRuns = JSON.parse(
-    api("GET", `repos/${GITHUB_REPOSITORY}/commits/main/check-runs`),
+    api("GET", `repos/${GITHUB_REPOSITORY}/commits/${branch}/check-runs`),
   ) as {
     check_runs?: Array<{
       app?: { id?: number };
@@ -118,13 +86,13 @@ if (enableBranchProtection) {
     validationCheck.conclusion !== "success"
   ) {
     throw new Error(
-      "Verify repository must complete successfully on main before branch protection can be enabled.",
+      `Verify repository must complete successfully on ${branch} before branch protection can be enabled.`,
     );
   }
 
   api(
     "PUT",
-    `repos/${GITHUB_OWNER}/${GITHUB_REPOSITORY_NAME}/branches/main/protection`,
+    `repos/${GITHUB_OWNER}/${GITHUB_REPOSITORY_NAME}/branches/${branch}/protection`,
     {
       required_status_checks: {
         strict: true,
@@ -152,6 +120,47 @@ if (enableBranchProtection) {
       allow_fork_syncing: true,
     },
   );
+}
+
+gh(["auth", "status"]);
+
+for (const delivery of DELIVERY_STAGES) {
+  const isProduction = delivery.stage === "production";
+  api("PUT", `repos/${GITHUB_REPOSITORY}/environments/${delivery.stage}`, {
+    wait_timer: 0,
+    can_admins_bypass: false,
+    prevent_self_review: false,
+    reviewers: isProduction
+      ? [{ type: "User", id: Number(GITHUB_OWNER_ID) }]
+      : [],
+    deployment_branch_policy: {
+      protected_branches: false,
+      custom_branch_policies: true,
+    },
+  });
+  ensureExclusiveBranchPolicy(delivery.stage, delivery.branch);
+
+  for (const [name, value] of Object.entries({
+    AWS_ACCOUNT_ID: DEPLOYMENT_ACCOUNT_ID,
+    AWS_REGION: DEPLOYMENT_REGION,
+    AWS_DEPLOY_ROLE_ARN: delivery.roleArn,
+  })) {
+    gh([
+      "variable",
+      "set",
+      name,
+      "--repo",
+      GITHUB_REPOSITORY,
+      "--env",
+      delivery.stage,
+      "--body",
+      value,
+    ]);
+  }
+}
+
+if (enableBranchProtection) {
+  for (const branch of ["stage", "main"]) protectBranch(branch);
 } else {
   console.log(
     "GitHub environments and variables configured. Re-run with --enable-branch-protection after the validation workflow is on GitHub.",

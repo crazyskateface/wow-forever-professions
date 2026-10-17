@@ -49,6 +49,11 @@ deterministic manual observations, so this path does not need AWS or call AH Led
 Recipe-change routes are tested separately because they require two imported builds
 and a stored comparison.
 
+`/api/health` is a process-liveness response. `/api/ready` verifies the configured
+catalog database without returning an endpoint, role, account, query, or error detail.
+The fixture and PostgreSQL-backed local servers both expose readiness; the Lambda
+readiness check runs `SELECT 1` through the application-reader connection.
+
 The smoke and shopping scripts contain fixture recipe IDs such as
 `heavy-armor-kit`; do not use them as full PostgreSQL catalog smoke tests. The imported
 catalog uses spell-based IDs such as `spell-3780`.
@@ -72,19 +77,41 @@ Keep URLs containing `&` inside single quotes in PowerShell.
 
 ## Deployed API
 
-Pass the `ApiUrl` CloudFormation output as the smoke command's first argument:
+Use the data-driven cloud smoke command with the `WebUrl` CloudFormation output. It
+discovers a real profession, recipe, market, and one-point route from the deployed
+catalog, validates every response with the shared contracts, and therefore does not
+depend on fixture-only IDs:
+
+```text
+pnpm api:smoke:cloud -- https://example.cloudfront.net
+```
+
+The command covers liveness, readiness, catalog, profession recipes, one recipe,
+Classic-to-Forever changes and summary, auction markets and prices, route
+optimization, and shopping-list planning. An empty auction market is allowed before
+the separately gated pricing schedule is enabled; pricing and shopping still must
+return contract-valid explicit unavailable/partial data.
+
+Pass the `ApiUrl` CloudFormation output to the fixture-oriented smoke command only
+when testing a fixture deployment:
 
 ```text
 pnpm api:smoke -- https://example.execute-api.us-east-1.amazonaws.com
 pnpm api:request -- /api/health https://example.execute-api.us-east-1.amazonaws.com
 ```
 
-The current development deployment can be tested through either entry point:
+The Phase 4 exit gate must use the CloudFront entry point:
 
 ```text
-pnpm api:smoke -- https://m6ulu3zwch.execute-api.us-east-1.amazonaws.com
-pnpm api:smoke -- https://d2v8wp3f4a4zkh.cloudfront.net
+pnpm api:smoke:cloud -- https://d2v8wp3f4a4zkh.cloudfront.net
 ```
+
+Direct API Gateway requests remain useful for diagnosis but do not satisfy the exit
+gate. Production intentionally has no wildcard API Gateway or Lambda CORS response;
+the browser uses same-origin `/api/*` requests through CloudFront. Staging retains
+wildcard CORS to support deliberate direct-origin testing. CloudFront's frontend-only
+viewer-request rewrite serves `index.html` for extensionless SPA routes without
+converting API `404` responses into HTML success responses.
 
 Or set it once for the current PowerShell session:
 
@@ -99,6 +126,7 @@ The deployed auction routes read Aurora DSQL. A `503` response means the API run
 
 ```text
 GET /api/health
+GET /api/ready
 GET /api/professions
 GET /api/professions/:professionId
 GET /api/professions/:professionId/recipes

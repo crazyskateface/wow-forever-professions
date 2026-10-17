@@ -22,6 +22,15 @@ isolation must therefore be enforced with distinct stack names, resource names, 
 paths, IAM roles, deployment environments, and data stores. A later move to separate
 AWS accounts must not require application changes.
 
+Git uses a matching promotion boundary: `stage` is the default integration branch and
+deploys only the staging environment. `main` is production-only and receives changes
+through reviewed `stage -> main` pull requests. The stages use independent `fpstage`
+and `fpprod` CDK bootstrap qualifiers; neither GitHub identity may assume the shared
+default bootstrap roles used to administer the delivery stack. Each identity instead
+assumes a dedicated deploy role that is limited to its two named CloudFormation stacks
+and is permitted to pass only its qualifier-specific execution role. The standard CDK
+bootstrap deploy roles are not exposed to GitHub Actions.
+
 The existing deployed stacks and their construct IDs are the staging compatibility
 boundary:
 
@@ -172,7 +181,7 @@ Recovery rules:
 
 Phase 0 is complete. The initial implementation proceeds with:
 
-1. one AWS account and region with strict staging/production naming isolation;
+1. one AWS account and region with strict staging/production naming and bootstrap-role isolation;
 2. the existing deployment preserved as staging;
 3. a separately named production environment;
 4. GitHub OIDC and a non-root operator identity as prerequisites;

@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "bootstrap": "cdk bootstrap aws://370979476195/us-east-1 --strict --termination-protection",
+    "bootstrap": "pnpm bootstrap:staging && pnpm bootstrap:production",
+    "bootstrap:staging": "cdk bootstrap aws://370979476195/us-east-1 --qualifier fpstage --toolkit-stack-name CDKToolkit-fpstage --strict --termination-protection",
+    "bootstrap:production": "cdk bootstrap aws://370979476195/us-east-1 --qualifier fpprod --toolkit-stack-name CDKToolkit-fpprod --strict --termination-protection",
     "build": "tsc -p tsconfig.json",
     "configure:github": "tsx scripts/configure-github-phase2.ts",
     "configure:github:protect": "tsx scripts/configure-github-phase2.ts --enable-branch-protection",

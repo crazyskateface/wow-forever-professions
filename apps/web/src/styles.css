@@ -303,8 +303,8 @@ button.item-tooltip-trigger-button { padding: 0; border: 0; background: transpar
 .item-quality-poor { --item-quality-color: #9d9d9d; }
 .item-quality-common { --item-quality-color: #ffffff; }
 .item-quality-uncommon { --item-quality-color: #1eff00; }
-.item-quality-rare { --item-quality-color: #4a9eff; }
-.item-quality-epic { --item-quality-color: #c06cff; }
+.item-quality-rare { --item-quality-color: #68adff; }
+.item-quality-epic { --item-quality-color: #d18aff; }
 .item-rarity-name.item-quality-poor,
 .item-rarity-name.item-quality-common,
 .item-rarity-name.item-quality-uncommon,

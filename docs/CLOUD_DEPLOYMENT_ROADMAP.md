@@ -2,7 +2,7 @@
 
 Last updated: October 16, 2026
 
-Status: Phase 3 data-plane proof complete; Phase 2 publication gate pending
+Status: Phase 4 implementation complete locally; live staging and Phase 2 publication gates pending
 
 This roadmap takes Forever Professions from the current local-development and CDK
 baseline to a repeatable production deployment in AWS. It is intentionally separate
@@ -31,8 +31,8 @@ The repository already defines two CDK stacks under `ops/`.
 | Data | Retained, versioned raw-data S3 bucket; deletion-protected Aurora DSQL; scoped migration/ingestion/runtime roles; checksum-ledger migrations; immutable raw snapshots and audited staging release | Production promotion using the exact staging-proven snapshots |
 | Pricing | ARM64 Lambda worker, EventBridge Scheduler, and DLQ | Provider credentials/configuration, production validation, alerts, and a deliberate schedule enablement |
 | API | ARM64 Lambda behind HTTP API; DSQL reader access; `/api/*` CloudFront behavior | Deployment pipeline, restricted production CORS, health/smoke checks, alarms, and release rollback procedure |
-| Web | Private, retained, versioned S3 bucket and CloudFront distribution with OAC and SPA error handling | Build upload, cache headers, invalidation, release manifest, and optional custom domain |
-| Delivery | `pnpm verify`; strict stage/delivery synth; pinned validation and OIDC-check workflows; deployed OIDC roles; protected GitHub environments; USD 10 budget | Publish the workflows, enable the required branch check, prove staging OIDC, then add staged deployment and post-deploy verification |
+| Web | Private, retained, versioned S3 bucket and CloudFront distribution with OAC and a frontend-only SPA route rewrite | Build upload, cache headers, invalidation, release manifest, and optional custom domain |
+| Delivery | `pnpm verify`; strict stage/delivery synth; pinned validation, deploy, and OIDC-check workflows; deployed OIDC roles; protected GitHub environments; `stage` integration branch; USD 10 budget | Publish the hardened workflows and isolated bootstrap roles, enable required checks on `stage` and `main`, then prove staging OIDC and deployment |
 
 The data stack is deliberately stateful and must remain independently deployable from
 the application stack. Never solve an application release problem by replacing or
@@ -129,6 +129,8 @@ Status: complete on October 16, 2026.
   do not have to reconstruct commands.
 - [x] Add `cdk-nag` checks and document any narrowly justified suppressions.
 - [x] Bootstrap every target account/region with modern CDK bootstrap resources.
+- [x] Configure independent `fpstage` and `fpprod` bootstrap qualifiers in code so
+  automation cannot inherit the shared delivery toolkit.
 
 Validation:
 
@@ -153,11 +155,14 @@ Status: implementation complete on October 16, 2026; publication gate pending.
 - [x] Add a pull-request workflow that uses the repository's pinned Node/pnpm setup,
   runs `pnpm install --frozen-lockfile`, `pnpm verify`, strict CDK synthesis, and the
   CDK security checks.
-- [ ] Configure GitHub branch protection so required validation must pass before merge.
+- [ ] Configure GitHub branch protection so required validation must pass before merge
+  into `stage` or `main`.
 - [x] Create one OIDC role per stage, restricted to this repository, its protected
   environment, and the intended branch or release ref.
-- [x] Scope each role to the CDK bootstrap deployment roles plus the exact site upload,
-  invalidation, migration, and import operations it needs.
+- [x] Scope each role to its stack-scoped deploy role, stage-qualified asset/lookup
+  roles, and the exact site upload, invalidation, migration, and import operations it
+  needs. The deploy role can operate only that environment's named stacks and pass
+  only its qualifier-specific CloudFormation execution role.
 - [x] Add GitHub `staging` and `production` environments. Require human approval for
   production.
 - [x] Create the account-level USD 10 monitoring budget with actual-spend alerts at
@@ -166,20 +171,25 @@ Status: implementation complete on October 16, 2026; publication gate pending.
 - [x] Use concurrency controls so two deployments cannot mutate the same stage at the
   same time.
 - [x] Pin action versions and keep dependency installation locked.
+- [x] Publish the freshly built web artifact to the selected stage bucket and
+  invalidate only that stage's CloudFront distribution after CDK succeeds.
 
 Implemented state: the termination-protected `ForeverProfessionsDelivery` stack owns
 the GitHub provider, immutable-repository/environment trust policies, stage roles, and
-the project budget. GitHub `staging` and `production` accept only `main`, production
-requires non-bypassable `crazyskateface` approval, and their variables contain only
+the project budget. `stage` is the integration and staging-deployment branch; `main`
+is production-only. GitHub `staging` accepts only `stage`, while `production` accepts
+only `main` and requires non-bypassable `crazyskateface` approval. Their variables contain only
 account metadata and role ARNs. Repository and environment secret inventories contain no AWS access
 keys. Current account spend was USD 23.324 when the account-level USD 10 guardrail was
 created, so its thresholds begin exceeded; the separate pre-existing USD 25 budget is
 intentionally untouched.
 
-Publication gate: commit and publish the two workflow files, let `Verify repository`
-pass once, run `pnpm infra:protect:main`, and dispatch `AWS identity check` for
-`staging`. Branch protection is intentionally not enabled before the check exists on
-GitHub, which avoids deadlocking the active pull request.
+Publication gate: publish the validation, deployment, and identity workflows plus the
+isolated `fpstage`/`fpprod` bootstrap configuration and stack-scoped deploy roles; let
+`Verify repository` pass on both long-lived branches; run
+`pnpm infra:protect:branches`; and dispatch `AWS identity check` for `staging`. Branch
+protection remains deferred until each branch has a real successful check, which
+avoids deadlocking promotion.
 
 This sequence remains a Phase 2 publication gate; it does not need to be moved into a
 later phase. The Phase 3 data plane was proven through the approved local operator
@@ -187,7 +197,7 @@ identity, but no automated staging deployment may run until this gate has passed
 
 Exit gate: **pending publication**. A pull request must prove the repository and CDK
 templates, the staging identity workflow must assume its role, and then the required
-check must be protected on `main`.
+check must be protected on both `stage` and `main`.
 
 ## Phase 3 — Prove the data plane
 
@@ -226,6 +236,11 @@ The passing machine audit and manifest are immutable objects under
 Both report 630 target client-data rows and 630 target quality rows; rerunning release
 recording returned `already-exists` for both objects.
 
+Release publication now independently derives the expected recipe, client-data,
+rarity, and `NEW`/`UPDATED`/`REMOVED`/`UNCHANGED` counts from the exact input snapshots.
+It compares all of them with persisted DSQL rows before creating immutable release
+objects, preventing an interrupted import from being certified.
+
 Exit gate: **complete**. A clean staging data stack can be migrated and populated from
 documented snapshots, the audit passes, and the release records source hashes and row
 counts.
@@ -234,15 +249,35 @@ counts.
 
 Goal: serve the production contracts from cloud data before publishing the web build.
 
+Status: implementation complete locally on October 16, 2026; deployment verification
+pending publication of the Phase 2 branch-isolation changes.
+
 - [ ] Deploy the staging application stack after the data exit gate passes.
-- [ ] Confirm the Lambda role can connect only as the intended application reader.
-- [ ] Add a lightweight health/readiness endpoint that verifies process health without
+- [x] Confirm in synthesized infrastructure that the Lambda role uses the application
+  reader and receives only `dsql:DbConnect` to the exact stage cluster.
+- [x] Add a lightweight health/readiness endpoint that verifies process health without
   leaking database or account details.
-- [ ] Restrict production CORS to the public application origin once that origin is
-  known. Do not leave wildcard CORS as the final configuration.
+- [x] Remove wildcard CORS from production. The first launch is same-origin through
+  CloudFront, so no cross-origin production allowance is required; staging remains
+  wildcard-enabled for direct-origin testing.
 - [ ] Exercise the catalog, recipe, change, route optimization, shopping-list, pricing
-  market, and pricing response contracts using `docs/API_TESTING.md`.
-- [ ] Verify failures are explicit when optional comparison or pricing data is absent.
+  market, and pricing response contracts through CloudFront using the data-driven
+  `pnpm api:smoke:cloud` command documented in `docs/API_TESTING.md`.
+- [x] Verify in API regression tests that optional comparison or pricing dependencies
+  return explicit `503` responses instead of fabricated data.
+
+Implemented readiness keeps `/api/health` as dependency-free liveness and adds
+`/api/ready` as a minimal application-reader database check. Both success and failure
+responses use a shared contract and disclose only `ready` or `unavailable`. The cloud
+smoke command selects real catalog identifiers at runtime and validates every Phase 4
+response against `packages/contracts`, avoiding the fixture IDs used by `api:smoke`.
+The frontend SPA fallback is now a default-behavior viewer-request rewrite instead of
+a distribution-wide custom error response, so API errors retain their JSON status and
+body through CloudFront.
+
+Do not deploy this uncommitted working tree manually. Publish the Phase 2 workflow and
+isolated bootstrap/deploy-role changes through the feature pull request first, then
+let the reviewed `stage` commit deploy staging and run the CloudFront smoke command.
 
 Exit gate: all smoke tests pass through the CloudFront `/api/*` behavior, not only the
 direct API Gateway URL.
@@ -413,8 +448,9 @@ This foundation slice is implemented locally and in the staging AWS account:
 4. Add a staging GitHub environment and narrowly scoped AWS OIDC deployment role.
 5. Document bootstrap and first data-stack deployment commands.
 
-The DSQL migration/import gate has now passed in staging. The next implementation work
-is Phase 4, but automated staging delivery remains blocked by the explicit Phase 2
-publication gate above. Production still waits for the later promotion, security, and
-rollback phases; Phase 3 completion does not authorize a production deployment or
-grant the production GitHub role permission to assume a production migration role.
+The DSQL migration/import gate has passed in staging, and Phase 4 application changes
+are implemented and tested locally. Their live CloudFront exit gate remains blocked by
+the explicit Phase 2 publication sequence above. Production still waits for the later
+promotion, security, and rollback phases; Phase 3 completion does not authorize a
+production deployment or grant the production GitHub role permission to assume a
+production migration role.

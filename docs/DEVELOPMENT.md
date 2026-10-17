@@ -92,6 +92,12 @@ pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --c
 
 The PostgreSQL container stores its database in `tmpfs`. Stopping/removing it clears
 normalized data. Raw objects under `.local-data/` are content-addressed and persist.
+The container includes `psql`; contributors do not need a host installation. For an
+interactive local query after `pnpm db:local:up`, run:
+
+```text
+docker compose -f docker-compose.local.yml exec postgres psql -U forever_professions -d forever_professions_local
+```
 
 ### Immutable-build regeneration gotcha
 
@@ -171,8 +177,10 @@ back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID`
 the planner. Their content and metadata live in `StaticPage.tsx`, while both the
 planner and static pages reuse `SiteFooter.tsx`. Navigation uses ordinary links so
 direct loads, refreshes, and browser history work without a client router dependency.
-The CloudFront distribution already maps 403 and 404 responses to `index.html`; keep
-that SPA fallback when changing hosting or these clean paths will fail on direct load.
+CloudFront rewrites extensionless paths to `index.html` only on the default frontend
+behavior; keep that SPA fallback when changing hosting or these clean paths will fail
+on direct load. Never restore a distribution-wide 403/404 custom error response,
+because it would turn `/api/*` errors into HTML success responses.
 
 ## Cloud infrastructure configuration
 

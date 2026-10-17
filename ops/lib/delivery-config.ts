@@ -1,4 +1,8 @@
-import { DEPLOYMENT_ACCOUNT_ID, DEPLOYMENT_REGION } from "./deployment-config";
+import {
+  DEPLOYMENT_ACCOUNT_ID,
+  DEPLOYMENT_REGION,
+  getDeploymentConfig,
+} from "./deployment-config";
 
 export const DELIVERY_STACK_NAME = "ForeverProfessionsDelivery";
 export const DELIVERY_BUDGET_NAME = "ForeverProfessions-Monthly-10-USD";
@@ -18,8 +22,14 @@ export const GITHUB_OIDC_SUBJECT_PREFIX =
 
 export interface DeliveryStageConfig {
   readonly stage: "staging" | "production";
+  readonly branch: "stage" | "main";
   readonly roleName: string;
   readonly roleArn: string;
+  readonly bootstrapQualifier: string;
+  readonly cdkBootstrapRoleArns: readonly string[];
+  readonly deploymentRoleName: string;
+  readonly deploymentRoleArn: string;
+  readonly cloudFormationExecutionRoleArn: string;
   readonly applicationStackName: string;
   readonly dataStackName: string;
   readonly siteBucketArnPattern: string;
@@ -31,11 +41,32 @@ function roleArn(roleName: string): string {
   return `arn:aws:iam::${DEPLOYMENT_ACCOUNT_ID}:role/${roleName}`;
 }
 
+function cdkBootstrapRoleArns(qualifier: string): readonly string[] {
+  return [
+    "file-publishing-role",
+    "image-publishing-role",
+    "lookup-role",
+  ].map(
+    (role) =>
+      `arn:aws:iam::${DEPLOYMENT_ACCOUNT_ID}:role/cdk-${qualifier}-${role}-${DEPLOYMENT_ACCOUNT_ID}-${DEPLOYMENT_REGION}`,
+  );
+}
+
+const staging = getDeploymentConfig("staging");
+const production = getDeploymentConfig("production");
+
 export const DELIVERY_STAGES: readonly DeliveryStageConfig[] = [
   {
     stage: "staging",
+    branch: staging.branch,
     roleName: "forever-professions-github-staging",
     roleArn: roleArn("forever-professions-github-staging"),
+    bootstrapQualifier: staging.bootstrapQualifier,
+    cdkBootstrapRoleArns: cdkBootstrapRoleArns(staging.bootstrapQualifier),
+    deploymentRoleName: staging.deploymentRoleName,
+    deploymentRoleArn: staging.deploymentRoleArn,
+    cloudFormationExecutionRoleArn:
+      staging.cloudFormationExecutionRoleArn,
     applicationStackName: "ForeverProfessions",
     dataStackName: "ForeverProfessionsData",
     siteBucketArnPattern:
@@ -47,8 +78,15 @@ export const DELIVERY_STAGES: readonly DeliveryStageConfig[] = [
   },
   {
     stage: "production",
+    branch: production.branch,
     roleName: "forever-professions-github-production",
     roleArn: roleArn("forever-professions-github-production"),
+    bootstrapQualifier: production.bootstrapQualifier,
+    cdkBootstrapRoleArns: cdkBootstrapRoleArns(production.bootstrapQualifier),
+    deploymentRoleName: production.deploymentRoleName,
+    deploymentRoleArn: production.deploymentRoleArn,
+    cloudFormationExecutionRoleArn:
+      production.cloudFormationExecutionRoleArn,
     applicationStackName: "ForeverProfessions-production",
     dataStackName: "ForeverProfessionsData-production",
     siteBucketArnPattern:
@@ -57,13 +95,3 @@ export const DELIVERY_STAGES: readonly DeliveryStageConfig[] = [
       `arn:aws:iam::${DEPLOYMENT_ACCOUNT_ID}:role/ForeverProfessionsData-production-IngestionRole-*`,
   },
 ] as const;
-
-export const CDK_BOOTSTRAP_ROLE_ARNS = [
-  "deploy-role",
-  "file-publishing-role",
-  "image-publishing-role",
-  "lookup-role",
-].map(
-  (role) =>
-    `arn:aws:iam::${DEPLOYMENT_ACCOUNT_ID}:role/cdk-hnb659fds-${role}-${DEPLOYMENT_ACCOUNT_ID}-${DEPLOYMENT_REGION}`,
-);

@@ -61,20 +61,32 @@ export class ForeverProfessionsStack extends Stack {
         "The site bucket is private and readable only through CloudFront origin access control. Viewer logging is handled at the distribution layer and is deferred to the low-cost observability phase.",
     });
 
+    const spaRouteRewrite = new cloudfront.Function(this, "SpaRouteRewrite", {
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+      code: cloudfront.FunctionCode.fromInline(`function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  if (uri !== "/" && uri.indexOf(".") === -1) {
+    request.uri = "/index.html";
+  }
+  return request;
+}`),
+    });
+
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: [
+          {
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+            function: spaRouteRewrite,
+          },
+        ],
         responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       },
       defaultRootObject: "index.html",
-      errorResponses: [403, 404].map((httpStatus) => ({
-        httpStatus,
-        responseHttpStatus: 200,
-        responsePagePath: "/index.html",
-        ttl: Duration.seconds(0),
-      })),
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
     });
     Validations.of(distribution).acknowledge({
@@ -122,6 +134,7 @@ export class ForeverProfessionsStack extends Stack {
         DSQL_ENDPOINT: dataClusterEndpoint,
         DATA_DATABASE_ROLE: "forever_professions_application_reader",
         NODE_OPTIONS: "--enable-source-maps",
+        ...(deployment.stage === "staging" ? { API_CORS_ORIGIN: "*" } : {}),
       },
     });
     Validations.of(apiFunction).acknowledge({
@@ -152,16 +165,20 @@ export class ForeverProfessionsStack extends Stack {
     });
     const api = new apigwv2.HttpApi(this, "HttpApi", {
       defaultIntegration: apiIntegration,
-      corsPreflight: {
-        allowHeaders: ["content-type"],
-        allowMethods: [
-          apigwv2.CorsHttpMethod.GET,
-          apigwv2.CorsHttpMethod.POST,
-          apigwv2.CorsHttpMethod.OPTIONS,
-        ],
-        allowOrigins: ["*"],
-        maxAge: Duration.days(1),
-      },
+      ...(deployment.stage === "staging"
+        ? {
+            corsPreflight: {
+              allowHeaders: ["content-type"],
+              allowMethods: [
+                apigwv2.CorsHttpMethod.GET,
+                apigwv2.CorsHttpMethod.POST,
+                apigwv2.CorsHttpMethod.OPTIONS,
+              ],
+              allowOrigins: ["*"],
+              maxAge: Duration.days(1),
+            },
+          }
+        : {}),
     });
     Validations.of(api).acknowledge({
       id: "AwsSolutions::AwsSolutions-APIG4",

@@ -1,3 +1,4 @@
+import { DefaultStackSynthesizer } from "aws-cdk-lib";
 import * as logs from "aws-cdk-lib/aws-logs";
 
 export const DEPLOYMENT_ACCOUNT_ID = "370979476195";
@@ -9,8 +10,14 @@ export type DeploymentStage = (typeof DEPLOYMENT_STAGES)[number];
 
 export interface DeploymentConfig {
   readonly stage: DeploymentStage;
+  readonly branch: "stage" | "main";
   readonly account: string;
   readonly region: string;
+  readonly bootstrapQualifier: string;
+  readonly bootstrapStackName: string;
+  readonly deploymentRoleName: string;
+  readonly deploymentRoleArn: string;
+  readonly cloudFormationExecutionRoleArn: string;
   readonly dataStackId: string;
   readonly dataStackName: string;
   readonly dataStackDescription: string;
@@ -33,11 +40,28 @@ const commonTags = {
   CostCenter: "personal-project",
 } as const;
 
+function roleArn(roleName: string): string {
+  return `arn:aws:iam::${DEPLOYMENT_ACCOUNT_ID}:role/${roleName}`;
+}
+
+function cloudFormationExecutionRoleArn(qualifier: string): string {
+  return roleArn(
+    `cdk-${qualifier}-cfn-exec-role-${DEPLOYMENT_ACCOUNT_ID}-${DEPLOYMENT_REGION}`,
+  );
+}
+
 const deploymentConfigs: Record<DeploymentStage, DeploymentConfig> = {
   staging: {
     stage: "staging",
+    branch: "stage",
     account: DEPLOYMENT_ACCOUNT_ID,
     region: DEPLOYMENT_REGION,
+    bootstrapQualifier: "fpstage",
+    bootstrapStackName: "CDKToolkit-fpstage",
+    deploymentRoleName: "forever-professions-cdk-deploy-staging",
+    deploymentRoleArn: roleArn("forever-professions-cdk-deploy-staging"),
+    cloudFormationExecutionRoleArn:
+      cloudFormationExecutionRoleArn("fpstage"),
     dataStackId: "ForeverProfessionsData",
     dataStackName: "ForeverProfessionsData",
     dataStackDescription: "Forever Professions retained Phase 2 data foundation",
@@ -53,8 +77,15 @@ const deploymentConfigs: Record<DeploymentStage, DeploymentConfig> = {
   },
   production: {
     stage: "production",
+    branch: "main",
     account: DEPLOYMENT_ACCOUNT_ID,
     region: DEPLOYMENT_REGION,
+    bootstrapQualifier: "fpprod",
+    bootstrapStackName: "CDKToolkit-fpprod",
+    deploymentRoleName: "forever-professions-cdk-deploy-production",
+    deploymentRoleArn: roleArn("forever-professions-cdk-deploy-production"),
+    cloudFormationExecutionRoleArn:
+      cloudFormationExecutionRoleArn("fpprod"),
     dataStackId: "ForeverProfessionsDataProduction",
     dataStackName: "ForeverProfessionsData-production",
     dataStackDescription: "Forever Professions production retained data foundation",
@@ -86,4 +117,15 @@ export function parseDeploymentStage(value: unknown): DeploymentStage {
 
 export function getDeploymentConfig(stage: DeploymentStage): DeploymentConfig {
   return deploymentConfigs[stage];
+}
+
+export function createDeploymentSynthesizer(
+  deployment: DeploymentConfig,
+): DefaultStackSynthesizer {
+  return new DefaultStackSynthesizer({
+    qualifier: deployment.bootstrapQualifier,
+    deployRoleArn: deployment.deploymentRoleArn,
+    cloudFormationExecutionRole:
+      deployment.cloudFormationExecutionRoleArn,
+  });
 }

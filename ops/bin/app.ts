@@ -4,6 +4,7 @@ import { AwsSolutionsChecks } from "cdk-nag";
 import { ForeverProfessionsDataStack } from "../lib/forever-professions-data-stack";
 import { ForeverProfessionsStack } from "../lib/forever-professions-stack";
 import {
+  createDeploymentSynthesizer,
   getDeploymentConfig,
   parseDeploymentStage,
 } from "../lib/deployment-config";
@@ -38,6 +39,7 @@ const dataStack = new ForeverProfessionsDataStack(app, deployment.dataStackId, {
   description: deployment.dataStackDescription,
   terminationProtection: true,
   deployment,
+  synthesizer: createDeploymentSynthesizer(deployment),
 });
 
 const applicationStack = new ForeverProfessionsStack(
@@ -49,6 +51,7 @@ const applicationStack = new ForeverProfessionsStack(
     description: deployment.applicationStackDescription,
     terminationProtection: true,
     deployment,
+    synthesizer: createDeploymentSynthesizer(deployment),
   },
 );
 applicationStack.addStackDependency(dataStack);

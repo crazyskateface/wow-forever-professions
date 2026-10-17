@@ -145,6 +145,12 @@ imported data or regeneration workflow.
 - Keep the shared `ForeverProfessionsDelivery` stack independent from application and
   data deployments. Preserve its immutable GitHub owner/repository IDs, exact
   environment subjects, termination protection, and monitoring-only budget.
+- Preserve the branch promotion boundary: feature pull requests target `stage`,
+  `stage` deploys only staging, and production changes arrive through a reviewed
+  `stage -> main` pull request. Never let a staging identity assume production or
+  shared-delivery CDK bootstrap roles. GitHub delivery identities may assume only
+  their environment's stack-scoped deploy role and qualifier-specific asset/lookup
+  roles; never restore access to a default or cross-environment CDK deploy role.
 - Keep GitHub Actions pinned to full commit SHAs, dependency installation frozen, and
   AWS access OIDC-only. Never add AWS access keys to repository or environment
   secrets.
@@ -188,6 +194,15 @@ Local endpoints:
 - API: `http://127.0.0.1:3001`
 - PostgreSQL: `127.0.0.1:55432`
 
+Local PostgreSQL is provided by the `postgres` service in
+`docker-compose.local.yml`. A host-installed `psql` executable is not required. When
+an interactive local SQL check is needed, use the container client after
+`pnpm db:local:up`:
+
+```text
+docker compose -f docker-compose.local.yml exec postgres psql -U forever_professions -d forever_professions_local
+```
+
 The API uses the full PostgreSQL catalog only when `LOCAL_DATABASE_URL` is set.
 Without it, the API and browser can fall back to the small illustrative fixture, and
 Forever Changes will not have a stored comparison.
@@ -208,7 +223,9 @@ Forever Changes will not have a stored comparison.
   existing commits without explicit permission.
 - Publish changes through pull requests. When the user authorizes committing and
   publishing work, create a `codex/*` feature branch, commit there, push that branch,
-  and open a pull request. Never push commits directly to `main`.
+  and open a pull request targeting `stage`. Promote the same reviewed commit to
+  production through a `stage -> main` pull request. Never push commits directly to
+  `stage` or `main`.
 
 ## Verification
 

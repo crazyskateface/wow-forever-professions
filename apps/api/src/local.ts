@@ -37,6 +37,13 @@ const server = createServer(async (request, response) => {
       ...(localCatalog === undefined ? {} : { catalog: localCatalog }),
       ...(localCatalog === undefined ? {} : { changes: localCatalog }),
       pricing: localPricingReader,
+      readiness:
+        localCatalog === undefined
+          ? async () => undefined
+          : async () => {
+              await localCatalog.listProfessions();
+            },
+      corsOrigin: "*",
     },
     await readJsonBody(request),
   );

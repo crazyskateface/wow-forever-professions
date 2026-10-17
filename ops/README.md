@@ -10,10 +10,10 @@ changing or deploying these stacks.
 `staging` is the default stage so the normal workspace `pnpm synth` gate remains
 compatible with the existing deployment.
 
-| Stage | Data stack | Application stack | DSQL parameter prefix | Log retention |
-| --- | --- | --- | --- | --- |
-| Staging | `ForeverProfessionsData` | `ForeverProfessions` | `/forever-professions/data/` | 7 days |
-| Production | `ForeverProfessionsData-production` | `ForeverProfessions-production` | `/forever-professions/production/data/` | 14 days |
+| Stage | Branch | CDK qualifier | Data stack | Application stack | DSQL parameter prefix | Log retention |
+| --- | --- | --- | --- | --- | --- | --- |
+| Staging | `stage` | `fpstage` | `ForeverProfessionsData` | `ForeverProfessions` | `/forever-professions/data/` | 7 days |
+| Production | `main` | `fpprod` | `ForeverProfessionsData-production` | `ForeverProfessions-production` | `/forever-professions/production/data/` | 14 days |
 
 The account-level `ForeverProfessionsDelivery` stack is shared by both stages. It owns
 the GitHub OIDC provider, one environment-specific GitHub role per stage, and the
@@ -35,6 +35,8 @@ Run these from the repository root:
 pnpm infra:synth:staging
 pnpm infra:synth:production
 pnpm infra:synth:delivery
+pnpm infra:bootstrap:staging
+pnpm infra:bootstrap:production
 pnpm infra:diff:staging
 pnpm infra:diff:data:staging
 pnpm infra:diff:production
@@ -69,34 +71,48 @@ modified by this stack.
 
 ## Bootstrap
 
-The accepted target is AWS account `370979476195` in `us-east-1`. Bootstrap it once
-through a non-root administrator identity:
+The accepted target is AWS account `370979476195` in `us-east-1`. Bootstrap each stage
+once through a non-root administrator identity:
 
 ```text
-pnpm infra:bootstrap
+pnpm infra:bootstrap:staging
+pnpm infra:bootstrap:production
 ```
 
-The bootstrap command enables termination protection on `CDKToolkit`. Never use the
-root login for bootstrap or deployment, and never delete the toolkit stack. GitHub
-OIDC replaces local deployment credentials in roadmap Phase 2.
+These commands create termination-protected `CDKToolkit-fpstage` and
+`CDKToolkit-fpprod` stacks. Their execution, asset-publishing, and lookup roles are
+disjoint. The delivery stack adds a separate deploy role for each stage; that role can
+operate only the two named stacks for its environment and can pass only that stage's
+CloudFormation execution role. A GitHub identity can assume its stack-scoped deploy
+role and its own qualifier's asset/lookup roles, but not the standard bootstrap deploy
+role. The pre-existing default `CDKToolkit` remains available only to the operator for
+shared delivery-stack recovery; neither GitHub stage identity can assume its
+`hnb659fds` roles. Never use the root login for bootstrap or deployment, and never
+delete a toolkit stack.
 
-Phase 1 upgraded the target to bootstrap version 32 and enabled toolkit termination
-protection on October 16, 2026. The same validation ran a live staging diff and found
-no retained-resource replacements. No application or data stack changes were deployed.
+Phase 1 upgraded the original toolkit to bootstrap version 32 and enabled termination
+protection on October 16, 2026. The stage-specific toolkits are the automation boundary;
+the original toolkit is not an application deployment path.
 
 ## GitHub delivery controls
 
 `.github/workflows/validation.yml` runs the locked install and complete `pnpm verify`
-gate for pull requests and `main`. All third-party actions are pinned to commit SHAs.
+gate for pull requests and pushes to `stage` and `main`. `.github/workflows/deploy.yml`
+repeats the full verification gate before assuming AWS access: a `stage` push selects
+the `staging` environment and a `main` push selects the approval-gated `production`
+environment. After the stage's CDK deployment succeeds, it uploads the freshly built
+web release to that stage's private site bucket and invalidates its CloudFront
+distribution. All third-party actions are pinned to commit SHAs.
 `.github/workflows/aws-identity.yml` is a manual OIDC smoke test; it receives only an
 environment role ARN, account ID, and region through GitHub environment variables.
 No AWS access key belongs in a repository or environment secret.
 
 The AWS trust policies use GitHub's immutable repository identity, including owner ID
 `936134` and repository ID `1409583896`, and an exact `staging` or `production`
-environment subject. The corresponding GitHub environments allow deployments only
-from `main`; production requires approval from `crazyskateface`, and administrators
-cannot bypass the environment rules. If the repository is
+environment subject. The staging environment accepts only `stage`; production accepts
+only `main`, requires approval from `crazyskateface`, and cannot be bypassed by
+administrators. Feature pull requests target `stage`; production promotion is a
+reviewed `stage -> main` pull request. If the repository is
 transferred or recreated, update the IDs in `lib/delivery-config.ts` and redeploy the
 delivery stack before trying OIDC again.
 
@@ -107,11 +123,11 @@ pnpm infra:configure:github
 ```
 
 Do not enable the required `Verify repository` branch check until the validation
-workflow exists on GitHub. Immediately after that workflow is published, activate
-`main` protection with:
+workflow exists on GitHub. After successful checks have run on both long-lived
+branches, protect both with:
 
 ```text
-pnpm infra:protect:main
+pnpm infra:protect:branches
 ```
 
 Then run the `AWS identity check` workflow against `staging`. Production remains
@@ -130,6 +146,19 @@ The stacks expose the values needed by later release phases:
 
 - raw-data bucket, DSQL identifier/endpoint, ingestion role, and pricing-worker role;
 - site bucket, CloudFront distribution ID/domain, API URL, and API role.
+
+The application exposes dependency-free liveness at `/api/health` and database-backed
+readiness at `/api/ready`. The readiness response never includes the DSQL endpoint,
+database role, account, SQL text, or caught error. Run the complete deployed contract
+smoke through the `WebUrl` output, not only the direct `ApiUrl`:
+
+```text
+pnpm api:smoke:cloud -- <WebUrl>
+```
+
+Staging permits wildcard CORS for direct-origin testing. Production is deliberately
+same-origin through CloudFront's `/api/*` behavior and has no wildcard API Gateway or
+Lambda CORS configuration.
 
 Do not commit `cdk-outputs*.json`; it may contain environment-specific endpoints.
 

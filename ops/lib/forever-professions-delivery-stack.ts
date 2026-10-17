@@ -11,7 +11,6 @@ import * as budgets from "aws-cdk-lib/aws-budgets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import type { Construct } from "constructs";
 import {
-  CDK_BOOTSTRAP_ROLE_ARNS,
   DELIVERY_BUDGET_LIMIT_USD,
   DELIVERY_BUDGET_NAME,
   DELIVERY_STAGES,
@@ -43,7 +42,7 @@ export class ForeverProfessionsDeliveryStack extends Stack {
     });
 
     for (const delivery of DELIVERY_STAGES) {
-      const role = new iam.Role(this, `${delivery.stage}GitHubRole`, {
+      const githubRole = new iam.Role(this, `${delivery.stage}GitHubRole`, {
         roleName: delivery.roleName,
         description: `GitHub Actions delivery role for Forever Professions ${delivery.stage}.`,
         maxSessionDuration: Duration.hours(1),
@@ -67,42 +66,148 @@ export class ForeverProfessionsDeliveryStack extends Stack {
         Owner: "crazyskateface",
         CostCenter: "personal-project",
       })) {
-        Tags.of(role).add(key, value);
+        Tags.of(githubRole).add(key, value);
       }
 
-      role.addToPolicy(
+      const deploymentRole = new iam.Role(
+        this,
+        `${delivery.stage}DeploymentRole`,
+        {
+          roleName: delivery.deploymentRoleName,
+          description: `Stack-scoped CDK deployment role for Forever Professions ${delivery.stage}.`,
+          maxSessionDuration: Duration.hours(1),
+          assumedBy: new iam.ArnPrincipal(githubRole.roleArn),
+        },
+      );
+      for (const [key, value] of Object.entries({
+        Application: "forever-professions",
+        Environment: delivery.stage,
+        ManagedBy: "aws-cdk",
+        Repository: GITHUB_REPOSITORY,
+        Owner: "crazyskateface",
+        CostCenter: "personal-project",
+      })) {
+        Tags.of(deploymentRole).add(key, value);
+      }
+
+      const stageStackArns = [
+        delivery.applicationStackName,
+        delivery.dataStackName,
+      ].map(
+        (stackName) =>
+          `arn:aws:cloudformation:${this.region}:${this.account}:stack/${stackName}/*`,
+      );
+      deploymentRole.addToPolicy(
         new iam.PolicyStatement({
-          sid: "AssumeCdkBootstrapRoles",
-          actions: ["sts:AssumeRole"],
-          resources: CDK_BOOTSTRAP_ROLE_ARNS,
+          sid: "CreateOrUpdateStageStacks",
+          actions: [
+            "cloudformation:CreateChangeSet",
+            "cloudformation:CreateStack",
+            "cloudformation:UpdateStack",
+          ],
+          resources: stageStackArns,
+          conditions: {
+            StringEquals: {
+              "cloudformation:RoleArn":
+                delivery.cloudFormationExecutionRoleArn,
+            },
+          },
+        }),
+      );
+      deploymentRole.addToPolicy(
+        new iam.PolicyStatement({
+          sid: "OperateStageStacks",
+          actions: [
+            "cloudformation:ContinueUpdateRollback",
+            "cloudformation:DeleteChangeSet",
+            "cloudformation:DeleteStack",
+            "cloudformation:DescribeChangeSet",
+            "cloudformation:DescribeStackEvents",
+            "cloudformation:DescribeStackResources",
+            "cloudformation:DescribeStacks",
+            "cloudformation:ExecuteChangeSet",
+            "cloudformation:GetTemplate",
+            "cloudformation:ListStackResources",
+            "cloudformation:RollbackStack",
+            "cloudformation:UpdateTerminationProtection",
+          ],
+          resources: stageStackArns,
+        }),
+      );
+      deploymentRole.addToPolicy(
+        new iam.PolicyStatement({
+          sid: "PassStageCloudFormationExecutionRole",
+          actions: ["iam:PassRole"],
+          resources: [delivery.cloudFormationExecutionRoleArn],
+          conditions: {
+            StringEquals: {
+              "iam:PassedToService": "cloudformation.amazonaws.com",
+            },
+          },
+        }),
+      );
+      deploymentRole.addToPolicy(
+        new iam.PolicyStatement({
+          sid: "ReadStageBootstrapMetadata",
+          actions: ["ssm:GetParameter", "ssm:GetParameters"],
+          resources: [
+            `arn:aws:ssm:${this.region}:${this.account}:parameter/cdk-bootstrap/${delivery.bootstrapQualifier}/version`,
+          ],
+        }),
+      );
+      deploymentRole.addToPolicy(
+        new iam.PolicyStatement({
+          sid: "ReadStageBootstrapAssets",
+          actions: [
+            "s3:GetBucketLocation",
+            "s3:GetEncryptionConfiguration",
+            "s3:GetObject",
+            "s3:ListBucket",
+          ],
+          resources: [
+            `arn:aws:s3:::cdk-${delivery.bootstrapQualifier}-assets-${this.account}-${this.region}`,
+            `arn:aws:s3:::cdk-${delivery.bootstrapQualifier}-assets-${this.account}-${this.region}/*`,
+          ],
+        }),
+      );
+      deploymentRole.addToPolicy(
+        new iam.PolicyStatement({
+          sid: "IdentifyDeploymentSession",
+          actions: ["sts:GetCallerIdentity"],
+          resources: ["*"],
         }),
       );
 
-      role.addToPolicy(
+      githubRole.addToPolicy(
+        new iam.PolicyStatement({
+          sid: "AssumeStageDeliveryRoles",
+          actions: ["sts:AssumeRole"],
+          resources: [
+            delivery.deploymentRoleArn,
+            ...delivery.cdkBootstrapRoleArns,
+          ],
+        }),
+      );
+
+      githubRole.addToPolicy(
         new iam.PolicyStatement({
           sid: "ReadStageStackOutputs",
           actions: [
             "cloudformation:DescribeStacks",
             "cloudformation:DescribeStackResources",
           ],
-          resources: [
-            delivery.applicationStackName,
-            delivery.dataStackName,
-          ].map(
-            (stackName) =>
-              `arn:aws:cloudformation:${this.region}:${this.account}:stack/${stackName}/*`,
-          ),
+          resources: stageStackArns,
         }),
       );
 
-      role.addToPolicy(
+      githubRole.addToPolicy(
         new iam.PolicyStatement({
           sid: "PublishStageSite",
           actions: ["s3:GetBucketLocation", "s3:ListBucket"],
           resources: [delivery.siteBucketArnPattern],
         }),
       );
-      role.addToPolicy(
+      githubRole.addToPolicy(
         new iam.PolicyStatement({
           sid: "PublishStageSiteObjects",
           actions: ["s3:DeleteObject", "s3:PutObject"],
@@ -110,7 +215,7 @@ export class ForeverProfessionsDeliveryStack extends Stack {
         }),
       );
 
-      role.addToPolicy(
+      githubRole.addToPolicy(
         new iam.PolicyStatement({
           sid: "InvalidateStageDistribution",
           actions: [
@@ -130,7 +235,7 @@ export class ForeverProfessionsDeliveryStack extends Stack {
         }),
       );
 
-      role.addToPolicy(
+      githubRole.addToPolicy(
         new iam.PolicyStatement({
           sid:
             delivery.migrationRoleArnPattern === undefined
@@ -160,15 +265,33 @@ export class ForeverProfessionsDeliveryStack extends Stack {
           : [delivery.migrationRoleArnPattern]),
       ];
       for (const resource of wildcardResources) {
-        Validations.of(role).acknowledge({
+        Validations.of(githubRole).acknowledge({
           id: `AwsSolutions::AwsSolutions-IAM5[Resource::${resource}]`,
           reason:
             "CloudFormation-generated resource IDs are not known until the stage is deployed. This wildcard is limited to a stable stack/logical-ID prefix or to tagged CloudFront distributions in exactly one stage.",
         });
       }
+      for (const resource of [
+        ...stageStackArns,
+        `arn:aws:s3:::cdk-${delivery.bootstrapQualifier}-assets-${this.account}-${this.region}/*`,
+      ]) {
+        Validations.of(deploymentRole).acknowledge({
+          id: `AwsSolutions::AwsSolutions-IAM5[Resource::${resource}]`,
+          reason:
+            "The wildcard is limited to CloudFormation-generated identifiers inside exactly one environment's named stacks or CDK asset bucket.",
+        });
+      }
+      Validations.of(deploymentRole).acknowledge({
+        id: "AwsSolutions::AwsSolutions-IAM5[Resource::*]",
+        reason:
+          "STS GetCallerIdentity does not support resource-level permissions and grants no mutation capability.",
+      });
 
       new CfnOutput(this, `${delivery.stage}GitHubRoleArn`, {
-        value: role.roleArn,
+        value: githubRole.roleArn,
+      });
+      new CfnOutput(this, `${delivery.stage}DeploymentRoleArn`, {
+        value: deploymentRole.roleArn,
       });
     }
 

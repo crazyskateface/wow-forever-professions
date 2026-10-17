@@ -1,7 +1,9 @@
+import { App, DefaultStackSynthesizer, Stack } from "aws-cdk-lib";
 import { describe, expect, it } from "vitest";
 import {
   DEPLOYMENT_ACCOUNT_ID,
   DEPLOYMENT_REGION,
+  createDeploymentSynthesizer,
   getDeploymentConfig,
   parseDeploymentStage,
 } from "../lib/deployment-config";
@@ -13,6 +15,12 @@ describe("deployment configuration", () => {
     expect(config).toMatchObject({
       account: DEPLOYMENT_ACCOUNT_ID,
       region: DEPLOYMENT_REGION,
+      branch: "stage",
+      bootstrapQualifier: "fpstage",
+      bootstrapStackName: "CDKToolkit-fpstage",
+      deploymentRoleName: "forever-professions-cdk-deploy-staging",
+      cloudFormationExecutionRoleArn:
+        "arn:aws:iam::370979476195:role/cdk-fpstage-cfn-exec-role-370979476195-us-east-1",
       dataStackId: "ForeverProfessionsData",
       dataStackName: "ForeverProfessionsData",
       applicationStackId: "ForeverProfessions",
@@ -44,6 +52,37 @@ describe("deployment configuration", () => {
       staging.auctionRefreshScheduleName,
     );
     expect(production.tags.Environment).toBe("production");
+    expect(production.branch).toBe("main");
+    expect(production.bootstrapQualifier).toBe("fpprod");
+    expect(production.bootstrapStackName).toBe("CDKToolkit-fpprod");
+    expect(production.bootstrapQualifier).not.toBe(staging.bootstrapQualifier);
+    expect(production.deploymentRoleArn).not.toBe(
+      staging.deploymentRoleArn,
+    );
+    expect(production.cloudFormationExecutionRoleArn).not.toBe(
+      staging.cloudFormationExecutionRoleArn,
+    );
+  });
+
+  it("synthesizes each stage against its isolated bootstrap resources", () => {
+    for (const stage of ["staging", "production"] as const) {
+      const deployment = getDeploymentConfig(stage);
+      const stack = new Stack(new App(), `Test${stage}`, {
+        env: { account: deployment.account, region: deployment.region },
+        synthesizer: createDeploymentSynthesizer(deployment),
+      });
+      expect(stack.synthesizer.bootstrapQualifier).toBe(
+        deployment.bootstrapQualifier,
+      );
+      expect(stack.synthesizer).toBeInstanceOf(DefaultStackSynthesizer);
+      const synthesizer = stack.synthesizer as DefaultStackSynthesizer;
+      expect(synthesizer.deployRoleArn).toBe(
+        deployment.deploymentRoleArn,
+      );
+      expect(synthesizer.cloudFormationExecutionRoleArn).toBe(
+        deployment.cloudFormationExecutionRoleArn,
+      );
+    }
   });
 
   it("rejects unknown stages instead of silently targeting staging", () => {

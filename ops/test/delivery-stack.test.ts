@@ -82,12 +82,114 @@ describe("Forever Professions delivery stack", () => {
     );
   });
 
+  it("keeps stage deployment roles disjoint from production and shared delivery", () => {
+    const { template } = createTemplate();
+    const [staging, production] = DELIVERY_STAGES;
+    expect(staging).toBeDefined();
+    expect(production).toBeDefined();
+    if (staging === undefined || production === undefined) {
+      throw new Error("Expected staging and production delivery configurations.");
+    }
+
+    expect(staging.branch).toBe("stage");
+    expect(production.branch).toBe("main");
+    expect(staging.cdkBootstrapRoleArns).not.toEqual(
+      production.cdkBootstrapRoleArns,
+    );
+    expect(staging.deploymentRoleArn).not.toBe(
+      production.deploymentRoleArn,
+    );
+    expect(staging.cloudFormationExecutionRoleArn).not.toBe(
+      production.cloudFormationExecutionRoleArn,
+    );
+    expect(
+      staging.cdkBootstrapRoleArns.some((arn) => arn.includes("hnb659fds")),
+    ).toBe(false);
+    expect(
+      production.cdkBootstrapRoleArns.some((arn) => arn.includes("hnb659fds")),
+    ).toBe(false);
+    expect(
+      DELIVERY_STAGES.flatMap((delivery) =>
+        delivery.cdkBootstrapRoleArns,
+      ).some((arn) => arn.includes("deploy-role")),
+    ).toBe(false);
+
+    for (const delivery of DELIVERY_STAGES) {
+      const stageStackArns = [
+        delivery.applicationStackName,
+        delivery.dataStackName,
+      ].map(
+        (stackName) =>
+          `arn:aws:cloudformation:${DEPLOYMENT_REGION}:${DEPLOYMENT_ACCOUNT_ID}:stack/${stackName}/*`,
+      );
+
+      template.hasResourceProperties("AWS::IAM::Role", {
+        RoleName: delivery.deploymentRoleName,
+        AssumeRolePolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: "sts:AssumeRole",
+              Principal: {
+                AWS: {
+                  "Fn::GetAtt": [
+                    Match.stringLikeRegexp(
+                      `^${delivery.stage}GitHubRole`,
+                    ),
+                    "Arn",
+                  ],
+                },
+              },
+            }),
+          ]),
+        },
+      });
+      template.hasResourceProperties("AWS::IAM::Policy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Sid: "AssumeStageDeliveryRoles",
+              Resource: [
+                delivery.deploymentRoleArn,
+                ...delivery.cdkBootstrapRoleArns,
+              ],
+            }),
+          ]),
+        },
+      });
+      template.hasResourceProperties("AWS::IAM::Policy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Sid: "CreateOrUpdateStageStacks",
+              Resource: stageStackArns,
+              Condition: {
+                StringEquals: {
+                  "cloudformation:RoleArn":
+                    delivery.cloudFormationExecutionRoleArn,
+                },
+              },
+            }),
+            Match.objectLike({
+              Sid: "PassStageCloudFormationExecutionRole",
+              Resource: delivery.cloudFormationExecutionRoleArn,
+              Condition: {
+                StringEquals: {
+                  "iam:PassedToService": "cloudformation.amazonaws.com",
+                },
+              },
+            }),
+          ]),
+        },
+      });
+    }
+  });
+
   it("uses termination protection and never grants action star", () => {
     const { stack, template } = createTemplate();
     const policies = template.findResources("AWS::IAM::Policy");
 
     expect(stack.terminationProtection).toBe(true);
-    expect(Object.values(policies)).toHaveLength(2);
+    expect(Object.values(policies)).toHaveLength(4);
     for (const policy of Object.values(policies)) {
       for (const statement of policy.Properties.PolicyDocument.Statement) {
         expect(statement.Action).not.toBe("*");

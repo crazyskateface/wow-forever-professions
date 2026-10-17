@@ -4,12 +4,17 @@ import { relative, resolve } from "node:path";
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
 import {
   auditImportedBuildDataset,
+  assertReleaseRowCounts,
+  compareRecipeBuilds,
   createAuroraDsqlTransactionRunner,
   createRawDatasetKey,
   createS3RawDatasetStore,
+  expectedReleaseRowCounts,
   INGESTION_DATABASE_ROLE,
+  normalizeBuildDataset,
   parseBuildImportScriptArguments,
   parseRawDatasetBytes,
+  persistedReleaseRowCounts,
 } from "../src/index.js";
 
 const roleArnPattern = /^arn:aws:iam::(\d{12}):role\/[A-Za-z0-9+=,.@_/-]{1,512}$/;
@@ -67,6 +72,21 @@ async function main(): Promise<void> {
   ]);
   const target = parseRawDatasetBytes(targetBytes);
   const base = parseRawDatasetBytes(baseBytes);
+  const normalizedTarget = normalizeBuildDataset(target);
+  const normalizedBase = normalizeBuildDataset(base);
+  const expectedCounts = expectedReleaseRowCounts(
+    normalizedBase,
+    normalizedTarget,
+    compareAgainst.comparisonType,
+  );
+  const expectedComparison = compareRecipeBuilds(
+    normalizedBase,
+    normalizedTarget,
+    {
+      comparisonType: compareAgainst.comparisonType,
+      includeUnchanged: true,
+    },
+  );
   const targetSha256 = sha256(targetBytes);
   const baseSha256 = sha256(baseBytes);
   const targetAudit = auditImportedBuildDataset(target);
@@ -151,12 +171,44 @@ async function main(): Promise<void> {
     );
     const countRow = counts.rows[0];
     if (countRow === undefined) throw new Error("Could not read release row counts.");
+    const persistedCounts = persistedReleaseRowCounts(countRow);
+    assertReleaseRowCounts(expectedCounts, persistedCounts);
+
+    const storedChangeCounts = await runner.query(
+      "SELECT change_type, COUNT(*) AS change_count FROM recipe_change WHERE comparison_id = $1 GROUP BY change_type ORDER BY change_type",
+      [comparison.comparison_id],
+    );
+    const expectedChangeCounts = {
+      NEW: expectedComparison.summary.new,
+      UPDATED: expectedComparison.summary.updated,
+      REMOVED: expectedComparison.summary.removed,
+      UNCHANGED: expectedComparison.summary.unchanged,
+    } as const;
+    const persistedChangeCounts = Object.fromEntries(
+      storedChangeCounts.rows.map((row) => [
+        String(row.change_type),
+        Number(row.change_count),
+      ]),
+    );
+    for (const [changeType, expectedCount] of Object.entries(expectedChangeCounts)) {
+      if (persistedChangeCounts[changeType] !== expectedCount) {
+        throw new Error(
+          `Persisted ${changeType} comparison count is incomplete or inconsistent: expected ${expectedCount}, found ${persistedChangeCounts[changeType] ?? 0}.`,
+        );
+      }
+    }
 
     const auditDocument = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       status: "passed",
       blockingFindings: 0,
       reports: { base: baseAudit, target: targetAudit },
+      persistence: {
+        expectedRowCounts: expectedCounts,
+        persistedRowCounts: persistedCounts,
+        expectedChangeCounts,
+        persistedChangeCounts,
+      },
     } as const;
     const auditBytes = jsonBytes(auditDocument);
     const auditSha256 = sha256(auditBytes);
@@ -167,6 +219,7 @@ async function main(): Promise<void> {
       targetSha256,
       comparisonType: compareAgainst.comparisonType,
       auditSha256,
+      validatedRowCounts: persistedCounts,
       migrations,
     };
     const releaseId = sha256(JSON.stringify(releaseIdentity)).slice(0, 32);
@@ -202,11 +255,7 @@ async function main(): Promise<void> {
         createdAt: isoTimestamp(comparison.created_at),
       },
       rowCounts: {
-        baseRecipes: Number(countRow.base_recipes),
-        targetRecipes: Number(countRow.target_recipes),
-        recipeChanges: Number(countRow.recipe_changes),
-        targetClientItems: Number(countRow.target_client_items),
-        targetQualityItems: Number(countRow.target_quality_items),
+        ...persistedCounts,
       },
       audit: { status: "passed", sha256: auditSha256, objectKey: auditObjectKey },
     } as const;

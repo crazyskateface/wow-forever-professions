@@ -224,6 +224,7 @@ pnpm typecheck                 # all workspace typechecks
 pnpm test                      # all workspace unit tests
 pnpm build                     # all packages and apps
 pnpm api:smoke                 # fixture-oriented smoke; run API without LOCAL_DATABASE_URL
+pnpm api:smoke:cloud -- <url>  # data-driven full-contract smoke through CloudFront
 pnpm api:request -- /api/health
 pnpm api:optimize -- 150 180 crafts
 pnpm api:shopping -- 33.375 cheapest  # fixture recipe IDs; fixture API only
@@ -232,6 +233,8 @@ pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/impor
 pnpm infra:synth:staging          # strict CDK + cdk-nag validation of existing stacks
 pnpm infra:synth:production       # strict validation of isolated production stacks
 pnpm infra:synth:delivery         # validate GitHub OIDC roles and the cost guardrail
+pnpm infra:bootstrap:staging      # create the isolated staging CDK toolkit
+pnpm infra:bootstrap:production   # create the isolated production CDK toolkit
 pnpm infra:diff:staging           # requires approved non-root AWS access
 pnpm infra:diff:data:staging      # review only the stateful staging stack
 pnpm infra:deploy:data:staging    # deploy only the reviewed staging data stack
@@ -240,11 +243,14 @@ pnpm db:roles:dsql                # map and verify scoped DSQL runtime roles
 pnpm infra:diff:delivery          # inspect delivery identity/budget changes
 ```
 
-Pull requests and `main` run the repository's pinned GitHub Actions validation
-workflow. AWS automation uses protected GitHub environments and short-lived OIDC
-sessions; the repository does not store AWS access keys. See
-[ops/README.md](ops/README.md) for delivery-stack deployment, environment setup, and
-the branch-protection activation sequence.
+Pull requests into `stage` or `main` run the pinned GitHub Actions validation workflow.
+Feature work merges into `stage`, whose successful pushes deploy staging. Production
+receives only reviewed `stage -> main` promotions; successful `main` pushes deploy the
+approval-gated production environment. Each stage uses a distinct CDK bootstrap
+qualifier, short-lived OIDC role, and stack-scoped deploy role; staging credentials
+cannot operate the production or shared delivery stacks. The repository stores no AWS
+access keys. See [ops/README.md](ops/README.md) for delivery-stack deployment,
+environment setup, and the branch-protection activation sequence.
 
 See [docs/API_TESTING.md](docs/API_TESTING.md) for every endpoint and
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for setup gotchas, ownership boundaries,
@@ -307,6 +313,7 @@ adapters.
 
 ```text
 GET  /api/health
+GET  /api/ready
 GET  /api/professions
 GET  /api/professions/:professionId
 GET  /api/professions/:professionId/recipes
@@ -321,7 +328,11 @@ POST /api/shopping-list
 
 All request and response boundaries are validated with shared contracts. Missing
 catalog, comparison, or pricing dependencies return explicit errors rather than
-fabricated data.
+fabricated data. `/api/health` is process liveness; `/api/ready` checks the configured
+database with the application-reader identity and returns only `ready` or
+`unavailable`. Production browser requests are same-origin through CloudFront, so the
+production API emits no wildcard CORS header. Staging and local development retain
+explicit wildcard CORS for testing.
 
 ## Documentation map
 
