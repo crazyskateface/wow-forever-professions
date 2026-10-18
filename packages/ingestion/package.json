@@ -16,6 +16,7 @@
     "import:local": "tsx scripts/import-local.ts",
     "migrate:dsql": "tsx scripts/migrate-dsql.ts",
     "release:dsql": "tsx scripts/release-dsql.ts",
+    "status:local": "tsx scripts/status-local.ts",
     "test": "vitest run",
     "test:dsql": "tsx scripts/dsql-smoke.ts",
     "test:local-db": "tsx local/postgres-smoke.ts",

@@ -64,10 +64,24 @@ timeout_seconds = 2400
 commands = [["pnpm", "verify"]]
 
 [[jobs]]
+id = "update-latest-local-catalog"
+name = "Update latest local catalog"
+description = "Check for newer compatible sources, regenerate changed snapshots, and import only when the exact local catalog is missing or outdated."
+category = "Data"
+working_directory = "."
+timeout_seconds = 5400
+required_environment = ["WOW_CLIENT_ROOT"]
+confirmation = "This runs the complete local data update in order and stops at the first failed step. It skips database imports when the exact Classic and Forever hashes and comparison are already present. When an import is needed, it recreates the disposable local database and loads both snapshots in comparison order."
+commands = [
+  ["${ADMIN_PYTHON}", "-m", "forever_admin.source_refresh", "refresh"],
+  ["${ADMIN_PYTHON}", "-m", "forever_admin.local_catalog_sync"],
+]
+
+[[jobs]]
 id = "audit-current-data"
 name = "Audit current data snapshots"
 description = "Regenerate both checked-in quality reports from the current Classic and Forever snapshots."
-category = "Data"
+category = "Data tools"
 working_directory = "."
 timeout_seconds = 900
 commands = [
@@ -79,7 +93,7 @@ commands = [
 id = "check-source-releases"
 name = "Check for newer source data"
 description = "Check CurseForge for the latest stable LibProfessionDB and LibItemDB releases compatible with both pinned game versions without changing files."
-category = "Data"
+category = "Data tools"
 working_directory = "."
 timeout_seconds = 120
 commands = [["${ADMIN_PYTHON}", "-m", "forever_admin.source_refresh", "check"]]
@@ -88,7 +102,7 @@ commands = [["${ADMIN_PYTHON}", "-m", "forever_admin.source_refresh", "check"]]
 id = "refresh-source-snapshots"
 name = "Fetch and generate latest source data"
 description = "Download the latest compatible stable sources, then regenerate and audit snapshots only when a source file ID has changed."
-category = "Data"
+category = "Data tools"
 working_directory = "."
 timeout_seconds = 3600
 required_environment = ["WOW_CLIENT_ROOT"]
@@ -99,7 +113,7 @@ commands = [["${ADMIN_PYTHON}", "-m", "forever_admin.source_refresh", "refresh"]
 id = "start-local-database"
 name = "Start local PostgreSQL"
 description = "Start the existing Docker Compose PostgreSQL service and wait for it to become healthy."
-category = "Local"
+category = "Local tools"
 working_directory = "."
 timeout_seconds = 180
 commands = [["pnpm", "db:local:up"]]
@@ -108,7 +122,7 @@ commands = [["pnpm", "db:local:up"]]
 id = "import-current-local-catalog"
 name = "Import current catalog locally"
 description = "Import the Classic baseline, then the current Forever snapshot and stored comparison into disposable local PostgreSQL."
-category = "Local"
+category = "Local tools"
 working_directory = "."
 timeout_seconds = 1800
 confirmation = "This writes both current snapshots to the disposable local PostgreSQL catalog. A same-build hash conflict requires resetting that local database."
@@ -121,7 +135,7 @@ commands = [
 id = "test-local-database"
 name = "Test local database"
 description = "Run the repository's isolated local PostgreSQL ingestion smoke test."
-category = "Local"
+category = "Local tools"
 working_directory = "."
 timeout_seconds = 900
 commands = [["pnpm", "db:local:test"]]

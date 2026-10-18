@@ -9,12 +9,27 @@ import pytest
 from forever_admin import source_refresh
 from forever_admin.source_refresh import (
     PROJECTS,
+    SourceRelease,
     SourceRefreshError,
+    describe_current_versions,
+    describe_version_changes,
     resolve_wow_client_root,
     safe_extract,
     select_latest_release,
     without_client_enrichment,
 )
+
+
+def _release(project_index: int, file_id: int, version: str) -> SourceRelease:
+    project = PROJECTS[project_index]
+    return SourceRelease(
+        projectId=project.project_id,
+        fileId=file_id,
+        version=version,
+        displayName=f"release-{version}",
+        fileName=f"release-{version}.zip",
+        pageUrl=f"https://example.test/{file_id}",
+    )
 
 
 def test_select_latest_release_uses_newest_stable_compatible_archive() -> None:
@@ -52,6 +67,24 @@ def test_select_latest_release_uses_newest_stable_compatible_archive() -> None:
     assert release.fileId == 10
     assert release.version == "v1.9.1"
     assert release.pageUrl.endswith("/files/10")
+
+
+def test_version_change_summary_reports_only_changed_source_files() -> None:
+    current = {
+        "professionDb": {"fileId": 10, "version": "v1.9.1"},
+        "itemDb": {"fileId": 20, "version": "v1.4.1"},
+    }
+    releases = {
+        "professionDb": _release(0, 10, "v1.9.1"),
+        "itemDb": _release(1, 30, "v1.6.0"),
+    }
+
+    assert describe_version_changes(current, releases) == (
+        "LibItemDB v1.4.1 -> v1.6.0",
+    )
+    assert describe_current_versions(releases) == (
+        "LibProfessionDB v1.9.1; LibItemDB v1.6.0"
+    )
 
 
 def test_safe_extract_replaces_destination(tmp_path: Path) -> None:

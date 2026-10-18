@@ -20,6 +20,7 @@
     "data:enrich:client": "pnpm --filter @forever-professions/ingestion enrich:client-data",
     "data:import": "pnpm --filter @forever-professions/ingestion import:client-data",
     "data:import:local": "pnpm --filter @forever-professions/ingestion import:local",
+    "data:status:local": "pnpm --filter @forever-professions/ingestion status:local",
     "data:release:dsql": "pnpm --filter @forever-professions/ingestion release:dsql",
     "guide:validate": "pnpm --filter @forever-professions/api validate:guide",
     "infra:bootstrap": "pnpm --filter @forever-professions/ops bootstrap",

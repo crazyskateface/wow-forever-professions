@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
@@ -49,6 +50,14 @@ _JOB_COLORS = {
 }
 
 _AWS_LOGIN_JOB_ID = "aws-login"
+_SOURCE_JOB_IDS = frozenset(
+    {
+        "check-source-releases",
+        "refresh-source-snapshots",
+        "update-latest-local-catalog",
+    }
+)
+_SOURCE_VERSION_PREFIX = "Source version status:"
 
 
 def _format_time(value: datetime | None) -> str:
@@ -387,6 +396,81 @@ def _render_job_history(history: list[JobExecution], limit: int = 6) -> None:
             _status_badge(execution.status)
 
 
+def _source_version_summary(execution: JobExecution | None) -> str | None:
+    if execution is None:
+        return None
+    for line in reversed(execution.output):
+        if line.text.startswith(_SOURCE_VERSION_PREFIX):
+            return line.text.removeprefix(_SOURCE_VERSION_PREFIX).strip()
+    return None
+
+
+def _source_version_rows(runtime: DashboardRuntime) -> tuple[tuple[str, str], ...]:
+    path = runtime.config.app.repo_root / "data" / "imports" / "source-releases.json"
+    try:
+        projects = json.loads(path.read_text(encoding="utf-8"))["projects"]
+        return tuple(
+            (
+                label,
+                f"{projects[key]['version']} · file {projects[key]['fileId']}",
+            )
+            for key, label in (
+                ("professionDb", "LibProfessionDB"),
+                ("itemDb", "LibItemDB"),
+            )
+        )
+    except (OSError, KeyError, TypeError, json.JSONDecodeError):
+        return ()
+
+
+def _render_source_version_card(runtime: DashboardRuntime) -> None:
+    rows = _source_version_rows(runtime)
+    latest = next(
+        (execution for execution in runtime.jobs.history if execution.job_id in _SOURCE_JOB_IDS),
+        None,
+    )
+    summary = _source_version_summary(latest)
+    with ui.card().classes("section-card w-full"):
+        with ui.row().classes("w-full items-start gap-3"):
+            with ui.column().classes("gap-1"):
+                ui.label("Source data versions").classes("section-title")
+                ui.label(
+                    "Pinned releases used to generate the local import snapshots."
+                ).classes("text-sm text-slate-400")
+            ui.space()
+            if latest and latest.status is JobState.RUNNING:
+                ui.badge("CHECKING", color="primary")
+            elif summary:
+                if summary.startswith("changed"):
+                    ui.badge("UPDATED", color="positive")
+                elif summary.startswith("update available"):
+                    ui.badge("UPDATE AVAILABLE", color="warning")
+                else:
+                    ui.badge("UNCHANGED", color="positive")
+            elif latest and latest.status in {JobState.FAILED, JobState.TIMED_OUT}:
+                ui.badge("FAILED", color="negative")
+            else:
+                ui.badge("NOT CHECKED", color="grey")
+        if rows:
+            with ui.row().classes("w-full gap-8"):
+                for label, value in rows:
+                    with ui.column().classes("gap-0"):
+                        ui.label(label).classes("text-xs uppercase tracking-wider text-slate-500")
+                        ui.label(value).classes("font-medium")
+        else:
+            ui.label("The source release lock could not be read.").classes("warning-callout")
+        if summary:
+            ui.label(summary).classes("text-sm text-slate-300")
+        elif latest and latest.status in {JobState.FAILED, JobState.TIMED_OUT}:
+            ui.label(
+                "The workflow stopped before it could report a completed source-version result."
+            ).classes("error-callout")
+        else:
+            ui.label("Run the update workflow to check for a newer compatible release.").classes(
+                "text-xs text-slate-500"
+            )
+
+
 def _render_log_entry(entry: LogEntry) -> None:
     color = {"CRITICAL": "negative", "ERROR": "negative", "WARN": "warning"}.get(entry.level, "grey")
     summary = entry.message.splitlines()[0][:180]
@@ -526,6 +610,7 @@ def register_pages(runtime: DashboardRuntime) -> None:
                         ui.label("Commands are predefined in admin/config.toml and execute without a shell.").classes("page-subtitle")
                     ui.space()
                     ui.label(f"{len(runtime.config.jobs)} registered jobs").classes("text-sm text-slate-500")
+                _render_source_version_card(runtime)
                 grouped: dict[str, list[Any]] = defaultdict(list)
                 for job in runtime.config.jobs:
                     grouped[job.category].append(job)

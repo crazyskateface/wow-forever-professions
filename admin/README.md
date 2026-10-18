@@ -56,21 +56,38 @@ stay inside this repository, and UI users cannot enter arbitrary commands.
 The checked-in catalog includes real jobs for the repository's current commands:
 
 - `pnpm verify`;
-- source-release checks, automatic downloads, data audit, and snapshot regeneration;
-- local PostgreSQL startup, import, and smoke tests;
+- a one-click local catalog update that refreshes compatible source releases and
+  imports only when the exact local catalog is missing or outdated;
+- granular source-release, local database, import, and smoke-test tools;
 - staging and production CDK diffs and guarded deploys;
 - staging and production DSQL migration, role setup, import, and release verification.
 
 Set `WOW_CLIENT_ROOT` once in `.env.admin`; the panel uses the installed client for
-metadata and icon enrichment. **Check for newer source data** is read-only. **Fetch
-and generate latest source data** queries the public CurseForge metadata for the
-latest stable LibProfessionDB and LibItemDB releases compatible with both pinned game
-versions, downloads them to the ignored `.local-data/admin-sources` cache, and does
-nothing when the pinned file IDs are already current. When a release changed, it runs
-the existing converters and audits and records the source URL, version, and SHA-256 in
-`data/imports/source-releases.json` and the normal attribution files. It never imports
-or publishes the generated snapshots; those remain separate confirmed jobs so the Git
-diff can be reviewed first.
+metadata and icon enrichment. **Update latest local catalog** is the normal local data
+workflow. One confirmation runs these guarded steps in order:
+
+1. query the public CurseForge metadata for the latest stable LibProfessionDB and
+   LibItemDB releases compatible with both pinned game versions;
+2. download and regenerate snapshots only when a pinned source file ID changed;
+3. start local PostgreSQL and compare its imported build hashes with both exact files;
+4. when either hash or the stored comparison is missing or outdated, recreate the
+   disposable database and import Classic followed by Forever.
+
+The runner stops immediately when any step fails, so a failed refresh cannot be
+followed by a database check or import. When both exact snapshots and their comparison
+are already present, it skips the reset and both imports. Classic is loaded again only
+when a fresh database is required: the comparison needs its baseline, and imported
+build rows are intentionally immutable. Although the Classic game build is fixed, an
+upstream source release can still correct the extracted Classic snapshot. The Jobs
+page shows the pinned version and file ID for both source libraries, plus whether the
+latest source operation found an update, completed an update, or was unchanged.
+
+The separate jobs under **Data tools** and **Local tools** remain available for
+diagnostics. Source downloads are cached under ignored
+`.local-data/admin-sources`. Successful regeneration records the source URL, version,
+and SHA-256 in `data/imports/source-releases.json` and the normal attribution files.
+Staging and production publication remain separate confirmed jobs so the generated
+Git diff can be reviewed before deployment.
 
 To add another trusted operation, copy an existing `[[jobs]]` entry, use a unique
 lowercase ID, list literal argument arrays, and add `confirmation` for anything that

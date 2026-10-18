@@ -63,6 +63,28 @@ PROJECTS = (
 )
 
 
+def describe_version_changes(
+    current: dict[str, Any],
+    releases: dict[str, SourceRelease],
+) -> tuple[str, ...]:
+    changes: list[str] = []
+    for project in PROJECTS:
+        pinned = current.get(project.key, {})
+        release = releases[project.key]
+        if int(pinned.get("fileId", 0)) == release.fileId:
+            continue
+        previous = str(pinned.get("version", "unknown"))
+        changes.append(f"{project.label} {previous} -> {release.version}")
+    return tuple(changes)
+
+
+def describe_current_versions(releases: dict[str, SourceRelease]) -> str:
+    return "; ".join(
+        f"{project.label} {releases[project.key].version}"
+        for project in PROJECTS
+    )
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -203,7 +225,11 @@ def resolve_wow_client_root(value: str) -> Path:
     )
 
 
-def _run(arguments: list[str], environment: dict[str, str]) -> None:
+def _run(
+    arguments: list[str],
+    environment: dict[str, str],
+    allowed_return_codes: tuple[int, ...] = (0,),
+) -> int:
     print(f"Running: {' '.join(arguments)}", flush=True)
     executable = shutil.which(arguments[0], path=environment.get("PATH"))
     if executable is None:
@@ -216,10 +242,11 @@ def _run(arguments: list[str], environment: dict[str, str]) -> None:
         result = subprocess.run(resolved_arguments, cwd=REPO_ROOT, env=environment, check=False)
     except OSError as error:
         raise SourceRefreshError(f"Could not start {executable}: {error}") from error
-    if result.returncode != 0:
+    if result.returncode not in allowed_return_codes:
         raise SourceRefreshError(
             f"Command failed with exit code {result.returncode}: {' '.join(arguments)}"
         )
+    return result.returncode
 
 
 def without_client_enrichment(environment: dict[str, str]) -> dict[str, str]:
@@ -294,6 +321,7 @@ def refresh_sources(force: bool = False) -> int:
     if not isinstance(current, dict) or not isinstance(targets, dict):
         raise SourceRefreshError(f"Invalid source release configuration in {SOURCE_LOCK}.")
     releases = _latest_releases()
+    version_changes = describe_version_changes(current, releases)
     changed = [
         key
         for key, release in releases.items()
@@ -301,6 +329,7 @@ def refresh_sources(force: bool = False) -> int:
     ]
     if not changed and not force:
         print("Source snapshots are already pinned to the latest compatible releases; nothing changed.")
+        print(f"Source version status: unchanged — {describe_current_versions(releases)}.")
         return 0
     print(f"Updating source releases: {', '.join(changed) if changed else 'forced refresh'}", flush=True)
     roots: dict[str, Path] = {}
@@ -381,6 +410,14 @@ def refresh_sources(force: bool = False) -> int:
     source_lock["projects"] = {key: asdict(value) for key, value in completed.items()}
     SOURCE_LOCK.write_text(f"{json.dumps(source_lock, indent=2)}\n", encoding="utf-8")
     print("Latest compatible sources were downloaded, converted, audited, and recorded.", flush=True)
+    if version_changes:
+        print(f"Source version status: changed — {'; '.join(version_changes)}.", flush=True)
+    else:
+        print(
+            f"Source version status: unchanged — forced regeneration of "
+            f"{describe_current_versions(releases)}.",
+            flush=True,
+        )
     print("Review the Git diff before importing or publishing the regenerated snapshots.", flush=True)
     return 0
 
@@ -393,6 +430,11 @@ def check_sources() -> int:
         pinned = current.get(key, {}) if isinstance(current, dict) else {}
         state = "current" if pinned.get("fileId") == release.fileId else "update available"
         print(f"{release.displayName}: {state}", flush=True)
+    changes = describe_version_changes(current if isinstance(current, dict) else {}, releases)
+    if changes:
+        print(f"Source version status: update available — {'; '.join(changes)}.", flush=True)
+    else:
+        print(f"Source version status: unchanged — {describe_current_versions(releases)}.", flush=True)
     return 0
 
 

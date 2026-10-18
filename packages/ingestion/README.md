@@ -64,6 +64,12 @@ pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
 pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
 ```
 
+The local admin dashboard first runs `pnpm data:status:local <classic.json>
+<forever.json>`. This checks the exact raw SHA-256 values in `wow_build` and verifies
+that the Classic-to-Forever comparison exists. A current catalog skips both imports.
+A missing or mismatched catalog is disposable and must be recreated before importing
+Classic and Forever in the order above; existing build rows are never rewritten.
+
 The full converter already performs client-data enrichment when the WoW installation root
 is supplied. When the addon archives are unchanged and only the pinned client metadata needs
 to be refreshed, run the narrower command before auditing and importing:

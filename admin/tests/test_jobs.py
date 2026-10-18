@@ -77,6 +77,35 @@ def test_successful_and_failed_execution(tmp_path: Path) -> None:
         assert any(line.stream == "stderr" and line.text == "failed" for line in second.output)
 
     asyncio.run(scenario())
+
+
+def test_failed_step_prevents_later_commands_from_running(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        job = JobDefinition(
+            id="chain",
+            name="chain",
+            description="test chain",
+            commands=(
+                (str(Path(sys.executable).resolve()), "-c", "import sys; sys.exit(9)"),
+                (
+                    str(Path(sys.executable).resolve()),
+                    "-c",
+                    "from pathlib import Path; Path('later-ran').write_text('bad')",
+                ),
+            ),
+        )
+        executor = JobExecutor((job,), _policy(tmp_path))
+
+        execution = await executor.start(job.id)
+        execution = await executor.wait(execution.execution_id)
+
+        assert execution.status is JobState.FAILED
+        assert execution.current_step == 1
+        assert not (tmp_path / "later-ran").exists()
+
+    asyncio.run(scenario())
+
+
 def test_job_timeout(tmp_path: Path) -> None:
     async def scenario() -> None:
         job = _job("slow", "import time; time.sleep(5)", timeout=0.1)

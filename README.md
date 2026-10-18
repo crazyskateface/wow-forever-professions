@@ -189,9 +189,13 @@ Copy-Item .env.admin.example .env.admin
 
 See [`admin/README.md`](admin/README.md) for job registration, source configuration,
 AWS permissions, and troubleshooting. The dashboard never runs imports or deploys at
-startup; data-writing jobs require confirmation. Its source-data jobs can check for
-and download newer compatible LibProfessionDB and LibItemDB releases automatically,
-while import and publication remain separate reviewable operations.
+startup; data-writing jobs require confirmation. **Update latest local catalog**
+checks for newer compatible LibProfessionDB and LibItemDB releases, regenerates only
+when a source file ID changed, and checks the exact hashes already loaded in local
+PostgreSQL. It skips imports when the catalog is current; otherwise it recreates the
+disposable database and imports Classic followed by Forever in one fail-fast workflow.
+The Jobs page reports the pinned source versions and whether that operation changed
+them. Staging and production publication remain separate reviewable operations.
 
 ## Full local start
 
