@@ -57,6 +57,6 @@ export function assessDataQuality(
     label: "Unverified",
     authoritative: false,
     explanation:
-      "This data has not yet been independently verified for World of Warcraft: Forever.",
+      "This data has not yet been independently verified for WoW Forever.",
   };
 }

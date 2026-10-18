@@ -40,6 +40,7 @@ import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
 import { SiteFooter } from "./SiteFooter.js";
+import { ChevronDownIcon, SearchIcon } from "./UiIcons.js";
 import {
   getItemRarityNameClass,
   hasProvisionalOutputQuantity,
@@ -390,7 +391,7 @@ function SkillChart({
     <div className="chart-wrap">
       <div className="chart-heading">
         <strong>Success rate by skill</strong>
-        <span className="chart-live">Current · {skill}</span>
+        <span className="chart-live">Current: {skill}</span>
       </div>
       <svg
         aria-label={`Skill-up chance curve for ${recipe.name}, ending at skill ${chart.endSkill}`}
@@ -457,10 +458,6 @@ export function App() {
   const [recipeId, setRecipeId] = useState(leatherworkingFixture.recipes[0]!.id);
   const recipe =
     profession.recipes.find(({ id }) => id === recipeId) ?? profession.recipes[0]!;
-  const recipeQuality = assessDataQuality(
-    recipe.provenance.source,
-    recipe.provenance.verification.status,
-  );
   const nonAuthoritativeRecipeCount = profession.recipes.filter(
     (candidate) =>
       !assessDataQuality(
@@ -978,8 +975,7 @@ export function App() {
     ].sort(),
     [markets, region],
   );
-  const selectedMarket = markets.find(({ id }) => id === marketId);
-  const marketLabel = selectedMarket?.label ?? marketId;
+  const profileLabel = `${region.toUpperCase()} - ${faction === "horde" ? "Horde" : "Alliance"}`;
 
   function invalidateShoppingResults(): void {
     shoppingRequestGuardRef.current.invalidate();
@@ -1175,27 +1171,34 @@ export function App() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-workspace">Skip to workspace</a>
+      <header className="brand-masthead" aria-labelledby="site-title">
+        <div className="masthead-content">
+          <p className="masthead-title" id="site-title">Forever Professions</p>
+          <p className="masthead-tagline">A fan-made crafting planner for WoW Forever players</p>
+        </div>
+      </header>
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="Forever Professions home">
-          <span className="brand-mark" aria-hidden="true">F</span>
-          <span>forever<span>.professions</span></span>
+        <a className="brand profession-brand" href="#top" aria-label="Leatherworking workspace">
+          <ItemIcon className="brand-mark" eager gameItemId={2302} name="Handstitched Leather Boots" />
+          <span><small>Profession</small>{profession.name}</span>
         </a>
         <label className="global-search">
-          <span className="search-icon" aria-hidden="true">⌕</span>
+          <SearchIcon className="search-icon" />
           <input aria-label="Search recipes" onChange={(event) => setSearch(event.target.value)} placeholder={recipeListView === "changes" ? "Search changed recipes, fields, or spell IDs…" : `Search ${profession.recipes.length} recipes…`} ref={searchRef} type="search" value={search} />
           <kbd>shift + f</kbd>
         </label>
         <details className="personalization-menu">
           <summary
-            aria-label={`Planning preferences for ${marketLabel}`}
+            aria-label={`Planning preferences for ${profileLabel}`}
             className="market-picker"
           >
             <span
               className={`status-orb${marketsError === undefined ? "" : " status-orb-warning"}`}
               aria-hidden="true"
             />
-            <span><small>Your profile</small>{marketLabel}</span>
-            <span aria-hidden="true">⌄</span>
+            <span className="profile-label"><small>Your profile</small>{profileLabel}</span>
+            <ChevronDownIcon className="disclosure-icon" />
           </summary>
           <div className="personalization-popover">
             <div className="personalization-heading">
@@ -1203,7 +1206,6 @@ export function App() {
                 <span className="section-kicker">Saved in this browser</span>
                 <strong>Planning preferences</strong>
               </div>
-              <span aria-hidden="true">◎</span>
             </div>
             <div className="personalization-grid">
               <label>
@@ -1450,7 +1452,7 @@ export function App() {
           ) : null}
         </aside>
 
-        <main className="main-workspace">
+        <main className="main-workspace" id="main-workspace" tabIndex={-1}>
           {recipeListView === "changes" ? null : (
             <nav className="workspace-nav" aria-label="Workspace views">
               <button className={workspaceView === "calculator" ? "active" : ""} onClick={() => setWorkspaceView("calculator")} type="button">Recipe calculator</button>
@@ -1493,12 +1495,6 @@ export function App() {
                   </div>
                 </div>
                 <div className="hero-actions">
-                  <span
-                    className={`quality-chip quality-${recipeQuality.level}`}
-                    title={recipeQuality.explanation}
-                  >
-                    {recipeQuality.label} data
-                  </span>
                   <button onClick={() => setWorkspaceView("planner")} type="button">Use in route</button>
                 </div>
               </section>
@@ -1594,7 +1590,7 @@ export function App() {
                   <legend>Recipes you know</legend>
                   <div className="known-recipes-toolbar">
                     <label className="known-recipes-search">
-                      <span className="search-icon" aria-hidden="true">⌕</span>
+                      <SearchIcon className="search-icon" />
                       <input
                         aria-label="Filter known recipes"
                         onChange={(event) => setKnownRecipeSearch(event.target.value)}

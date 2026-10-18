@@ -19,9 +19,9 @@ export function SiteFooter() {
         <div className="site-footer-summary">
           <a className="site-footer-brand" href="/" aria-label="Forever Professions home">
             <span className="site-footer-mark" aria-hidden="true">F</span>
-            <span>forever<span>.professions</span></span>
+            <span>Forever <span>Professions</span></span>
           </a>
-          <p>A community-built profession planner for World of Warcraft: Forever.</p>
+          <p>A community-built profession planner for WoW Forever players.</p>
         </div>
         <nav aria-label="Legal and support">
           {FOOTER_LINKS.map(({ href, label }) => (
@@ -39,8 +39,8 @@ export function SiteFooter() {
         </nav>
       </div>
       <p className="site-footer-disclaimer">
-        Not affiliated with or endorsed by Blizzard Entertainment. World of Warcraft
-        and related names and assets belong to their respective owners.
+        Not affiliated with or endorsed by Blizzard Entertainment. All game names and
+        related assets belong to their respective owners.
       </p>
     </footer>
   );

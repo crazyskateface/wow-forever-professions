@@ -150,8 +150,8 @@ function TermsOfUse() {
       <LegalSection title="Unofficial project">
         <p>
           This project is not affiliated with, sponsored by, or endorsed by Blizzard
-          Entertainment. World of Warcraft, Blizzard Entertainment, and related game
-          names, marks, and assets are the property of their respective owners.
+          Entertainment. Blizzard Entertainment and all related game names, marks, and
+          assets are the property of their respective owners.
         </p>
       </LegalSection>
 
@@ -283,7 +283,7 @@ export function StaticPage({ page }: { readonly page: StaticPageId }) {
       <header className="static-topbar">
         <a className="brand" href="/" aria-label="Forever Professions home">
           <span className="brand-mark" aria-hidden="true">F</span>
-          <span>forever<span>.professions</span></span>
+          <span>Forever <span>Professions</span></span>
         </a>
         <a className="back-to-planner" href="/">Back to planner</a>
       </header>
