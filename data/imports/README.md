@@ -3,7 +3,7 @@
 `classic-era-1.15.9.69722-leatherworking.json` is the normalized Classic Era
 baseline used by the recipe-diff pipeline. It contains 314 Leatherworking
 recipes from the Vanilla tables shipped in the same LibProfessionDB v1.9.1 and
-LibItemDB v1.4.1 source archives as the Forever snapshot. Its records retain
+LibItemDB v1.6.0 source archives as the Forever snapshot. Its records retain
 `classic-fallback` provenance so the UI does not confuse baseline evidence with
 Forever-specific verification.
 
@@ -11,7 +11,11 @@ The deterministic comparison against the current Forever target contains 289 New
 227 Updated, 0 Removed, and 87 Unchanged Leatherworking recipes. These are logical
 recipes matched by profession ID and spell ID.
 
-`forever-1.60.1.69977-leatherworking.json` is a transform of the Forever tables in LibProfessionDB v1.9.1 and the matching English item names and item types in LibItemDB v1.4.1, supplemented by explicitly identified manual corrections from `forever-leatherworking-overrides.json`. Generic item-name-description labels are read from the installed Forever client, not inferred from item names. The source archives are not vendored. Their project pages, versions, checksums, and license notice are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+`forever-1.60.1.69977-leatherworking.json` is a transform of the Forever tables in LibProfessionDB v1.9.1 and the matching English item names and item types in LibItemDB v1.6.0, supplemented by explicitly identified manual corrections from `forever-leatherworking-overrides.json`. Generic item-name-description labels are read from the installed Forever client, not inferred from item names. The source archives are not vendored. Their project pages, versions, checksums, and license notice are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+`source-releases.json` records the exact upstream file IDs, versions, source pages,
+archive checksums, and immutable output targets used by the local admin panel's
+source-refresh workflow. The downloaded archives stay under ignored `.local-data/`.
 
 The dataset contains 603 Leatherworking recipes for client build `1.60.1.69977`. The frontend also carries 760 lossless WebP item icons extracted from the installed Forever client build `1.60.1.70374`; `apps/web/public/icons/items/manifest.json` records both build identities, every item-to-FileDataID mapping, and any missing IDs. The same pinned client build classifies seven referenced items through `ItemSparse.ItemNameDescriptionID`, including the three Leatherworking reagents labeled `Scarce`. It also provides display name, rarity ID, equipment slot, required level, and vendor sell price for 630 referenced items; 452 have equipment slots and 443 have armor derived from the client's armor tables. Each record retains its source product, build, and locale. It is useful product data, but it is deliberately not labeled authoritative:
 

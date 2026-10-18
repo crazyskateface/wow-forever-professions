@@ -1,0 +1,198 @@
+[app]
+name = "Forever Professions Operations"
+host = "127.0.0.1"
+port = 8088
+auto_refresh_seconds = 30
+
+[aws]
+enabled = true
+region = "us-east-1"
+lookback_hours = 24
+
+[[aws.environments]]
+stage = "staging"
+label = "Staging"
+application_stack = "ForeverProfessions"
+data_stack = "ForeverProfessionsData"
+
+[[aws.environments]]
+stage = "production"
+label = "Production"
+application_stack = "ForeverProfessions-production"
+data_stack = "ForeverProfessionsData-production"
+
+[[health]]
+id = "local-api-liveness"
+name = "Local API liveness"
+url = "http://127.0.0.1:3001/api/health"
+expected_status = "ok"
+environment = "local"
+timeout_seconds = 4
+
+[[health]]
+id = "local-api-readiness"
+name = "Local database readiness"
+url = "http://127.0.0.1:3001/api/ready"
+expected_status = "ready"
+environment = "local"
+timeout_seconds = 4
+
+[security]
+allowed_executables = ["${ADMIN_PYTHON}", "aws", "aws.exe", "pnpm", "pnpm.cmd"]
+redact_environment = []
+
+[[jobs]]
+id = "aws-login"
+name = "Sign in to AWS"
+description = "Open the AWS CLI browser sign-in flow for the configured dashboard profile, then refresh its short-lived credentials."
+category = "Access"
+working_directory = "."
+timeout_seconds = 900
+confirmation = "This opens the AWS browser sign-in flow for ADMIN_AWS_PROFILE. Continue only if the displayed profile is the identity you intend to use for monitoring and operations."
+commands = [
+  ["aws", "--version"],
+  ["aws", "login", "--profile", "${ADMIN_AWS_PROFILE}"],
+]
+
+[[jobs]]
+id = "verify-repository"
+name = "Verify repository"
+description = "Run the complete typecheck, test, build, and CDK synthesis gate."
+category = "Validation"
+working_directory = "."
+timeout_seconds = 2400
+commands = [["pnpm", "verify"]]
+
+[[jobs]]
+id = "audit-current-data"
+name = "Audit current data snapshots"
+description = "Regenerate both checked-in quality reports from the current Classic and Forever snapshots."
+category = "Data"
+working_directory = "."
+timeout_seconds = 900
+commands = [
+  ["pnpm", "data:audit", "data/imports/forever-1.60.1.69977-leatherworking.json", "data/imports/forever-1.60.1.69977-leatherworking.quality.md"],
+  ["pnpm", "data:audit", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "data/imports/classic-era-1.15.9.69722-leatherworking.quality.md"],
+]
+
+[[jobs]]
+id = "check-source-releases"
+name = "Check for newer source data"
+description = "Check CurseForge for the latest stable LibProfessionDB and LibItemDB releases compatible with both pinned game versions without changing files."
+category = "Data"
+working_directory = "."
+timeout_seconds = 120
+commands = [["${ADMIN_PYTHON}", "-m", "forever_admin.source_refresh", "check"]]
+
+[[jobs]]
+id = "refresh-source-snapshots"
+name = "Fetch and generate latest source data"
+description = "Download the latest compatible stable sources, then regenerate and audit snapshots only when a source file ID has changed."
+category = "Data"
+working_directory = "."
+timeout_seconds = 3600
+required_environment = ["WOW_CLIENT_ROOT"]
+confirmation = "This downloads newer source releases and, only when their file IDs changed, regenerates versioned snapshots, quality reports, manifests, and icons. It does not import or publish data. Review the resulting Git diff before using an import button."
+commands = [["${ADMIN_PYTHON}", "-m", "forever_admin.source_refresh", "refresh"]]
+
+[[jobs]]
+id = "start-local-database"
+name = "Start local PostgreSQL"
+description = "Start the existing Docker Compose PostgreSQL service and wait for it to become healthy."
+category = "Local"
+working_directory = "."
+timeout_seconds = 180
+commands = [["pnpm", "db:local:up"]]
+
+[[jobs]]
+id = "import-current-local-catalog"
+name = "Import current catalog locally"
+description = "Import the Classic baseline, then the current Forever snapshot and stored comparison into disposable local PostgreSQL."
+category = "Local"
+working_directory = "."
+timeout_seconds = 1800
+confirmation = "This writes both current snapshots to the disposable local PostgreSQL catalog. A same-build hash conflict requires resetting that local database."
+commands = [
+  ["pnpm", "data:import:local", "data/imports/classic-era-1.15.9.69722-leatherworking.json"],
+  ["pnpm", "data:import:local", "data/imports/forever-1.60.1.69977-leatherworking.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "--comparison-type", "classic-forever"],
+]
+
+[[jobs]]
+id = "test-local-database"
+name = "Test local database"
+description = "Run the repository's isolated local PostgreSQL ingestion smoke test."
+category = "Local"
+working_directory = "."
+timeout_seconds = 900
+commands = [["pnpm", "db:local:test"]]
+
+[[jobs]]
+id = "diff-staging"
+name = "Review staging infrastructure diff"
+description = "Show the CDK diff for the staging data and application stacks."
+category = "Deployment"
+working_directory = "."
+timeout_seconds = 900
+commands = [["pnpm", "infra:diff:staging"]]
+
+[[jobs]]
+id = "deploy-staging"
+name = "Deploy staging infrastructure"
+description = "Run the repository's guarded CDK deployment for staging."
+category = "Deployment"
+working_directory = "."
+timeout_seconds = 2700
+confirmation = "Deploy the current working tree to staging only after reviewing the staging diff. CDK will still stop for IAM broadening approval when required."
+commands = [["pnpm", "infra:deploy:staging"]]
+
+[[jobs]]
+id = "diff-production"
+name = "Review production infrastructure diff"
+description = "Show the CDK diff for the production data and application stacks."
+category = "Deployment"
+working_directory = "."
+timeout_seconds = 900
+commands = [["pnpm", "infra:diff:production"]]
+
+[[jobs]]
+id = "deploy-production"
+name = "Deploy production infrastructure"
+description = "Run the repository's guarded CDK deployment for production."
+category = "Deployment"
+working_directory = "."
+timeout_seconds = 2700
+confirmation = "Deploy the current working tree to production only after reviewing the production diff and the stage-to-main promotion. CDK will still stop for IAM broadening approval when required."
+commands = [["pnpm", "infra:deploy:production"]]
+
+[[jobs]]
+id = "publish-current-data-staging"
+name = "Publish current data to staging"
+description = "Migrate roles, import both snapshots, and run the immutable data-release verification against staging."
+category = "Deployment"
+working_directory = "."
+timeout_seconds = 3600
+confirmation = "This writes immutable catalog rows and a release manifest to staging. Confirm the source snapshot hashes and staging stack outputs first."
+environment = { DSQL_ENDPOINT = "${STAGING_DSQL_ENDPOINT}", RAW_DATA_BUCKET = "${STAGING_RAW_DATA_BUCKET}", INGESTION_ROLE_ARN = "${STAGING_INGESTION_ROLE_ARN}", MIGRATION_ROLE_ARN = "${STAGING_MIGRATION_ROLE_ARN}", PRICING_WRITER_ROLE_ARN = "${STAGING_PRICING_WRITER_ROLE_ARN}", APPLICATION_READER_ROLE_ARN = "${STAGING_APPLICATION_READER_ROLE_ARN}", AWS_REGION = "us-east-1" }
+commands = [
+  ["pnpm", "db:migrate:dsql"],
+  ["pnpm", "db:roles:dsql"],
+  ["pnpm", "data:import", "data/imports/classic-era-1.15.9.69722-leatherworking.json"],
+  ["pnpm", "data:import", "data/imports/forever-1.60.1.69977-leatherworking.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "--comparison-type", "classic-forever"],
+  ["pnpm", "data:release:dsql", "data/imports/forever-1.60.1.69977-leatherworking.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "--comparison-type", "classic-forever"],
+]
+[[jobs]]
+id = "publish-current-data-production"
+name = "Publish current data to production"
+description = "Migrate roles, import both snapshots, and run the immutable data-release verification against production."
+category = "Deployment"
+working_directory = "."
+timeout_seconds = 3600
+confirmation = "This writes immutable catalog rows and a release manifest to production. Confirm the reviewed stage-to-main promotion and production stack outputs first."
+environment = { DSQL_ENDPOINT = "${PRODUCTION_DSQL_ENDPOINT}", RAW_DATA_BUCKET = "${PRODUCTION_RAW_DATA_BUCKET}", INGESTION_ROLE_ARN = "${PRODUCTION_INGESTION_ROLE_ARN}", MIGRATION_ROLE_ARN = "${PRODUCTION_MIGRATION_ROLE_ARN}", PRICING_WRITER_ROLE_ARN = "${PRODUCTION_PRICING_WRITER_ROLE_ARN}", APPLICATION_READER_ROLE_ARN = "${PRODUCTION_APPLICATION_READER_ROLE_ARN}", AWS_REGION = "us-east-1" }
+commands = [
+  ["pnpm", "db:migrate:dsql"],
+  ["pnpm", "db:roles:dsql"],
+  ["pnpm", "data:import", "data/imports/classic-era-1.15.9.69722-leatherworking.json"],
+  ["pnpm", "data:import", "data/imports/forever-1.60.1.69977-leatherworking.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "--comparison-type", "classic-forever"],
+  ["pnpm", "data:release:dsql", "data/imports/forever-1.60.1.69977-leatherworking.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "--comparison-type", "classic-forever"],
+]

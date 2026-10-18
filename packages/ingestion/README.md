@@ -74,6 +74,11 @@ pnpm data:enrich:client data/imports/forever-1.60.1.69977-leatherworking.json "C
 
 The override file contains only reviewed field corrections and their provenance; reagents, outputs, names, and item types continue to come from the source archives, while item-name-description labels come from the pinned client build. The converter rejects duplicate, missing-source, or unmatched override records instead of silently dropping them. `WOW_CLIENT_ROOT` and `ITEM_ICON_OUTPUT_DIR` may be used instead of the final two positional arguments. `WOWDATA_PATH` can select a non-default extractor binary. Existing icons are reused only when their manifest records the same client asset build and FileDataID.
 
+The converter defaults to the versions pinned by the checked-in snapshot. Automated
+source refreshes set `PROFESSION_DB_VERSION`, `ITEM_DB_VERSION`, and
+`PROFESSION_DB_SOURCE_URL` so regenerated records retain the release actually used;
+these values are provenance metadata, not credentials.
+
 The current Leatherworking conversion finds seven item-name-description labels among
 the 760 referenced items: Pristine Leather, Pristine Hide, and Pristine Scale are
 `Scarce`; four Spiritcaller outputs are `Crafted`. These values are examples of the

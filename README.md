@@ -73,6 +73,8 @@ data.
 - Displays summary counts, search, profession and change-type filters, item-type
   filters, current-skill availability filters, provenance, icons, and expandable
   before/after values.
+- Loads comparison records on demand when the Forever Changes tab is first opened,
+  keeping the initial guide request burst below the API's concurrency boundary.
 - Hides unchanged recipes by default; badges are reused in the guide and All Recipes.
 - The bundled comparison currently contains 289 New, 227 Updated, 0 Removed, and 87
   Unchanged Leatherworking recipes (603 total).
@@ -119,7 +121,7 @@ data.
 
 ### Reproducible client-data pipeline
 
-- Converts LibProfessionDB v1.9.1 and LibItemDB v1.4.1 Lua literals without executing
+- Converts LibProfessionDB v1.9.1 and LibItemDB v1.6.0 Lua literals without executing
   Lua.
 - Reapplies reviewed corrections from a validated, versioned override file.
 - Archives exact raw bytes by SHA-256, normalizes immutable build records, and writes
@@ -166,6 +168,30 @@ recipes with unknown learning ranks cannot enter a leveling route.
 - AWS credentials only for deployment or live DSQL validation
 - `wowdata` and a local Forever client only when regenerating icons, client item
   classifications, or tooltip attributes
+- Python 3.12 or newer only when using the optional local operations dashboard
+
+## Local operations dashboard
+
+`admin/` contains a standalone, localhost-only NiceGUI console for health checks,
+CloudWatch logs and usage, CloudFormation deployment status, and controlled execution
+of the repository's existing imports, validation, and deployment commands. It binds
+only to `127.0.0.1`, accepts no arbitrary terminal input, and uses the normal AWS
+credential chain without storing credentials.
+
+On Windows, create its isolated environment and launch it from the repository root:
+
+```powershell
+python -m venv .venv-admin
+.\.venv-admin\Scripts\python -m pip install -e ".\admin[dev]"
+Copy-Item .env.admin.example .env.admin
+.\.venv-admin\Scripts\forever-admin
+```
+
+See [`admin/README.md`](admin/README.md) for job registration, source configuration,
+AWS permissions, and troubleshooting. The dashboard never runs imports or deploys at
+startup; data-writing jobs require confirmation. Its source-data jobs can check for
+and download newer compatible LibProfessionDB and LibItemDB releases automatically,
+while import and publication remain separate reviewable operations.
 
 ## Full local start
 

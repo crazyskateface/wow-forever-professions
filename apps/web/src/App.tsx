@@ -55,11 +55,15 @@ import {
   type PlayerFaction,
 } from "./personalization.js";
 import { createRequestGuard } from "./request-guard.js";
+import {
+  shouldLoadRecipeChanges,
+  shouldLoadRecipePrices,
+  type CatalogState,
+  type RecipeListView,
+} from "./request-policy.js";
 import { buildSkillChartData } from "./skill-chart.js";
 
 type WorkspaceView = "calculator" | "planner";
-type RecipeListView = "guide" | "recipes" | "changes";
-type CatalogState = "loading" | "ready" | "fixture" | "fallback";
 
 const MIN_PROFESSION_SKILL = 0;
 const RECIPE_ROW_HEIGHT = 78;
@@ -478,6 +482,7 @@ export function App() {
   const [changesLoading, setChangesLoading] = useState(true);
   const [changesError, setChangesError] = useState<string>();
   const [changesReload, setChangesReload] = useState(0);
+  const changesLoadedRef = useRef(false);
   const [changeFilters, setChangeFilters] = useState<ForeverChangeFilters>(
     initialPreferences.changeFilters,
   );
@@ -683,6 +688,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!shouldLoadRecipeChanges(recipeListView, changesLoadedRef.current)) return;
     const controller = new AbortController();
     const query = new URLSearchParams({ comparison: "classic-forever" });
     const unchangedQuery = new URLSearchParams({
@@ -719,6 +725,7 @@ export function App() {
         }
         setRecipeChanges([...changesByIdentity.values()]);
         setChangeSummary(summary.summary);
+        changesLoadedRef.current = true;
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
@@ -733,7 +740,7 @@ export function App() {
       });
 
     return () => controller.abort();
-  }, [changesReload]);
+  }, [changesReload, recipeListView]);
 
   useEffect(() => {
     function selectRecipeFromHistory(): void {
@@ -768,6 +775,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!shouldLoadRecipePrices(catalogState, marketsLoading)) return;
     const gameItemIds = recipe.reagents.flatMap(({ gameItemId }) =>
       gameItemId === undefined ? [] : [gameItemId],
     );
@@ -790,7 +798,7 @@ export function App() {
         setPriceError("Live auction prices are unavailable. Quantities are still accurate.");
       });
     return () => controller.abort();
-  }, [marketId, recipe]);
+  }, [catalogState, marketId, marketsLoading, recipe]);
 
   const calculation = useMemo(() => {
     const probability = getSkillUpProbability(skill, recipe.thresholds);

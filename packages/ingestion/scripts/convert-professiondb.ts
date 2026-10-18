@@ -112,9 +112,11 @@ const converted = convertProfessionDbSnapshot({
   itemNamesLua,
   itemCoreLua,
   profession: { id: "leatherworking", name: "Leatherworking", skillLineId: 165 },
-  professionDbVersion: "v1.9.1",
-  itemDbVersion: "v1.4.1",
-  sourceUrl: "https://www.curseforge.com/wow/addons/libprofessiondb/files/9095167",
+  professionDbVersion: process.env.PROFESSION_DB_VERSION?.trim() || "v1.9.1",
+  itemDbVersion: process.env.ITEM_DB_VERSION?.trim() || "v1.4.1",
+  sourceUrl:
+    process.env.PROFESSION_DB_SOURCE_URL?.trim() ||
+    "https://www.curseforge.com/wow/addons/libprofessiondb/files/9095167",
   gameVersion,
   ...(resolvedCanonicalItemNames === undefined
     ? {}
