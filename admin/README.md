@@ -84,8 +84,11 @@ latest source operation found an update, completed an update, or was unchanged.
 
 The separate jobs under **Data tools** and **Local tools** remain available for
 diagnostics. Source downloads are cached under ignored
-`.local-data/admin-sources`. Successful regeneration records the source URL, version,
-and SHA-256 in `data/imports/source-releases.json` and the normal attribution files.
+`.local-data/admin-sources`. Generated datasets, audits, and icons stay in an ignored
+staging directory until both dataset build IDs match their configured immutable
+snapshot filenames, so a failed conversion, audit, or build check leaves checked-in
+targets unchanged. Successful regeneration records the source URL, version, and
+SHA-256 in `data/imports/source-releases.json` and the normal attribution files.
 Staging and production publication remain separate confirmed jobs so the generated
 Git diff can be reviewed before deployment.
 

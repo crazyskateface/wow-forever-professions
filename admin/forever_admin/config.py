@@ -138,7 +138,7 @@ def _environment_bool(name: str, default: bool) -> bool:
 
 def load_config(path: Path | None = None) -> DashboardConfig:
     repo_root = _repo_root()
-    os.environ.setdefault("ADMIN_PYTHON", str(Path(sys.executable).resolve()))
+    os.environ.setdefault("ADMIN_PYTHON", os.path.abspath(sys.executable))
     _load_environment(repo_root)
     requested = path or Path(os.getenv("ADMIN_CONFIG", repo_root / "admin" / "config.toml"))
     source_path = requested.expanduser().resolve()

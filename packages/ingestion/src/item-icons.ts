@@ -9,6 +9,7 @@ import {
   type ItemClientData,
   type ItemClientSource,
   type ItemClassification,
+  type ItemStat,
 } from "@forever-professions/contracts";
 
 const execFileAsync = promisify(execFile);
@@ -71,6 +72,8 @@ interface WowdataItemClassificationReferenceRow {
   readonly OverallQualityID: number;
   readonly RequiredLevel: number;
   readonly SellPrice: number;
+  readonly StatModifier_bonusStat: readonly number[];
+  readonly StatPercentEditor: readonly number[];
 }
 
 interface WowdataItemNameDescriptionRow {
@@ -103,6 +106,18 @@ interface WowdataArmorLocationRow {
 interface WowdataItemArmorShieldRow {
   readonly ItemLevel: number;
   readonly Quality: readonly number[];
+}
+
+interface WowdataRandPropPointsRow {
+  readonly ID: number;
+  readonly GoodF: readonly number[];
+  readonly SuperiorF: readonly number[];
+  readonly EpicF: readonly number[];
+}
+
+interface WowdataGlobalStringRow {
+  readonly BaseTag: string;
+  readonly TagText_lang: string;
 }
 
 export interface EnrichedItemClientRecord {
@@ -203,6 +218,62 @@ const INVENTORY_TYPES: Readonly<Record<number, {
   35: { token: "INVTYPE_EQUIPABLESPELL_WEAPON", equipmentSlot: "Weapon Spell" },
 };
 
+interface ItemStatPresentation {
+  readonly label: string;
+  readonly globalStringTag?: string;
+  readonly displayTone: ItemStat["displayTone"];
+}
+
+const ITEM_STAT_PRESENTATIONS: Readonly<Record<number, ItemStatPresentation>> = {
+  0: { label: "Mana", globalStringTag: "ITEM_MOD_MANA", displayTone: "attribute" },
+  1: { label: "Health", globalStringTag: "ITEM_MOD_HEALTH", displayTone: "attribute" },
+  3: { label: "Agility", globalStringTag: "ITEM_MOD_AGILITY", displayTone: "attribute" },
+  4: { label: "Strength", globalStringTag: "ITEM_MOD_STRENGTH", displayTone: "attribute" },
+  5: { label: "Intellect", globalStringTag: "ITEM_MOD_INTELLECT", displayTone: "attribute" },
+  6: { label: "Spirit", globalStringTag: "ITEM_MOD_SPIRIT", displayTone: "attribute" },
+  7: { label: "Stamina", globalStringTag: "ITEM_MOD_STAMINA", displayTone: "attribute" },
+  12: { label: "Defense", globalStringTag: "ITEM_MOD_DEFENSE_SKILL_RATING", displayTone: "effect" },
+  13: { label: "Dodge", globalStringTag: "ITEM_MOD_DODGE_RATING", displayTone: "effect" },
+  14: { label: "Parry", globalStringTag: "ITEM_MOD_PARRY_RATING", displayTone: "effect" },
+  15: { label: "Block", globalStringTag: "ITEM_MOD_BLOCK_RATING", displayTone: "effect" },
+  16: { label: "Melee Hit", globalStringTag: "ITEM_MOD_HIT_MELEE_RATING", displayTone: "effect" },
+  17: { label: "Ranged Hit", globalStringTag: "ITEM_MOD_HIT_RANGED_RATING", displayTone: "effect" },
+  18: { label: "Spell Hit", globalStringTag: "ITEM_MOD_HIT_SPELL_RATING", displayTone: "effect" },
+  19: { label: "Melee Critical Strike", globalStringTag: "ITEM_MOD_CRIT_MELEE_RATING", displayTone: "effect" },
+  20: { label: "Ranged Critical Strike", globalStringTag: "ITEM_MOD_CRIT_RANGED_RATING", displayTone: "effect" },
+  21: { label: "Spell Critical Strike", globalStringTag: "ITEM_MOD_CRIT_SPELL_RATING", displayTone: "effect" },
+  31: { label: "Hit", globalStringTag: "ITEM_MOD_HIT_RATING", displayTone: "effect" },
+  32: { label: "Critical Strike", globalStringTag: "ITEM_MOD_CRIT_RATING", displayTone: "effect" },
+  35: { label: "Resilience", globalStringTag: "ITEM_MOD_RESILIENCE_RATING", displayTone: "effect" },
+  36: { label: "Haste", globalStringTag: "ITEM_MOD_HASTE_RATING", displayTone: "effect" },
+  37: { label: "Expertise", globalStringTag: "ITEM_MOD_EXPERTISE_RATING", displayTone: "effect" },
+  38: { label: "Attack Power", globalStringTag: "ITEM_MOD_ATTACK_POWER", displayTone: "effect" },
+  39: { label: "Ranged Attack Power", globalStringTag: "ITEM_MOD_RANGED_ATTACK_POWER", displayTone: "effect" },
+  41: { label: "Healing", globalStringTag: "ITEM_MOD_SPELL_HEALING_DONE", displayTone: "effect" },
+  42: { label: "Spell Damage", globalStringTag: "ITEM_MOD_SPELL_DAMAGE_DONE", displayTone: "effect" },
+  43: { label: "Mana Regeneration", globalStringTag: "ITEM_MOD_MANA_REGENERATION", displayTone: "effect" },
+  44: { label: "Armor Penetration", globalStringTag: "ITEM_MOD_ARMOR_PENETRATION_RATING", displayTone: "effect" },
+  45: { label: "Spell Power", globalStringTag: "ITEM_MOD_SPELL_POWER", displayTone: "effect" },
+  46: { label: "Health Regeneration", globalStringTag: "ITEM_MOD_HEALTH_REGEN", displayTone: "effect" },
+  47: { label: "Spell Penetration", globalStringTag: "ITEM_MOD_SPELL_PENETRATION", displayTone: "effect" },
+  48: { label: "Block Value", globalStringTag: "ITEM_MOD_BLOCK_VALUE", displayTone: "effect" },
+  50: { label: "Bonus Armor", globalStringTag: "ITEM_MOD_EXTRA_ARMOR", displayTone: "effect" },
+  51: { label: "Fire Resistance", displayTone: "attribute" },
+  52: { label: "Frost Resistance", displayTone: "attribute" },
+  53: { label: "Holy Resistance", displayTone: "attribute" },
+  54: { label: "Shadow Resistance", displayTone: "attribute" },
+  55: { label: "Nature Resistance", displayTone: "attribute" },
+  56: { label: "Arcane Resistance", displayTone: "attribute" },
+  83: { label: "Physical Damage", globalStringTag: "ITEM_MOD_PHYSICAL_DAMAGE_DONE", displayTone: "effect" },
+  84: { label: "Holy Damage", globalStringTag: "ITEM_MOD_HOLY_DAMAGE_DONE", displayTone: "effect" },
+  85: { label: "Fire Damage", globalStringTag: "ITEM_MOD_FIRE_DAMAGE_DONE", displayTone: "effect" },
+  86: { label: "Nature Damage", globalStringTag: "ITEM_MOD_NATURE_DAMAGE_DONE", displayTone: "effect" },
+  87: { label: "Frost Damage", globalStringTag: "ITEM_MOD_FROST_DAMAGE_DONE", displayTone: "effect" },
+  88: { label: "Shadow Damage", globalStringTag: "ITEM_MOD_SHADOW_DAMAGE_DONE", displayTone: "effect" },
+  89: { label: "Arcane Damage", globalStringTag: "ITEM_MOD_ARCANE_DAMAGE_DONE", displayTone: "effect" },
+  112: { label: "Herbalism Skill", globalStringTag: "ITEM_MOD_HERBALISM", displayTone: "effect" },
+};
+
 function positiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
@@ -295,6 +366,123 @@ function calculateItemArmor(
   return armor > 0 ? Math.floor(armor + 0.5) : undefined;
 }
 
+function itemStatPropertyIndex(
+  item: Pick<WowdataItemMetadataRow, "SubclassID" | "InventoryType">,
+): number | undefined {
+  switch (item.InventoryType) {
+    case 1:
+    case 4:
+    case 5:
+    case 7:
+    case 15:
+    case 17:
+    case 20:
+    case 25:
+      return 0;
+    case 3:
+    case 6:
+    case 8:
+    case 10:
+    case 12:
+      return 1;
+    case 2:
+    case 9:
+    case 11:
+    case 14:
+    case 16:
+    case 23:
+      return 2;
+    case 13:
+    case 21:
+    case 22:
+      return 3;
+    case 26:
+      return item.SubclassID === 19 ? 3 : 0;
+    case 28:
+      return 4;
+    default:
+      return undefined;
+  }
+}
+
+function itemStatBudget(
+  item: Pick<WowdataItemMetadataRow, "SubclassID" | "InventoryType">,
+  sparse: Pick<WowdataItemClassificationReferenceRow, "ItemLevel" | "OverallQualityID">,
+  randPropPointsByLevel: ReadonlyMap<number, WowdataRandPropPointsRow>,
+): number | undefined {
+  const propertyIndex = itemStatPropertyIndex(item);
+  const points = randPropPointsByLevel.get(sparse.ItemLevel);
+  if (propertyIndex === undefined || points === undefined) return undefined;
+  const values = sparse.OverallQualityID === 2
+    ? points.GoodF
+    : sparse.OverallQualityID === 3 || sparse.OverallQualityID === 7
+      ? points.SuperiorF
+      : sparse.OverallQualityID >= 4 && sparse.OverallQualityID <= 6
+        ? points.EpicF
+        : undefined;
+  const budget = values?.[propertyIndex];
+  return finiteNumber(budget) && budget > 0 ? budget : undefined;
+}
+
+function renderItemStatText(
+  statId: number,
+  value: number,
+  globalStrings: ReadonlyMap<string, string>,
+): Pick<ItemStat, "displayText" | "displayTone"> {
+  const presentation = ITEM_STAT_PRESENTATIONS[statId] ?? {
+    label: `Item stat #${statId}`,
+    displayTone: "effect" as const,
+  };
+  const template = presentation.globalStringTag === undefined
+    ? undefined
+    : globalStrings.get(presentation.globalStringTag);
+  const sign = value < 0 ? "-" : "+";
+  const magnitude = Math.abs(value).toString();
+  const formatted = template === undefined
+    ? `${sign}${magnitude} ${presentation.label}`
+    : template
+        .replaceAll("%c", sign)
+        .replaceAll("%s", magnitude)
+        .replaceAll("%d", magnitude);
+  return {
+    displayText: presentation.displayTone === "effect" && !formatted.startsWith("Equip:")
+      ? `Equip: ${formatted}`
+      : formatted,
+    displayTone: presentation.displayTone,
+  };
+}
+
+function calculateItemStats(
+  item: Pick<WowdataItemMetadataRow, "SubclassID" | "InventoryType">,
+  sparse: Pick<
+    WowdataItemClassificationReferenceRow,
+    "ItemLevel" | "OverallQualityID" | "StatModifier_bonusStat" | "StatPercentEditor"
+  >,
+  randPropPointsByLevel: ReadonlyMap<number, WowdataRandPropPointsRow>,
+  globalStrings: ReadonlyMap<string, string>,
+): ItemStat[] {
+  const budget = itemStatBudget(item, sparse, randPropPointsByLevel);
+  if (budget === undefined) return [];
+  const result: ItemStat[] = [];
+  const length = Math.min(
+    sparse.StatModifier_bonusStat.length,
+    sparse.StatPercentEditor.length,
+  );
+  for (let index = 0; index < length; index += 1) {
+    const statId = sparse.StatModifier_bonusStat[index];
+    const allocation = sparse.StatPercentEditor[index];
+    if (!nonnegativeInteger(statId) || !integer(allocation) || allocation === 0) continue;
+    const value = Math.floor((budget * allocation) / 10_000 + 0.5);
+    if (value === 0) continue;
+    result.push({
+      statId,
+      value,
+      ...renderItemStatText(statId, value, globalStrings),
+    });
+  }
+  return result;
+}
+
 export function parseWowdataItemClientData(
   itemRowsValue: unknown,
   sparseRowsValue: unknown,
@@ -302,6 +490,8 @@ export function parseWowdataItemClientData(
   armorQualityRowsValue: unknown,
   armorLocationRowsValue: unknown,
   shieldArmorRowsValue: unknown,
+  randPropPointsRowsValue: unknown,
+  globalStringRowsValue: unknown,
   source: ItemClientSource,
 ): Map<number, EnrichedItemClientRecord> {
   const items = new Map<number, WowdataItemMetadataRow>();
@@ -369,6 +559,40 @@ export function parseWowdataItemClientData(
     }
   }
 
+  const randPropPointsByLevel = new Map<number, WowdataRandPropPointsRow>();
+  for (const value of rowsFromWowdata(randPropPointsRowsValue, "RandPropPoints")) {
+    const row = value as Partial<WowdataRandPropPointsRow>;
+    const good = numberArray(row.GoodF);
+    const superior = numberArray(row.SuperiorF);
+    const epic = numberArray(row.EpicF);
+    if (
+      nonnegativeInteger(row.ID) &&
+      good !== undefined &&
+      superior !== undefined &&
+      epic !== undefined
+    ) {
+      randPropPointsByLevel.set(row.ID, {
+        ID: row.ID,
+        GoodF: good,
+        SuperiorF: superior,
+        EpicF: epic,
+      });
+    }
+  }
+
+  const globalStrings = new Map<string, string>();
+  for (const value of rowsFromWowdata(globalStringRowsValue, "GlobalStrings")) {
+    const row = value as Partial<WowdataGlobalStringRow>;
+    if (
+      typeof row.BaseTag === "string" &&
+      row.BaseTag.length > 0 &&
+      typeof row.TagText_lang === "string" &&
+      row.TagText_lang.length > 0
+    ) {
+      globalStrings.set(row.BaseTag, row.TagText_lang);
+    }
+  }
+
   const result = new Map<number, EnrichedItemClientRecord>();
   for (const value of rowsFromWowdata(sparseRowsValue, "ItemSparse")) {
     const row = value as Partial<WowdataItemClassificationReferenceRow>;
@@ -380,7 +604,9 @@ export function parseWowdataItemClientData(
       !nonnegativeInteger(row.ItemLevel) ||
       !nonnegativeInteger(row.OverallQualityID) ||
       !nonnegativeInteger(row.RequiredLevel) ||
-      !nonnegativeInteger(row.SellPrice)
+      !nonnegativeInteger(row.SellPrice) ||
+      numberArray(row.StatModifier_bonusStat) === undefined ||
+      numberArray(row.StatPercentEditor) === undefined
     ) {
       continue;
     }
@@ -396,6 +622,12 @@ export function parseWowdataItemClientData(
       armorLocationByInventoryType,
       shieldArmorByLevel,
     );
+    const stats = calculateItemStats(
+      item,
+      sparse,
+      randPropPointsByLevel,
+      globalStrings,
+    );
     result.set(item.ID, {
       itemClassId: item.ClassID,
       itemSubClassId: item.SubclassID,
@@ -407,6 +639,7 @@ export function parseWowdataItemClientData(
           ? {}
           : { equipmentSlot: inventory.equipmentSlot }),
         ...(armor === undefined ? {} : { armor }),
+        ...(stats.length === 0 ? {} : { stats }),
         requiredLevel: sparse.RequiredLevel,
         sellPriceCopper: sparse.SellPrice,
         source,
@@ -626,7 +859,7 @@ export async function enrichItemClientData({
         "--ids",
         batch.join(","),
         "--fields",
-        "ID,Display_lang,InventoryType,ItemLevel,OverallQualityID,RequiredLevel,SellPrice,ItemNameDescriptionID",
+        "ID,Display_lang,InventoryType,ItemLevel,OverallQualityID,RequiredLevel,SellPrice,ItemNameDescriptionID,StatModifier_bonusStat,StatPercentEditor",
         ...pinnedTargetArguments,
       ],
       "wowdata db2 rows ItemSparse",
@@ -748,6 +981,38 @@ export async function enrichItemClientData({
     ],
     "wowdata db2 stream ItemArmorShield",
   );
+  const randPropPointsRows = await runWowdata<WowdataRowsResult>(
+    wowdataExecutable,
+    [
+      "db2",
+      "stream",
+      "RandPropPoints",
+      "--limit",
+      "1000000",
+      "--fields",
+      "ID,GoodF,SuperiorF,EpicF",
+      "--format",
+      "json",
+      ...pinnedTargetArguments,
+    ],
+    "wowdata db2 stream RandPropPoints",
+  );
+  const globalStringRows = await runWowdata<WowdataRowsResult>(
+    wowdataExecutable,
+    [
+      "db2",
+      "stream",
+      "GlobalStrings",
+      "--limit",
+      "1000000",
+      "--fields",
+      "BaseTag,TagText_lang",
+      "--format",
+      "json",
+      ...pinnedTargetArguments,
+    ],
+    "wowdata db2 stream GlobalStrings",
+  );
   const clientData = parseWowdataItemClientData(
     { rows: clientItemRows },
     { rows: itemRows },
@@ -755,6 +1020,8 @@ export async function enrichItemClientData({
     armorQualityRows,
     armorLocationRows,
     shieldArmorRows,
+    randPropPointsRows,
+    globalStringRows,
     source,
   );
   const enrichItem = <Item extends { readonly gameId?: number | undefined }>(

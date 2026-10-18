@@ -73,6 +73,12 @@ describe("build normalization", () => {
       clientData: {
         displayName: "Heavy Leather",
         qualityId: 1,
+        stats: [{
+          statId: 5,
+          value: 2,
+          displayText: "+2 Intellect",
+          displayTone: "attribute",
+        }],
         requiredLevel: 0,
         sellPriceCopper: 15,
         source: {
@@ -111,6 +117,12 @@ describe("build normalization", () => {
     expect(normalized.items.find(({ id }) => id === "heavy-leather")?.clientData).toEqual({
       displayName: "Heavy Leather",
       qualityId: 1,
+      stats: [{
+        statId: 5,
+        value: 2,
+        displayText: "+2 Intellect",
+        displayTone: "attribute",
+      }],
       requiredLevel: 0,
       sellPriceCopper: 15,
       source: {

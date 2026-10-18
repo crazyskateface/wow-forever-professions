@@ -166,7 +166,7 @@ async function main(): Promise<void> {
     }
 
     const counts = await runner.query(
-      "SELECT (SELECT COUNT(*) FROM recipe_version WHERE build_id = $1) AS base_recipes, (SELECT COUNT(*) FROM recipe_version WHERE build_id = $2) AS target_recipes, (SELECT COUNT(*) FROM recipe_change WHERE comparison_id = $3) AS recipe_changes, (SELECT COUNT(*) FROM item_client_data WHERE recipe_build_id = $2) AS target_client_items, (SELECT COUNT(*) FROM item_quality WHERE recipe_build_id = $2) AS target_quality_items",
+      "SELECT (SELECT COUNT(*) FROM recipe_version WHERE build_id = $1) AS base_recipes, (SELECT COUNT(*) FROM recipe_version WHERE build_id = $2) AS target_recipes, (SELECT COUNT(*) FROM recipe_change WHERE comparison_id = $3) AS recipe_changes, (SELECT COUNT(*) FROM item_client_data WHERE recipe_build_id = $2) AS target_client_items, (SELECT COUNT(*) FROM item_quality WHERE recipe_build_id = $2) AS target_quality_items, (SELECT COUNT(*) FROM item_stat WHERE recipe_build_id = $2) AS target_item_stats",
       [base.build.id, target.build.id, comparison.comparison_id],
     );
     const countRow = counts.rows[0];

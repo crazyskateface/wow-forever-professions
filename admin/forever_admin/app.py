@@ -5,7 +5,7 @@ import json
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from nicegui import ui
@@ -179,7 +179,10 @@ class DashboardRuntime:
             entries.extend(result.entries)
             if result.error:
                 errors.append(result.error)
-        entries.sort(key=lambda entry: entry.timestamp or datetime.min.astimezone(), reverse=True)
+        entries.sort(
+            key=lambda entry: entry.timestamp or datetime.min.replace(tzinfo=UTC),
+            reverse=True,
+        )
         self.recent_errors = tuple(entries[:8])
         self.log_errors = tuple(str(error) for error in errors)
 

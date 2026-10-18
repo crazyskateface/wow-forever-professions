@@ -84,3 +84,25 @@ def test_structured_error_field_is_an_error_without_keyword_in_value() -> None:
 
     assert entry.level == "ERROR"
     assert entry.message == "database unavailable"
+
+
+def test_invalid_payload_timestamp_falls_back_to_cloudwatch_event_time() -> None:
+    entry = parse_log_message(
+        '{"timestamp":"not-a-date","level":"ERROR","message":"failed"}',
+        "AWS staging",
+        1_781_694_000_000,
+    )
+
+    assert entry.timestamp is not None
+    assert int(entry.timestamp.timestamp() * 1000) == 1_781_694_000_000
+
+
+def test_tab_separated_plain_log_parses_timestamp_and_level() -> None:
+    entry = parse_log_message(
+        "2026-10-17T10:00:00Z\tERROR\tdatabase unavailable",
+        "AWS staging",
+    )
+
+    assert entry.timestamp is not None
+    assert entry.level == "ERROR"
+    assert entry.message == "database unavailable"

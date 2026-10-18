@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from forever_admin.jobs import (
     JobValidationError,
     SecretRedactor,
 )
-from forever_admin.models import JobDefinition, JobState
+from forever_admin.models import JobDefinition, JobExecution, JobState
 
 
 def _policy(repo_root: Path) -> CommandPolicy:
@@ -49,6 +50,17 @@ def test_rejects_working_directory_outside_repository(tmp_path: Path) -> None:
 
     with pytest.raises(JobValidationError, match="inside the repository"):
         _policy(tmp_path).validate_job(job)
+
+
+def test_relative_executable_paths_are_normalized_from_repository_root(tmp_path: Path) -> None:
+    executable = tmp_path / "tools" / "python.exe"
+    executable.parent.mkdir()
+    executable.write_text("placeholder", encoding="utf-8")
+    policy = CommandPolicy(tmp_path, ("tools/python.exe",))
+
+    resolved = policy.resolve_command(("tools/python.exe", "--version"))
+
+    assert resolved == (os.path.abspath(executable), "--version")
 
 
 def test_redacts_secrets_from_output() -> None:
@@ -116,6 +128,41 @@ def test_job_timeout(tmp_path: Path) -> None:
 
         assert execution.status is JobState.TIMED_OUT
         assert "timeout" in (execution.error or "")
+
+    asyncio.run(scenario())
+
+
+def test_drain_splits_output_that_exceeds_stream_reader_line_limit(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        executor = JobExecutor((), _policy(tmp_path))
+        execution = JobExecution(execution_id="long-output", job_id="test", job_name="test")
+        reader = asyncio.StreamReader(limit=64)
+        payload = b"x" * 150_000
+        reader.feed_data(payload)
+        reader.feed_eof()
+
+        await executor._drain(reader, execution, "stdout")
+
+        assert b"".join(line.text.encode() for line in execution.output) == payload
+        assert all(len(line.text.encode()) <= 64 * 1024 for line in execution.output)
+
+    asyncio.run(scenario())
+
+
+def test_timeout_terminates_children_that_inherit_output_pipes(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        code = (
+            "import subprocess, sys, time; "
+            "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)']); "
+            "time.sleep(30)"
+        )
+        job = _job("process-tree", code, timeout=0.1)
+        executor = JobExecutor((job,), _policy(tmp_path))
+
+        execution = await executor.start(job.id)
+        execution = await asyncio.wait_for(executor.wait(execution.execution_id), timeout=15)
+
+        assert execution.status is JobState.TIMED_OUT
 
     asyncio.run(scenario())
 

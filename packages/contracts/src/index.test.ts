@@ -4,6 +4,7 @@ import {
   auctionPriceRequestSchema,
   healthResponseSchema,
   importedBuildDatasetSchema,
+  itemClientDataSchema,
   professionFixtureSchema,
   readinessResponseSchema,
   recipeOutputSchema,
@@ -15,6 +16,36 @@ import {
 } from "./index.js";
 
 describe("shared contracts", () => {
+  it("preserves ordered client-derived item tooltip stats", () => {
+    const parsed = itemClientDataSchema.parse({
+      displayName: "Minor Channeling Ring",
+      qualityId: 2,
+      equipmentSlot: "Finger",
+      stats: [
+        {
+          statId: 5,
+          value: 2,
+          displayText: "+2 Intellect",
+          displayTone: "attribute",
+        },
+        {
+          statId: 45,
+          value: 5,
+          displayText: "Equip: Increases spell power by 5.",
+          displayTone: "effect",
+        },
+      ],
+      requiredLevel: 0,
+      sellPriceCopper: 1875,
+      source: { product: "wow_classic_beta", build: "1.60.1.70450", locale: "enUS" },
+    });
+
+    expect(parsed.stats?.map(({ displayTone }) => displayTone)).toEqual([
+      "attribute",
+      "effect",
+    ]);
+  });
+
   it("accepts the health response shape", () => {
     expect(
       healthResponseSchema.parse({

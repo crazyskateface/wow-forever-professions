@@ -9,7 +9,7 @@ from forever_admin.models import LogEntry, LogFetchResult
 
 
 _LINE_PATTERN = re.compile(
-    r"^(?:(?P<timestamp>\d{4}-\d{2}-\d{2}[T ][^ ]+)\s+)?"
+    r"^(?:(?P<timestamp>\d{4}-\d{2}-\d{2}[T ][^\s]+)\s+)?"
     r"(?:\[(?P<bracket_level>[A-Za-z]+)\]|(?P<level>DEBUG|INFO|WARN(?:ING)?|ERROR|CRITICAL))?\s*"
     r"(?P<message>.*)$",
     re.IGNORECASE,
@@ -51,6 +51,14 @@ def _parse_timestamp(value: object) -> datetime | None:
             return datetime.fromisoformat(candidate).astimezone()
         except ValueError:
             return None
+    return None
+
+
+def _first_timestamp(*values: object) -> datetime | None:
+    for value in values:
+        parsed = _parse_timestamp(value)
+        if parsed is not None:
+            return parsed
     return None
 
 
@@ -97,7 +105,7 @@ def parse_log_message(message: str, source: str, timestamp: object = None) -> Lo
         primary = payload.get("message") or error_message or stripped
         signal = str(primary) if str(primary) != stripped else ""
         return LogEntry(
-            timestamp=_parse_timestamp(payload.get("timestamp") or payload.get("time") or timestamp),
+            timestamp=_first_timestamp(payload.get("timestamp"), payload.get("time"), timestamp),
             level=normalize_level(str(level_value) if level_value else None, signal),
             source=source,
             message=str(primary),
@@ -109,7 +117,7 @@ def parse_log_message(message: str, source: str, timestamp: object = None) -> Lo
         return LogEntry(_parse_timestamp(timestamp), normalize_level(None, stripped), source, stripped)
     groups = match.groupdict()
     return LogEntry(
-        timestamp=_parse_timestamp(groups.get("timestamp") or timestamp),
+        timestamp=_first_timestamp(groups.get("timestamp"), timestamp),
         level=normalize_level(groups.get("bracket_level") or groups.get("level"), stripped),
         source=source,
         message=groups.get("message") or stripped,

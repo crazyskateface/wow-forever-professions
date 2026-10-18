@@ -32,6 +32,9 @@ _SENSITIVE_ASSIGNMENT = re.compile(
 )
 _AWS_ACCESS_KEY = re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")
 _BEARER_TOKEN = re.compile(r"(?i)\bBearer\s+[^\s,;]+")
+_OUTPUT_READ_BYTES = 16 * 1024
+_OUTPUT_RECORD_BYTES = 64 * 1024
+_DRAIN_TIMEOUT_SECONDS = 10
 
 
 class SecretRedactor:
@@ -60,7 +63,22 @@ class SecretRedactor:
 class CommandPolicy:
     def __init__(self, repo_root: Path, allowed_executables: tuple[str, ...]) -> None:
         self.repo_root = repo_root.resolve()
-        self.allowed = {value.casefold() for value in allowed_executables}
+        self.allowed_names = {
+            value.casefold()
+            for value in allowed_executables
+            if Path(value).name == value
+        }
+        self.allowed_paths = {
+            self._normalize_explicit_path(value)
+            for value in allowed_executables
+            if Path(value).name != value
+        }
+
+    def _normalize_explicit_path(self, value: str) -> str:
+        path = Path(value)
+        if not path.is_absolute():
+            path = self.repo_root / path
+        return os.path.normcase(os.path.abspath(path))
 
     def validate_job(self, job: JobDefinition) -> Path:
         if not job.commands:
@@ -81,10 +99,10 @@ class CommandPolicy:
             raise JobValidationError("Commands cannot be empty.")
         executable = command[0]
         executable_path = Path(executable)
-        normalized = executable.casefold() if executable_path.name == executable else str(executable_path.resolve()).casefold()
-        if normalized not in self.allowed and executable_path.name.casefold() not in self.allowed:
-            raise JobValidationError(f"Executable is not allowlisted: {executable_path.name}")
-        if executable_path.name != executable and normalized not in self.allowed:
+        if executable_path.name == executable:
+            if executable.casefold() not in self.allowed_names:
+                raise JobValidationError(f"Executable is not allowlisted: {executable_path.name}")
+        elif self._normalize_explicit_path(executable) not in self.allowed_paths:
             raise JobValidationError("Executable paths must be explicitly allowlisted.")
         for argument in command:
             if not argument or "\x00" in argument or "\n" in argument or "\r" in argument:
@@ -96,7 +114,9 @@ class CommandPolicy:
         self.validate_command(command)
         executable = command[0]
         if Path(executable).name != executable:
-            resolved = str(Path(executable).resolve())
+            resolved = os.path.abspath(
+                Path(executable) if Path(executable).is_absolute() else self.repo_root / executable
+            )
         else:
             located = shutil.which(executable)
             if located is None:
@@ -192,8 +212,28 @@ class JobExecutor:
     ) -> None:
         if reader is None:
             return
-        while line := await reader.readline():
-            self._append(execution, stream, line.decode("utf-8", errors="replace"))
+        pending = bytearray()
+        while chunk := await reader.read(_OUTPUT_READ_BYTES):
+            pending.extend(chunk)
+            while pending:
+                newline = pending.find(b"\n")
+                if 0 <= newline < _OUTPUT_RECORD_BYTES:
+                    record_length = newline + 1
+                elif len(pending) >= _OUTPUT_RECORD_BYTES:
+                    record_length = _OUTPUT_RECORD_BYTES
+                else:
+                    break
+                record = bytes(pending[:record_length])
+                del pending[:record_length]
+                self._append(execution, stream, record.decode("utf-8", errors="replace"))
+        if pending:
+            self._append(execution, stream, pending.decode("utf-8", errors="replace"))
+
+    async def _finish_drains(self, drains: tuple[asyncio.Task[None], ...]) -> None:
+        _, pending = await asyncio.wait(drains, timeout=_DRAIN_TIMEOUT_SECONDS)
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*drains, return_exceptions=True)
 
     async def _run(self, job: JobDefinition, execution: JobExecution) -> None:
         working_directory = self.policy.validate_job(job)
@@ -235,7 +275,7 @@ class JobExecutor:
                     self._append(execution, "system", execution.error)
                     break
                 finally:
-                    await asyncio.gather(*drains, return_exceptions=True)
+                    await self._finish_drains(drains)
                     self._processes.pop(execution.execution_id, None)
 
                 if execution.cancel_requested:
@@ -270,5 +310,25 @@ class JobExecutor:
             await asyncio.wait_for(process.wait(), timeout=5)
         except (ProcessLookupError, TimeoutError):
             if process.returncode is None:
-                process.kill()
-                await process.wait()
+                if os.name == "nt":
+                    taskkill = shutil.which("taskkill.exe") or shutil.which("taskkill")
+                    if taskkill is not None:
+                        killer = await asyncio.create_subprocess_exec(
+                            taskkill,
+                            "/PID",
+                            str(process.pid),
+                            "/T",
+                            "/F",
+                            stdout=asyncio.subprocess.DEVNULL,
+                            stderr=asyncio.subprocess.DEVNULL,
+                        )
+                        await killer.wait()
+                    if process.returncode is None:
+                        process.kill()
+                else:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                if process.returncode is None:
+                    await asyncio.wait_for(process.wait(), timeout=5)

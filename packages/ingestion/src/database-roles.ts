@@ -26,6 +26,7 @@ const catalogTables = [
   "item_classification",
   "item_client_data",
   "item_quality",
+  "item_stat",
 ] as const;
 
 const pricingTables = ["auction_market", "auction_price_current"] as const;

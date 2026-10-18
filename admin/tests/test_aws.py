@@ -55,6 +55,34 @@ class _Logs:
         )
 
 
+class _LimitedLogPaginator:
+    def __init__(self, events: list[dict[str, Any]]) -> None:
+        self.events = events
+        self.kwargs: dict[str, Any] | None = None
+
+    def paginate(self, **kwargs: Any):
+        self.kwargs = kwargs
+        maximum = int(kwargs["PaginationConfig"]["MaxItems"])
+        yield {"events": self.events[:maximum]}
+
+
+class _NewestLogs:
+    def __init__(self) -> None:
+        self.paginator = _LimitedLogPaginator(
+            [
+                {
+                    "timestamp": 1_781_694_000_000 + index,
+                    "message": f'{{"level":"ERROR","message":"error-{index}"}}',
+                }
+                for index in range(30)
+            ]
+        )
+
+    def get_paginator(self, operation: str) -> _LimitedLogPaginator:
+        assert operation == "filter_log_events"
+        return self.paginator
+
+
 def test_cloudwatch_retrieval_uses_mocked_clients() -> None:
     clients = {"cloudformation": _CloudFormation(), "logs": _Logs()}
     settings = AwsSettings(
@@ -87,6 +115,33 @@ def test_access_log_filter_uses_structured_status_and_integration_fields() -> No
 
     assert pattern == '{ ($.status = %5[0-9][0-9]%) || ($.integrationError != "-") }'
     assert cloudwatch_filter_pattern("ERROR", "/aws/lambda/forever-api") is not None
+
+
+def test_cloudwatch_retrieval_keeps_newest_events_after_scanning() -> None:
+    logs = _NewestLogs()
+    clients = {"cloudformation": _CloudFormation(), "logs": logs}
+    monitor = AwsMonitor(
+        AwsSettings(
+            enabled=True,
+            profile=None,
+            region="us-east-1",
+            lookback_hours=24,
+            environments=(),
+        ),
+        client_factory=lambda service: clients[service],
+    )
+    environment = AwsEnvironment(
+        stage="staging",
+        label="Staging",
+        application_stack="App",
+        data_stack="Data",
+    )
+
+    result = monitor.fetch_logs(environment, limit=2, level="ERROR")
+
+    assert [entry.message for entry in result.entries] == ["error-29", "error-28"]
+    assert logs.paginator.kwargs is not None
+    assert logs.paginator.kwargs["PaginationConfig"] == {"MaxItems": 5_000}
 
 
 def test_reset_discards_cached_clients() -> None:

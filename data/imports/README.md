@@ -17,7 +17,7 @@ recipes matched by profession ID and spell ID.
 archive checksums, and immutable output targets used by the local admin panel's
 source-refresh workflow. The downloaded archives stay under ignored `.local-data/`.
 
-The dataset contains 603 Leatherworking recipes for client build `1.60.1.69977`. The frontend also carries 760 lossless WebP item icons extracted from the installed Forever client build `1.60.1.70374`; `apps/web/public/icons/items/manifest.json` records both build identities, every item-to-FileDataID mapping, and any missing IDs. The same pinned client build classifies seven referenced items through `ItemSparse.ItemNameDescriptionID`, including the three Leatherworking reagents labeled `Scarce`. It also provides display name, rarity ID, equipment slot, required level, and vendor sell price for 630 referenced items; 452 have equipment slots and 443 have armor derived from the client's armor tables. Each record retains its source product, build, and locale. It is useful product data, but it is deliberately not labeled authoritative:
+The dataset contains 603 Leatherworking recipes for client build `1.60.1.69977`. The frontend also carries 760 lossless WebP item icons extracted from installed Forever client build `1.60.1.70374`; `apps/web/public/icons/items/manifest.json` records both build identities, every item-to-FileDataID mapping, and any missing IDs. Tooltip metadata comes from the newer installed client build `1.60.1.70450`. That pinned client classifies seven referenced items through `ItemSparse.ItemNameDescriptionID`, including the three Leatherworking reagents labeled `Scarce`, and provides display name, rarity ID, equipment slot, required level, and vendor sell price for 630 referenced items. Of those, 452 have equipment slots, 443 have armor derived from the client's armor tables, and 427 expose 1,174 ordered stat lines derived from client allocations, random-property budgets, and localized strings. Each record retains its source product, build, and locale. It is useful product data, but it is deliberately not labeled authoritative:
 
 - every recipe remains `unverified` until Forever-specific evidence is reviewed;
 - 130 referenced item IDs have no `ItemSparse` row in the pinned client and therefore
@@ -29,7 +29,7 @@ The dataset contains 603 Leatherworking recipes for client build `1.60.1.69977`.
 - 60 recipes carry a specialization requirement;
 - the source does not encode crafted stack sizes, so 595 output quantities remain provisionally one after the eight reviewed overrides.
 
-The known-learning-rank subset has no candidate coverage gaps from skill 1 through 299. That is enough to begin optimizer experiments, but it does not establish that every selected recipe is obtainable. The current JSON SHA-256 is `6ef7940ca283a866a9accb53cd308706e723e0c96e9dfbc517315709de76c1f7`.
+The known-learning-rank subset has no candidate coverage gaps from skill 1 through 299. That is enough to begin optimizer experiments, but it does not establish that every selected recipe is obtainable. The current JSON SHA-256 is `da3636f33a4459de7509854bb85f11eceefe5a10ec223a54de6c3acf53b9168b`.
 
 ## Manual corrections
 

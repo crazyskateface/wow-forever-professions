@@ -8,8 +8,10 @@ import re
 import shutil
 import subprocess
 import sys
+import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -258,9 +260,13 @@ def without_client_enrichment(environment: dict[str, str]) -> dict[str, str]:
 
 def _replace_versions(path: Path, old: dict[str, Any], new: dict[str, SourceRelease]) -> None:
     contents = path.read_text(encoding="utf-8")
-    for key in ("professionDb", "itemDb"):
-        old_version = str(old[key]["version"])
-        contents = contents.replace(old_version, new[key].version)
+    for project in PROJECTS:
+        old_version = str(old[project.key]["version"])
+        contents = re.sub(
+            rf"\b{re.escape(project.label)} {re.escape(old_version)}\b",
+            f"{project.label} {new[project.key].version}",
+            contents,
+        )
     path.write_text(contents, encoding="utf-8")
 
 
@@ -314,6 +320,58 @@ def _build_id(path: Path) -> str:
     return str(build["id"])
 
 
+def _target_path(targets: dict[str, Any], key: str) -> Path:
+    value = targets.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise SourceRefreshError(f"Source release target {key!r} must be a non-empty path.")
+    candidate = Path(value)
+    resolved = (candidate if candidate.is_absolute() else REPO_ROOT / candidate).resolve()
+    if not resolved.is_relative_to(REPO_ROOT):
+        raise SourceRefreshError(f"Source release target {key!r} must stay inside the repository.")
+    return resolved
+
+
+def _publish_file(source: Path, destination: Path) -> None:
+    if not source.is_file():
+        raise SourceRefreshError(f"Generated file is missing: {source}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    incoming = destination.with_name(f".{destination.name}.refresh-{uuid.uuid4().hex}")
+    try:
+        shutil.copy2(source, incoming)
+        incoming.replace(destination)
+    except OSError as error:
+        raise SourceRefreshError(f"Could not publish generated file {destination}: {error}") from error
+    finally:
+        incoming.unlink(missing_ok=True)
+
+
+def _publish_directory(source: Path, destination: Path) -> None:
+    if not source.is_dir():
+        raise SourceRefreshError(f"Generated directory is missing: {source}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    token = uuid.uuid4().hex
+    incoming = destination.with_name(f".{destination.name}.refresh-{token}")
+    backup = destination.with_name(f".{destination.name}.backup-{token}")
+    moved_existing = False
+    try:
+        shutil.copytree(source, incoming)
+        if destination.exists():
+            destination.replace(backup)
+            moved_existing = True
+        incoming.replace(destination)
+    except OSError as error:
+        if moved_existing and backup.exists() and not destination.exists():
+            backup.replace(destination)
+        raise SourceRefreshError(
+            f"Could not publish generated directory {destination}: {error}"
+        ) from error
+    finally:
+        if incoming.exists():
+            shutil.rmtree(incoming)
+        if backup.exists():
+            shutil.rmtree(backup)
+
+
 def refresh_sources(force: bool = False) -> int:
     source_lock = _read_json(SOURCE_LOCK)
     current = source_lock.get("projects")
@@ -357,54 +415,93 @@ def refresh_sources(force: bool = False) -> int:
             "PROFESSION_DB_SOURCE_URL": completed["professionDb"].pageUrl,
         }
     )
-    forever = str(targets["foreverDataset"])
-    classic = str(targets["classicDataset"])
-    _run(
-        [
-            "pnpm",
-            "data:convert:professiondb",
-            str(roots["professionDb"]),
-            str(roots["itemDb"]),
-            forever,
-            "Forever",
-            "-",
-            str(targets["overrides"]),
-            wow_client_root,
-            str(targets["iconDirectory"]),
-        ],
-        environment,
-    )
-    classic_environment = without_client_enrichment(environment)
-    _run(
-        [
-            "pnpm",
-            "data:convert:professiondb",
-            str(roots["professionDb"]),
-            str(roots["itemDb"]),
-            classic,
-            "Vanilla",
-            forever,
-        ],
-        classic_environment,
-    )
-    _run(["pnpm", "data:audit", forever, str(targets["foreverQuality"])], environment)
-    _run(["pnpm", "data:audit", classic, str(targets["classicQuality"])], environment)
+    target_paths = {
+        key: _target_path(targets, key)
+        for key in (
+            "foreverDataset",
+            "classicDataset",
+            "foreverQuality",
+            "classicQuality",
+            "overrides",
+            "iconDirectory",
+        )
+    }
+    CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix="generated-", dir=CACHE_ROOT) as temporary:
+        staging_root = Path(temporary)
+        staged = {
+            "foreverDataset": staging_root / target_paths["foreverDataset"].name,
+            "classicDataset": staging_root / target_paths["classicDataset"].name,
+            "foreverQuality": staging_root / target_paths["foreverQuality"].name,
+            "classicQuality": staging_root / target_paths["classicQuality"].name,
+            "iconDirectory": staging_root / "item-icons",
+        }
+        _run(
+            [
+                "pnpm",
+                "data:convert:professiondb",
+                str(roots["professionDb"]),
+                str(roots["itemDb"]),
+                str(staged["foreverDataset"]),
+                "Forever",
+                "-",
+                str(target_paths["overrides"]),
+                wow_client_root,
+                str(staged["iconDirectory"]),
+            ],
+            environment,
+        )
+        classic_environment = without_client_enrichment(environment)
+        _run(
+            [
+                "pnpm",
+                "data:convert:professiondb",
+                str(roots["professionDb"]),
+                str(roots["itemDb"]),
+                str(staged["classicDataset"]),
+                "Vanilla",
+                str(staged["foreverDataset"]),
+            ],
+            classic_environment,
+        )
+        _run(
+            [
+                "pnpm",
+                "data:audit",
+                str(staged["foreverDataset"]),
+                str(staged["foreverQuality"]),
+            ],
+            environment,
+        )
+        _run(
+            [
+                "pnpm",
+                "data:audit",
+                str(staged["classicDataset"]),
+                str(staged["classicQuality"]),
+            ],
+            environment,
+        )
 
-    builds = {
-        "forever": _build_id(REPO_ROOT / forever),
-        "classic": _build_id(REPO_ROOT / classic),
-    }
-    expected_builds = {
-        "forever": re.search(r"forever-([0-9.]+)-", forever),
-        "classic": re.search(r"classic-era-([0-9.]+)-", classic),
-    }
-    for key, match in expected_builds.items():
-        if match is None or builds[key] != match.group(1):
-            raise SourceRefreshError(
-                f"The latest {key} source targets build {builds[key]}, but the configured immutable "
-                f"snapshot path targets {match.group(1) if match else 'an unknown build'}. "
-                "Add a new versioned snapshot path before publishing it."
-            )
+        builds = {
+            "forever": _build_id(staged["foreverDataset"]),
+            "classic": _build_id(staged["classicDataset"]),
+        }
+        expected_builds = {
+            "forever": re.search(r"forever-([0-9.]+)-", target_paths["foreverDataset"].name),
+            "classic": re.search(r"classic-era-([0-9.]+)-", target_paths["classicDataset"].name),
+        }
+        for key, match in expected_builds.items():
+            if match is None or builds[key] != match.group(1):
+                raise SourceRefreshError(
+                    f"The latest {key} source targets build {builds[key]}, but the configured immutable "
+                    f"snapshot path targets {match.group(1) if match else 'an unknown build'}. "
+                    "Add a new versioned snapshot path before publishing it."
+                )
+
+        for key in ("foreverDataset", "classicDataset", "foreverQuality", "classicQuality"):
+            _publish_file(staged[key], target_paths[key])
+        _publish_directory(staged["iconDirectory"], target_paths["iconDirectory"])
 
     _update_notices(current, completed, builds)
     source_lock["projects"] = {key: asdict(value) for key, value in completed.items()}

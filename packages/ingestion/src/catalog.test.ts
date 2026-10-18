@@ -95,6 +95,16 @@ describe("SQL recipe catalog", () => {
             },
           ]);
         }
+        if (sql.startsWith("SELECT item_id, stat_index")) {
+          return result([{
+            item_id: "item-2308",
+            stat_index: 0,
+            stat_id: 45,
+            stat_value: 5,
+            display_text: "Equip: Increases spell power by 5.",
+            display_tone: "effect",
+          }]);
+        }
         throw new Error(`Unexpected SQL: ${sql}`);
       },
     };
@@ -138,6 +148,12 @@ describe("SQL recipe catalog", () => {
               qualityId: 2,
               equipmentSlot: "Back",
               armor: 14,
+              stats: [{
+                statId: 45,
+                value: 5,
+                displayText: "Equip: Increases spell power by 5.",
+                displayTone: "effect",
+              }],
               requiredLevel: 10,
               sellPriceCopper: 267,
               source: { build: "1.60.1.70374" },

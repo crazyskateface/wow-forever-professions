@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import os
+import sys
 from dataclasses import replace
 from datetime import datetime
 
+from forever_admin import config as config_module
 from forever_admin.app import DashboardRuntime, _job_render_signature, _source_version_summary
-from forever_admin.config import load_config
+from forever_admin.config import LocalLogSource, load_config
 from forever_admin.models import JobExecution, JobOutputLine, JobState
 
 
@@ -66,3 +70,42 @@ def test_combined_local_update_job_runs_refresh_before_catalog_sync() -> None:
 
     assert job.commands[0][1:] == ("-m", "forever_admin.source_refresh", "refresh")
     assert job.commands[1][1:] == ("-m", "forever_admin.local_catalog_sync")
+
+
+def test_recent_error_refresh_accepts_timestamp_less_entries(tmp_path) -> None:
+    path = tmp_path / "api.log"
+    path.write_text("ERROR database unavailable\n", encoding="utf-8")
+    config = load_config()
+    config = replace(
+        config,
+        aws=replace(config.aws, environments=()),
+        local_log_sources=(LocalLogSource("api", "Local API", path),),
+    )
+    runtime = DashboardRuntime(config)
+
+    asyncio.run(runtime.refresh_recent_errors())
+
+    assert len(runtime.recent_errors) == 1
+    assert runtime.recent_errors[0].timestamp is None
+
+
+def test_config_preserves_the_active_python_executable_path(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    active_python = tmp_path / "venv" / ("python.exe" if sys.platform == "win32" else "python")
+    monkeypatch.delenv("ADMIN_PYTHON", raising=False)
+    monkeypatch.setenv("ADMIN_ENV_FILE", str(tmp_path / "missing.env"))
+    monkeypatch.setattr(config_module.sys, "executable", str(active_python))
+
+    config = load_config()
+
+    expected = os.path.abspath(active_python)
+    assert os.environ["ADMIN_PYTHON"] == expected
+    python_commands = [
+        command[0]
+        for job in config.jobs
+        for command in job.commands
+        if command[0] == expected
+    ]
+    assert python_commands

@@ -35,7 +35,8 @@ The current product data is Leatherworking only:
 | --- | --- | --- |
 | Classic comparison baseline | `1.15.9.69722` | `data/imports/classic-era-1.15.9.69722-leatherworking.json` |
 | Forever target catalog | `1.60.1.69977` | `data/imports/forever-1.60.1.69977-leatherworking.json` |
-| Client icons and item labels | `1.60.1.70374` | `apps/web/public/icons/items/manifest.json` plus classification source metadata |
+| Client icons | `1.60.1.70374` | `apps/web/public/icons/items/manifest.json` |
+| Item labels and tooltip metadata | `1.60.1.70450` | Classification and client-data source metadata in the Forever catalog |
 
 The target contains 603 recipes and 760 referenced items. Its current Classic →
 Forever comparison is 289 New, 227 Updated, 0 Removed, and 87 Unchanged logical
@@ -132,8 +133,9 @@ serves the latest stored comparison of the requested comparison type.
   client source product/build/locale because enrichment may come from a newer client
   than the recipe archive.
 - Tooltip records are also recipe-build scoped and retain their actual client source.
-  A missing `ItemSparse` row stays missing; do not backfill name, rarity, level, armor,
-  or sell price from another game version.
+  Ordered stat lines preserve both their numeric stat identity and the localized client
+  display text. A missing `ItemSparse` row stays missing; do not backfill name, rarity,
+  level, armor, stat lines, or sell price from another game version.
 - Missing auction prices are unavailable, never zero.
 
 ## Item assets
@@ -154,9 +156,11 @@ back to the smaller comparison snapshot because no current catalog record exists
 Calculator output and reagent icons are also buttons that pin the tooltip, move focus
 to its close control, and restore focus when the close button or Escape dismisses it;
 an outside click also closes it. Tooltip content is limited to catalog-backed item
-class, subclass, item rarity, equipment slot, armor, required level, vendor sell
-price, classification, quantity, recipe, market price, and ID facts. Do not infer
-binding, stats, or any other field absent from the imported data. Rarity comes from
+class, subclass, item rarity, equipment slot, armor, ordered item stats, required
+level, vendor sell price, classification, quantity, recipe, market price, and ID
+facts. Attribute stat lines use ordinary tooltip text and equip-effect lines use green
+text, with the effect meaning also stated in the content. Do not infer binding or any
+other field absent from the imported data. Rarity comes from
 `ItemSparse.OverallQualityID`; do not derive it from an item name or icon. Visible item
 and crafted-output names use the shared `getItemRarityNameClass` helper so the guide,
 catalog, calculator, changes view, route planner, shopping list, and tooltip stay
@@ -290,7 +294,7 @@ misclassify that host-level temp failure as a product test failure.
   requests.
 - The add-on collection approach is deferred; the current pipeline relies on source
   archives, installed-client DB2 data, reviewed overrides, and quality reporting.
-- Aurora DSQL migrations 017–024 have not yet completed the same live revalidation as
+- Aurora DSQL migrations 017–026 have not yet completed the same live revalidation as
   migrations 001–016.
 
 ## Documentation maintenance

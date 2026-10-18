@@ -149,11 +149,19 @@ export const itemClassificationSchema = z.object({
   source: itemClientSourceSchema,
 });
 
+export const itemStatSchema = z.object({
+  statId: z.number().int().nonnegative(),
+  value: z.number().int(),
+  displayText: z.string().min(1),
+  displayTone: z.enum(["attribute", "effect"]),
+});
+
 export const itemClientDataSchema = z.object({
   displayName: z.string().min(1),
   qualityId: z.number().int().nonnegative().optional(),
   equipmentSlot: z.string().min(1).optional(),
   armor: z.number().int().nonnegative().optional(),
+  stats: z.array(itemStatSchema).max(10).optional(),
   requiredLevel: z.number().int().nonnegative(),
   sellPriceCopper: z.number().int().nonnegative(),
   source: itemClientSourceSchema,
@@ -719,6 +727,7 @@ export type ImportedRecipe = z.infer<typeof importedRecipeSchema>;
 export type ItemClientData = z.infer<typeof itemClientDataSchema>;
 export type ItemClientSource = z.infer<typeof itemClientSourceSchema>;
 export type ItemClassification = z.infer<typeof itemClassificationSchema>;
+export type ItemStat = z.infer<typeof itemStatSchema>;
 export type ItemModel = z.infer<typeof itemModelSchema>;
 export type NormalizedBuild = z.infer<typeof normalizedBuildSchema>;
 export type ProfessionModel = z.infer<typeof professionModelSchema>;

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -309,11 +310,12 @@ class AwsMonitor:
             )
             entries = []
             for group in groups:
+                group_entries = deque(maxlen=limit)
                 kwargs: dict[str, Any] = {
                     "logGroupName": group,
                     "startTime": start_time,
                     "interleaved": True,
-                    "PaginationConfig": {"MaxItems": max(limit, 20)},
+                    "PaginationConfig": {"MaxItems": 5_000},
                 }
                 filter_pattern = cloudwatch_filter_pattern(level, group)
                 if filter_pattern:
@@ -327,7 +329,8 @@ class AwsMonitor:
                             event.get("timestamp"),
                         )
                         if level == "ALL" or entry.level == level:
-                            entries.append(entry)
+                            group_entries.append(entry)
+                entries.extend(group_entries)
             entries.sort(
                 key=lambda entry: entry.timestamp or datetime.min.replace(tzinfo=UTC),
                 reverse=True,

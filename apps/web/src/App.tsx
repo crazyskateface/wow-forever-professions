@@ -232,6 +232,7 @@ function tooltipItemData(item: TooltipRecipeItem): Omit<ItemTooltipData, "detail
       ? {}
       : { equipmentSlot: clientData.equipmentSlot }),
     ...(clientData?.armor === undefined ? {} : { armor: clientData.armor }),
+    ...(clientData?.stats === undefined ? {} : { stats: clientData.stats }),
     ...(clientData?.requiredLevel === undefined
       ? {}
       : { requiredLevel: clientData.requiredLevel }),

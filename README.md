@@ -57,8 +57,9 @@ data.
 - Shows catalog-backed item details after a one-second pointer hover or when the
   owning recipe control receives keyboard focus. Calculator icons can pin the
   tooltip on click and support close-button, Escape, and outside-click dismissal.
-  Imported client metadata supplies in-game rarity, equipment slot, armor, required
-  level, and vendor sell price when those fields are available. Item names throughout
+  Imported client metadata supplies in-game rarity, equipment slot, armor, primary
+  attributes, green equip-effect text, required level, and vendor sell price when
+  those fields are available. Item names throughout
   the guide, catalog, calculator, changes view, route planner, shopping list, and
   tooltips use the familiar gray, white, green, blue, and purple rarity colors.
   Tooltips also spell out the rarity alongside the item category.
@@ -129,19 +130,22 @@ data.
 - Imports generic client item labels through
   `ItemSparse.ItemNameDescriptionID → ItemNameDescription`, preserving the source
   product, client build, and locale. The current Leatherworking set contains three
-  `Scarce` reagents and four `Crafted` outputs from client build `1.60.1.70374`.
-- Imports build-scoped item display names, rarity IDs, equipment slots, armor,
-  required levels, and vendor sell prices from the same pinned client. Armor is
-  derived from the client's armor-total, quality, location, and shield tables
-  instead of guessed from an item name.
+  `Scarce` reagents and four `Crafted` outputs from client build `1.60.1.70450`.
+- Imports build-scoped item display names, rarity IDs, equipment slots, armor, item
+  stat lines, required levels, and vendor sell prices from the same pinned client.
+  Armor is derived from the client's armor-total, quality, location, and shield
+  tables. Stat values combine the client's item allocations with its level-, quality-,
+  and slot-specific random-property budgets, and use localized client strings rather
+  than guessed item-name heuristics.
 - Extracts local client icons through `wowdata`, including the equipment-appearance
   fallback path, and writes a build-stamped manifest.
 - Produces a repeatable quality audit instead of filling unknown facts with guesses.
 
 ## Current data boundary
 
-The bundled target is Forever build `1.60.1.69977`; client-derived icons, item-name
-descriptions, and tooltip attributes come from installed beta client build
+The bundled target is Forever build `1.60.1.69977`; client-derived item-name
+descriptions and tooltip attributes come from installed beta client build
+`1.60.1.70450`, while the unchanged icon bundle remains stamped with asset build
 `1.60.1.70374`. The Classic Era baseline is build `1.15.9.69722`.
 
 The data is useful but not authoritative:
@@ -152,6 +156,7 @@ The data is useful but not authoritative:
 - 630 of 760 referenced items have client tooltip attributes, including rarity; the
   other 130 have no `ItemSparse` row in the pinned client build and remain explicitly
   unenriched;
+- 427 referenced items expose 1,174 ordered client stat lines;
 - 90 recipes reference at least one item missing an English name in the source
   snapshot;
 - 595 output quantities remain provisional after reviewed overrides.
