@@ -80,6 +80,8 @@ describe("item icon extraction", () => {
     const records = parseWowdataItemClientData(
       {
         rows: [
+          { ID: 1449, ClassID: 4, SubclassID: 0, InventoryType: 11 },
+          { ID: 1450, ClassID: 4, SubclassID: 0, InventoryType: 11 },
           { ID: 2308, ClassID: 4, SubclassID: 1, InventoryType: 16 },
           { ID: 2318, ClassID: 7, SubclassID: 6, InventoryType: 0 },
           { ID: 9999, ClassID: 4, SubclassID: 1, InventoryType: 20 },
@@ -88,6 +90,28 @@ describe("item icon extraction", () => {
       {
         rows: [
           {
+            ID: 1449,
+            Display_lang: "Minor Channeling Ring",
+            InventoryType: 11,
+            ItemLevel: 24,
+            OverallQualityID: 2,
+            RequiredLevel: 0,
+            SellPrice: 1875,
+            StatModifier_bonusStat: [5, 45, -1, -1, -1, -1, -1, -1, -1, -1],
+            StatPercentEditor: [4000, 9360, 0, 0, 0, 0, 0, 0, 0, 0],
+          },
+          {
+            ID: 1450,
+            Display_lang: "Regeneration Test Ring",
+            InventoryType: 11,
+            ItemLevel: 24,
+            OverallQualityID: 2,
+            RequiredLevel: 20,
+            SellPrice: 2000,
+            StatModifier_bonusStat: [43, 46, -1, -1, -1, -1, -1, -1, -1, -1],
+            StatPercentEditor: [10000, 10000, 0, 0, 0, 0, 0, 0, 0, 0],
+          },
+          {
             ID: 2308,
             Display_lang: "Fine Leather Cloak",
             InventoryType: 16,
@@ -95,6 +119,8 @@ describe("item icon extraction", () => {
             OverallQualityID: 2,
             RequiredLevel: 10,
             SellPrice: 267,
+            StatModifier_bonusStat: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+            StatPercentEditor: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           },
           {
             ID: 2318,
@@ -104,6 +130,8 @@ describe("item icon extraction", () => {
             OverallQualityID: 1,
             RequiredLevel: 0,
             SellPrice: 15,
+            StatModifier_bonusStat: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+            StatPercentEditor: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           },
           {
             ID: 9999,
@@ -113,6 +141,8 @@ describe("item icon extraction", () => {
             OverallQualityID: 2,
             RequiredLevel: 10,
             SellPrice: 300,
+            StatModifier_bonusStat: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+            StatPercentEditor: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           },
         ],
       },
@@ -137,8 +167,62 @@ describe("item icon extraction", () => {
         ],
       },
       { rows: [] },
+      {
+        rows: [{
+          ID: 24,
+          GoodF: [8, 6, 5, 3, 3],
+          SuperiorF: [13, 10, 7, 6, 4],
+          EpicF: [19, 14, 11, 8, 6],
+        }],
+      },
+      {
+        rows: [
+          { BaseTag: "ITEM_MOD_INTELLECT", TagText_lang: "%c%s Intellect" },
+          { BaseTag: "ITEM_MOD_SPELL_POWER", TagText_lang: "Increases spell power by %s." },
+          { BaseTag: "ITEM_MOD_MANA_REGENERATION", TagText_lang: "Restores %s mana per 5 sec." },
+          { BaseTag: "ITEM_MOD_HEALTH_REGEN", TagText_lang: "Restores %s health per 5 sec." },
+        ],
+      },
       source,
     );
+
+    expect(records.get(1449)?.clientData).toEqual({
+      displayName: "Minor Channeling Ring",
+      qualityId: 2,
+      equipmentSlot: "Finger",
+      stats: [
+        {
+          statId: 5,
+          value: 2,
+          displayText: "+2 Intellect",
+          displayTone: "attribute",
+        },
+        {
+          statId: 45,
+          value: 5,
+          displayText: "Equip: Increases spell power by 5.",
+          displayTone: "effect",
+        },
+      ],
+      requiredLevel: 0,
+      sellPriceCopper: 1875,
+      source,
+    });
+
+    expect(records.get(1450)?.clientData.stats).toEqual([
+      {
+        statId: 43,
+        value: 5,
+        displayText: "Equip: Restores 5 mana per 5 sec.",
+        displayTone: "effect",
+      },
+      {
+        statId: 46,
+        value: 5,
+        displayText: "Equip: Restores 5 health per 5 sec.",
+        displayTone: "effect",
+      },
+    ]);
 
     expect(records.get(2308)).toEqual({
       itemClassId: 4,

@@ -17,6 +17,8 @@ Professions: 1 · Recipes: 603 · Items: 760
 - Item rarities: 630/760
 - Equipment slots: 452/760
 - Armor values: 443/760
+- Items with tooltip stats: 427/760
+- Tooltip stat lines: 1174
 - Required levels: 630/760
 - Vendor sell prices: 630/760
 

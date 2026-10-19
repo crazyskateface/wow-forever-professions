@@ -7,9 +7,28 @@ import {
   type ValidationRecipe,
 } from "./index.js";
 
+const verifiedRouteEvidence = {
+  level: "verified",
+  reasons: [],
+  acquisition: "trainer",
+  availability: "available",
+  provenanceSource: "observed-in-game",
+  verificationStatus: "verified",
+} as const;
+
+const unknownRouteEvidence = {
+  level: "unknown",
+  reasons: ["unknown-acquisition", "unknown-availability"],
+  acquisition: "unknown",
+  availability: "unknown",
+  provenanceSource: "client-data",
+  verificationStatus: "unverified",
+} as const;
+
 const route: CompleteRouteResult = {
   status: "complete",
   objective: "crafts",
+  confidencePolicy: "practical",
   startSkill: 1,
   targetSkill: 4,
   steps: [
@@ -20,6 +39,7 @@ const route: CompleteRouteResult = {
       skillUpProbability: 1,
       expectedCrafts: 1,
       expectedMaterials: 2,
+      evidence: verifiedRouteEvidence,
     },
     {
       skill: 2,
@@ -28,6 +48,7 @@ const route: CompleteRouteResult = {
       skillUpProbability: 1,
       expectedCrafts: 1,
       expectedMaterials: 2,
+      evidence: verifiedRouteEvidence,
     },
     {
       skill: 3,
@@ -36,6 +57,7 @@ const route: CompleteRouteResult = {
       skillUpProbability: 0.5,
       expectedCrafts: 2,
       expectedMaterials: 6,
+      evidence: unknownRouteEvidence,
     },
   ],
   segments: [
@@ -47,6 +69,7 @@ const route: CompleteRouteResult = {
       expectedSkillUps: 2,
       expectedCrafts: 2,
       expectedMaterials: 4,
+      evidence: verifiedRouteEvidence,
       alternatives: [],
     },
     {
@@ -57,6 +80,7 @@ const route: CompleteRouteResult = {
       expectedSkillUps: 1,
       expectedCrafts: 2,
       expectedMaterials: 6,
+      evidence: unknownRouteEvidence,
       alternatives: [],
     },
   ],
@@ -216,6 +240,7 @@ describe("guide route validation", () => {
     const duplicateRoute: CompleteRouteResult = {
       status: "complete",
       objective: "crafts",
+      confidencePolicy: "practical",
       startSkill: 1,
       targetSkill: 2,
       steps: [{
@@ -225,6 +250,7 @@ describe("guide route validation", () => {
         skillUpProbability: 1,
         expectedCrafts: 1,
         expectedMaterials: 1,
+        evidence: verifiedRouteEvidence,
       }],
       segments: [{
         recipeId: "duplicate-a",
@@ -234,6 +260,7 @@ describe("guide route validation", () => {
         expectedSkillUps: 1,
         expectedCrafts: 1,
         expectedMaterials: 1,
+        evidence: verifiedRouteEvidence,
         alternatives: [],
       }],
       totals: {
@@ -314,6 +341,7 @@ describe("guide route validation", () => {
     expect(report).toContain("[Example](https://example.com)");
     expect(report).toContain("`project-data-uncertainty`");
     expect(report).toContain("Pristine Hide");
+    expect(report.endsWith("\n\n")).toBe(false);
   });
 
   it("rejects a reference for a different route range", () => {

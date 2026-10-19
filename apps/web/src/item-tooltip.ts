@@ -14,6 +14,10 @@ export interface ItemTooltipData {
   readonly inventoryType?: string;
   readonly equipmentSlot?: string;
   readonly armor?: number;
+  readonly stats?: readonly {
+    readonly displayText: string;
+    readonly displayTone: "attribute" | "effect";
+  }[];
   readonly requiredLevel?: number;
   readonly sellPriceCopper?: number;
   readonly classification?: {

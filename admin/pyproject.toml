@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "forever-professions-admin"
+version = "0.1.0"
+description = "Local operations dashboard for Forever Professions"
+requires-python = ">=3.12"
+dependencies = [
+  "boto3==1.43.97",
+  "nicegui==3.18.0",
+  "python-dotenv==1.2.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1"]
+
+[project.scripts]
+forever-admin = "forever_admin.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["forever_admin"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

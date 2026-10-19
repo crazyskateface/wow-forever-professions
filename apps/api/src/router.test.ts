@@ -405,6 +405,8 @@ describe("fixture API router", () => {
     expect(
       shoppingListResponseSchema.parse(JSON.parse(response.body)),
     ).toMatchObject({
+      marketId: "forever.pvp.horde.us",
+      oldestPriceObservedAt: "2026-10-08T06:00:00.000Z",
       plan: {
         status: "complete",
         routeReagents: [
@@ -412,8 +414,18 @@ describe("fixture API router", () => {
           { itemId: "heavy-leather", quantity: 12.5 },
         ],
         purchases: [
-          { itemId: "fine-thread", quantity: 2.5, expectedCostCopper: 25 },
-          { itemId: "heavy-leather", quantity: 12.5, expectedCostCopper: 125 },
+          {
+            itemId: "fine-thread",
+            quantity: 2.5,
+            expectedCostCopper: 25,
+            priceObservedAt: "2026-10-08T06:00:00.000Z",
+          },
+          {
+            itemId: "heavy-leather",
+            quantity: 12.5,
+            expectedCostCopper: 125,
+            priceObservedAt: "2026-10-08T06:00:00.000Z",
+          },
         ],
         crafts: [],
         expectedCostCopper: 150,

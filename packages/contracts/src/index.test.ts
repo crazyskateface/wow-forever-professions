@@ -4,6 +4,7 @@ import {
   auctionPriceRequestSchema,
   healthResponseSchema,
   importedBuildDatasetSchema,
+  itemClientDataSchema,
   professionFixtureSchema,
   readinessResponseSchema,
   recipeOutputSchema,
@@ -15,6 +16,36 @@ import {
 } from "./index.js";
 
 describe("shared contracts", () => {
+  it("preserves ordered client-derived item tooltip stats", () => {
+    const parsed = itemClientDataSchema.parse({
+      displayName: "Minor Channeling Ring",
+      qualityId: 2,
+      equipmentSlot: "Finger",
+      stats: [
+        {
+          statId: 5,
+          value: 2,
+          displayText: "+2 Intellect",
+          displayTone: "attribute",
+        },
+        {
+          statId: 45,
+          value: 5,
+          displayText: "Equip: Increases spell power by 5.",
+          displayTone: "effect",
+        },
+      ],
+      requiredLevel: 0,
+      sellPriceCopper: 1875,
+      source: { product: "wow_classic_beta", build: "1.60.1.70450", locale: "enUS" },
+    });
+
+    expect(parsed.stats?.map(({ displayTone }) => displayTone)).toEqual([
+      "attribute",
+      "effect",
+    ]);
+  });
+
   it("accepts the health response shape", () => {
     expect(
       healthResponseSchema.parse({
@@ -268,11 +299,13 @@ describe("shared contracts", () => {
         startSkill: 150,
         targetSkill: 180,
         objective: "cost",
+        confidencePolicy: "supported-only",
         constraints: {
           faction: "horde",
           specializationSpellIds: [10656],
           professionBranchId: "dragonscale",
           knownRecipeIds: ["heavy-armor-kit"],
+          allowUnknownAcquisition: false,
           allowUnknownAvailability: true,
           allowUnknownFaction: true,
           allowCooldowns: false,
@@ -329,6 +362,7 @@ describe("shared contracts", () => {
   it("accepts complete and blocked route results", () => {
     const base = {
       objective: "crafts",
+      confidencePolicy: "practical",
       startSkill: 150,
       targetSkill: 151,
       steps: [
@@ -350,6 +384,14 @@ describe("shared contracts", () => {
           expectedSkillUps: 1,
           expectedCrafts: 1,
           expectedMaterials: 6,
+          evidence: {
+            level: "verified",
+            reasons: [],
+            acquisition: "trainer",
+            availability: "available",
+            provenanceSource: "observed-in-game",
+            verificationStatus: "verified",
+          },
         },
       ],
       totals: {
@@ -403,6 +445,7 @@ describe("shared contracts", () => {
               quantity: 62.5,
               unitPriceCopper: 125,
               expectedCostCopper: 7_812.5,
+              priceObservedAt: "2026-10-19T12:00:00.000Z",
             },
           ],
           crafts: [],
@@ -411,6 +454,7 @@ describe("shared contracts", () => {
           knownSubtotalCopper: 7_812.5,
           expectedCostCopper: 7_812.5,
         },
+        oldestPriceObservedAt: "2026-10-19T12:00:00.000Z",
       }),
     ).toBeDefined();
   });

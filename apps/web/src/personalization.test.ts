@@ -44,8 +44,10 @@ describe("browser personalization", () => {
         version: 1,
         currentSkill: 999,
         routeStartSkill: 225,
+        routeStartLinked: false,
         targetSkill: 100,
         routeObjective: "fastest",
+        routeConfidencePolicy: "reckless",
         shoppingStrategy: "craft-first",
         trainerOnly: true,
         region: " eu ",
@@ -64,8 +66,10 @@ describe("browser personalization", () => {
       version: 1,
       currentSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
       routeStartSkill: 225,
+      routeStartLinked: false,
       targetSkill: 225,
       routeObjective: "crafts",
+      routeConfidencePolicy: "practical",
       shoppingStrategy: "craft-first",
       trainerOnly: true,
       region: "eu",
@@ -82,11 +86,29 @@ describe("browser personalization", () => {
     });
   });
 
+  it("keeps a linked route start aligned with current skill", () => {
+    expect(parsePersonalization({
+      ...DEFAULT_PERSONALIZATION,
+      currentSkill: 175,
+      routeStartSkill: 20,
+      routeStartLinked: true,
+      targetSkill: 100,
+      routeConfidencePolicy: "supported-only",
+    })).toMatchObject({
+      currentSkill: 175,
+      routeStartSkill: 175,
+      routeStartLinked: true,
+      targetSkill: 175,
+      routeConfidencePolicy: "supported-only",
+    });
+  });
+
   it("round-trips and clears a valid profile", () => {
     const storage = memoryStorage();
     const profile = {
       ...DEFAULT_PERSONALIZATION,
       currentSkill: 137,
+      routeStartSkill: 137,
       targetSkill: 225,
       routeObjective: "materials" as const,
     };

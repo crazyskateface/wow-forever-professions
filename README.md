@@ -30,14 +30,22 @@ data.
   configured once in the shared domain package.
 - Optimizes expected crafts, material units, or stored auction cost per skill point.
 - Uses dynamic programming with configurable recipe-switch and acquisition friction.
+- Uses a Practical confidence policy by default: supported acquisition and availability
+  win over unknown evidence whenever they can complete the same route. A Supported-only
+  policy blocks at the first skill that would require unknown evidence.
 - Supports known-recipe selection, trainer-only mode, faction/specialization/cooldown
   constraints, and explicit recipe or reagent exclusions at the API boundary.
 - Groups adjacent decisions into practical guide steps and exposes ordinary
-  alternatives.
+  alternatives. Every returned segment and alternative includes machine-readable
+  acquisition, availability, provenance, verification, confidence, and risk reasons.
 - Treats reagents carrying Forever's client-defined `Scarce` label as a last resort:
   a complete non-Scarce route wins even when its ordinary objective score is higher.
 - Opens each guide step in the calculator at the relevant skill and shows New/Updated
   Forever badges when comparison data exists.
+- Presents generated segments as an execution checklist with the active skill range,
+  expected crafts, primary and total materials, market estimate, acquisition, and
+  expandable confidence details. Completion is saved only for the exact matching
+  build, range, objective, confidence policy, constraints, market, and route.
 
 ### Recipe catalog and calculator
 
@@ -57,8 +65,9 @@ data.
 - Shows catalog-backed item details after a one-second pointer hover or when the
   owning recipe control receives keyboard focus. Calculator icons can pin the
   tooltip on click and support close-button, Escape, and outside-click dismissal.
-  Imported client metadata supplies in-game rarity, equipment slot, armor, required
-  level, and vendor sell price when those fields are available. Item names throughout
+  Imported client metadata supplies in-game rarity, equipment slot, armor, primary
+  attributes, green equip-effect text, required level, and vendor sell price when
+  those fields are available. Item names throughout
   the guide, catalog, calculator, changes view, route planner, shopping list, and
   tooltips use the familiar gray, white, green, blue, and purple rarity colors.
   Tooltips also spell out the rarity alongside the item category.
@@ -73,16 +82,24 @@ data.
 - Displays summary counts, search, profession and change-type filters, item-type
   filters, current-skill availability filters, provenance, icons, and expandable
   before/after values.
+- Loads comparison records on demand when the Forever Changes tab is first opened,
+  keeping the initial guide request burst below the API's concurrency boundary.
 - Hides unchanged recipes by default; badges are reused in the guide and All Recipes.
 - The bundled comparison currently contains 289 New, 227 Updated, 0 Removed, and 87
   Unchanged Leatherworking recipes (603 total).
 
 ### Shopping and pricing
 
-- Aggregates a generated route into expected shopping quantities.
+- Promotes a generated route into a first-class shopping checklist with aggregate
+  and per-step material views.
+- Saves owned quantities and checked materials under the exact route fingerprint;
+  remaining quantities never change the route's canonical expected totals.
 - Supports cheapest, buy-only, and craft-first strategies with guarded recursive
   intermediate crafting.
-- Keeps missing prices and unresolved crafting sources explicit and detects cycles.
+- Keeps buy and craft paths separate, preserves missing prices and unresolved
+  crafting sources, and detects cycles.
+- Labels complete totals versus partial known subtotals, shows the oldest price
+  observation used, and provides copy and print-friendly summaries.
 - Normalizes AH Ledger observations to integer copper and preserves attribution.
 - Reads prices refreshed ahead of time; API requests never call an auction provider
   directly.
@@ -99,8 +116,13 @@ data.
 
 ### Personalization without accounts
 
-- Saves current and target skill, route objective, trainer-only mode, shopping
-  strategy, region, market, faction, and Forever Changes filters in the browser.
+- Saves current and target skill, route objective, confidence policy, current-skill
+  linking, trainer-only mode, shopping strategy, region, market, faction, and Forever
+  Changes filters in the browser.
+- Saves route-step completion under a separate route fingerprint and exposes
+  mark-through-current-skill and resume-at-current-skill actions.
+- Saves shopping owned quantities and checked materials separately under that same
+  exact-route fingerprint.
 - Restores the saved profile when generating the initial guide and uses its market and
   faction in price, route, and shopping-list requests.
 - Validates and versions stored preferences, falls back safely when storage is corrupt
@@ -119,7 +141,7 @@ data.
 
 ### Reproducible client-data pipeline
 
-- Converts LibProfessionDB v1.9.1 and LibItemDB v1.4.1 Lua literals without executing
+- Converts LibProfessionDB v1.9.1 and LibItemDB v1.6.0 Lua literals without executing
   Lua.
 - Reapplies reviewed corrections from a validated, versioned override file.
 - Archives exact raw bytes by SHA-256, normalizes immutable build records, and writes
@@ -127,19 +149,22 @@ data.
 - Imports generic client item labels through
   `ItemSparse.ItemNameDescriptionID → ItemNameDescription`, preserving the source
   product, client build, and locale. The current Leatherworking set contains three
-  `Scarce` reagents and four `Crafted` outputs from client build `1.60.1.70374`.
-- Imports build-scoped item display names, rarity IDs, equipment slots, armor,
-  required levels, and vendor sell prices from the same pinned client. Armor is
-  derived from the client's armor-total, quality, location, and shield tables
-  instead of guessed from an item name.
+  `Scarce` reagents and four `Crafted` outputs from client build `1.60.1.70450`.
+- Imports build-scoped item display names, rarity IDs, equipment slots, armor, item
+  stat lines, required levels, and vendor sell prices from the same pinned client.
+  Armor is derived from the client's armor-total, quality, location, and shield
+  tables. Stat values combine the client's item allocations with its level-, quality-,
+  and slot-specific random-property budgets, and use localized client strings rather
+  than guessed item-name heuristics.
 - Extracts local client icons through `wowdata`, including the equipment-appearance
   fallback path, and writes a build-stamped manifest.
 - Produces a repeatable quality audit instead of filling unknown facts with guesses.
 
 ## Current data boundary
 
-The bundled target is Forever build `1.60.1.69977`; client-derived icons, item-name
-descriptions, and tooltip attributes come from installed beta client build
+The bundled target is Forever build `1.60.1.69977`; client-derived item-name
+descriptions and tooltip attributes come from installed beta client build
+`1.60.1.70450`, while the unchanged icon bundle remains stamped with asset build
 `1.60.1.70374`. The Classic Era baseline is build `1.15.9.69722`.
 
 The data is useful but not authoritative:
@@ -150,6 +175,7 @@ The data is useful but not authoritative:
 - 630 of 760 referenced items have client tooltip attributes, including rarity; the
   other 130 have no `ItemSparse` row in the pinned client build and remain explicitly
   unenriched;
+- 427 referenced items expose 1,174 ordered client stat lines;
 - 90 recipes reference at least one item missing an English name in the source
   snapshot;
 - 595 output quantities remain provisional after reviewed overrides.
@@ -166,6 +192,38 @@ recipes with unknown learning ranks cannot enter a leveling route.
 - AWS credentials only for deployment or live DSQL validation
 - `wowdata` and a local Forever client only when regenerating icons, client item
   classifications, or tooltip attributes
+- Python 3.12 or newer only when using the optional local operations dashboard
+
+## Local operations dashboard
+
+`admin/` contains a standalone, localhost-only NiceGUI console for health checks,
+CloudWatch logs and usage, CloudFormation deployment status, and controlled execution
+of the repository's existing imports, validation, and deployment commands. It binds
+only to `127.0.0.1`, accepts no arbitrary terminal input, and uses the normal AWS
+credential chain without storing credentials.
+
+On Windows, create its isolated environment and launch it from the repository root:
+
+```powershell
+python -m venv .venv-admin
+.\.venv-admin\Scripts\python -m pip install -e ".\admin[dev]"
+Copy-Item .env.admin.example .env.admin
+.\.venv-admin\Scripts\forever-admin
+```
+
+See [`admin/README.md`](admin/README.md) for job registration, source configuration,
+AWS permissions, and troubleshooting. The dashboard never runs imports or deploys at
+startup; data-writing jobs require confirmation. **Update latest local catalog**
+checks for newer compatible LibProfessionDB and LibItemDB releases, regenerates only
+when a source file ID changed, and checks the exact hashes already loaded in local
+PostgreSQL. It skips imports when the catalog is current; otherwise it resets the
+local catalog volume and imports Classic followed by Forever in one fail-fast workflow.
+The Jobs page reports the pinned source versions and whether that operation changed
+them. It also provides a managed Start/Stop button for the local Vite frontend at
+`http://127.0.0.1:5173` and a separate local API button that automatically uses the
+loopback PostgreSQL catalog at `127.0.0.1:55432`. These local services require no AWS
+login or token. Staging and production publication remain separate reviewable
+operations.
 
 ## Full local start
 
@@ -175,7 +233,7 @@ Install dependencies once:
 pnpm install
 ```
 
-Start disposable PostgreSQL, import the Classic baseline, then import Forever while
+Start local PostgreSQL, import the Classic baseline, then import Forever while
 generating the comparison:
 
 ```text
@@ -208,9 +266,11 @@ pnpm dev:web
 - API: `http://localhost:3001`
 - PostgreSQL: `127.0.0.1:55432`
 
-Vite proxies `/api` to the local API. PostgreSQL uses container `tmpfs`; `pnpm
-db:local:down` removes the normalized database. Content-addressed raw imports under
-ignored `.local-data/` remain on disk.
+Vite proxies `/api` to the local API. PostgreSQL uses a named Docker volume, so the
+normalized catalog survives container and Docker Desktop restarts. `pnpm db:local:down`
+stops the database without deleting it; `pnpm db:local:reset` explicitly removes the
+local catalog volume when an immutable dataset or migration mismatch requires a clean
+import. Content-addressed raw imports under ignored `.local-data/` remain on disk.
 
 The API can run without `LOCAL_DATABASE_URL`, but it then serves only the small
 illustrative fixture. The browser also falls back to that fixture if the API cannot

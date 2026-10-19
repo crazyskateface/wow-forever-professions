@@ -4,6 +4,7 @@ export interface ShoppingItem {
   readonly id: string;
   readonly name: string;
   readonly unitPriceCopper?: number;
+  readonly priceObservedAt?: string;
 }
 
 export interface ShoppingRecipeItem {
@@ -40,6 +41,7 @@ export interface ShoppingQuantity {
 export interface ShoppingPurchase extends ShoppingQuantity {
   readonly unitPriceCopper: number;
   readonly expectedCostCopper: number;
+  readonly priceObservedAt?: string;
 }
 
 export interface ShoppingCraft {
@@ -76,6 +78,7 @@ interface BuyDecision {
   readonly kind: "buy";
   readonly itemId: string;
   readonly unitCostCopper: number;
+  readonly priceObservedAt?: string;
 }
 
 interface CraftDecision {
@@ -117,6 +120,12 @@ function validateInput(input: ShoppingPlanInput): void {
       (!Number.isSafeInteger(item.unitPriceCopper) || item.unitPriceCopper <= 0)
     ) {
       throw new RangeError(`Item ${item.id} price must be positive integer copper.`);
+    }
+    if (
+      item.priceObservedAt !== undefined &&
+      Number.isNaN(Date.parse(item.priceObservedAt))
+    ) {
+      throw new RangeError(`Item ${item.id} price timestamp must be an ISO date.`);
     }
   }
 
@@ -195,7 +204,14 @@ export function planShoppingList(input: ShoppingPlanInput): ShoppingPlan {
     const buy =
       item?.unitPriceCopper === undefined
         ? undefined
-        : ({ kind: "buy", itemId, unitCostCopper: item.unitPriceCopper } as const);
+        : ({
+            kind: "buy",
+            itemId,
+            unitCostCopper: item.unitPriceCopper,
+            ...(item.priceObservedAt === undefined
+              ? {}
+              : { priceObservedAt: item.priceObservedAt }),
+          } as const);
     if (strategy === "buy-only") {
       return buy ?? { kind: "unresolved", itemId, reason: "missing-price" };
     }
@@ -294,6 +310,9 @@ export function planShoppingList(input: ShoppingPlanInput): ShoppingPlan {
         quantity: nextQuantity,
         unitPriceCopper: decision.unitCostCopper,
         expectedCostCopper: nextQuantity * decision.unitCostCopper,
+        ...(decision.priceObservedAt === undefined
+          ? {}
+          : { priceObservedAt: decision.priceObservedAt }),
       });
       return;
     }

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import type { ImportedBuildDataset } from "@forever-professions/contracts";
 import {
@@ -27,6 +28,16 @@ function localConnectionUrl(): string {
   }
 
   return value;
+}
+
+function temporaryDatabaseUrl(connectionUrl: string, databaseName: string): string {
+  const parsed = new URL(connectionUrl);
+  parsed.pathname = `/${databaseName}`;
+  return parsed.toString();
+}
+
+function quoteIdentifier(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
 function sampleDataset(): ImportedBuildDataset {
@@ -70,6 +81,14 @@ function sampleDataset(): ImportedBuildDataset {
                   clientData: {
                     displayName: "Heavy Leather",
                     qualityId: 1,
+                    stats: [
+                      {
+                        statId: 45,
+                        value: 2,
+                        displayText: "Equip: Increases spell power by 2.",
+                        displayTone: "effect",
+                      },
+                    ],
                     requiredLevel: 0,
                     sellPriceCopper: 15,
                     source: {
@@ -207,6 +226,7 @@ async function clearLocalRows(pool: Pool): Promise<void> {
     await client.query("DELETE FROM recipe_version");
     await client.query("DELETE FROM verification");
     await client.query("DELETE FROM recipe");
+    await client.query("DELETE FROM item_stat");
     await client.query("DELETE FROM item_quality");
     await client.query("DELETE FROM item_client_data");
     await client.query("DELETE FROM item_classification");
@@ -275,8 +295,9 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     recipe_changes: string;
     item_client_data: string;
     item_quality: string;
+    item_stats: string;
   }>(
-    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM item_client_data) AS item_client_data, (SELECT COUNT(*) FROM item_quality) AS item_quality, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
+    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM item_client_data) AS item_client_data, (SELECT COUNT(*) FROM item_quality) AS item_quality, (SELECT COUNT(*) FROM item_stat) AS item_stats, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
   );
   const row = counts.rows[0]!;
 
@@ -290,6 +311,7 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     "SELECT COUNT(*) AS count FROM recipe_change rc LEFT JOIN recipe_comparison c ON c.comparison_id = rc.comparison_id LEFT JOIN profession p ON p.profession_id = rc.profession_id WHERE c.comparison_id IS NULL OR p.profession_id IS NULL",
     "SELECT COUNT(*) AS count FROM item_client_data icd LEFT JOIN item i ON i.item_id = icd.item_id LEFT JOIN wow_build b ON b.build_id = icd.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
     "SELECT COUNT(*) AS count FROM item_quality iq LEFT JOIN item i ON i.item_id = iq.item_id LEFT JOIN wow_build b ON b.build_id = iq.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
+    "SELECT COUNT(*) AS count FROM item_stat ist LEFT JOIN item i ON i.item_id = ist.item_id LEFT JOIN wow_build b ON b.build_id = ist.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
   ] as const;
   let orphanCount = 0;
   for (const orphanQuery of orphanQueries) {
@@ -309,25 +331,35 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     recipeChanges: Number(row.recipe_changes),
     itemClientData: Number(row.item_client_data),
     itemQualities: Number(row.item_quality),
+    itemStats: Number(row.item_stats),
     orphans: orphanCount,
   };
 }
 
 async function main(): Promise<void> {
-  const pool = new Pool({ connectionString: localConnectionUrl(), max: 3 });
+  const connectionUrl = localConnectionUrl();
+  const databaseName = `forever_professions_smoke_${randomUUID().replaceAll("-", "")}`;
+  const adminPool = new Pool({ connectionString: connectionUrl, max: 1 });
+  let pool: Pool | undefined;
   const rawStore = new MemoryRawDatasetStore();
-  const transactionRunner = createLocalTransactionRunner(pool);
   const baseDataset = sampleDataset();
   const rawBytes = new TextEncoder().encode(JSON.stringify(baseDataset));
   const targetRawBytes = new TextEncoder().encode(JSON.stringify(targetDataset()));
 
   try {
+    await adminPool.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`);
+    const testPool = new Pool({
+      connectionString: temporaryDatabaseUrl(connectionUrl, databaseName),
+      max: 3,
+    });
+    pool = testPool;
+    const transactionRunner = createLocalTransactionRunner(testPool);
     const migrations = await applySqlMigrations(transactionRunner, {
       dialect: "postgres",
       scope: "catalog",
       migrations: await loadSqlMigrations(new URL("../sql/", import.meta.url)),
     });
-    await clearLocalRows(pool);
+    await clearLocalRows(testPool);
     const firstImport = await ingestBuildDataset({
       rawBytes,
       rawStore,
@@ -368,10 +400,12 @@ async function main(): Promise<void> {
         },
       ],
     });
-    const rows = await verifyDatabase(pool);
+    const rows = await verifyDatabase(testPool);
     const database: SqlExecutor = {
       query: async (sql, values): Promise<SqlQueryResult> => {
-        const result = values === undefined ? await pool.query(sql) : await pool.query(sql, [...values]);
+        const result = values === undefined
+          ? await testPool.query(sql)
+          : await testPool.query(sql, [...values]);
         return {
           rowCount: result.rowCount,
           rows: result.rows as readonly Record<string, unknown>[],
@@ -391,6 +425,7 @@ async function main(): Promise<void> {
     if (
       rows.comparisons !== 1 ||
       rows.recipeChanges !== 3 ||
+      rows.itemStats !== 2 ||
       changeSummary?.summary.new !== 1 ||
       changeSummary.summary.updated !== 1 ||
       changeSummary.summary.unchanged !== 1 ||
@@ -422,7 +457,11 @@ async function main(): Promise<void> {
       )}\n`,
     );
   } finally {
-    await pool.end();
+    await pool?.end();
+    await adminPool.query(
+      `DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)} WITH (FORCE)`,
+    );
+    await adminPool.end();
   }
 }
 

@@ -14,6 +14,39 @@ import {
   type ImportedRecipeOverrides,
 } from "@forever-professions/contracts";
 
+interface PinnedSourceProject {
+  readonly version: string;
+  readonly pageUrl: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function readPinnedSources(path: string): Promise<{
+  readonly professionDb: PinnedSourceProject;
+  readonly itemDb: PinnedSourceProject;
+}> {
+  const value: unknown = JSON.parse(await readFile(path, "utf8"));
+  if (!isRecord(value) || !isRecord(value.projects)) {
+    throw new Error(`Source release lock is missing projects: ${path}`);
+  }
+  const project = (key: "professionDb" | "itemDb"): PinnedSourceProject => {
+    const candidate = value.projects[key];
+    if (
+      !isRecord(candidate) ||
+      typeof candidate.version !== "string" ||
+      candidate.version.trim() === "" ||
+      typeof candidate.pageUrl !== "string" ||
+      candidate.pageUrl.trim() === ""
+    ) {
+      throw new Error(`Source release lock has an invalid ${key} record: ${path}`);
+    }
+    return { version: candidate.version, pageUrl: candidate.pageUrl };
+  };
+  return { professionDb: project("professionDb"), itemDb: project("itemDb") };
+}
+
 const [
   professionDbRoot,
   itemDbRoot,
@@ -41,6 +74,9 @@ const gameVersion = requestedGameVersion ?? "Forever";
 const invocationDirectory = process.env.INIT_CWD
   ? resolve(process.env.INIT_CWD)
   : process.cwd();
+const pinnedSources = await readPinnedSources(
+  resolve(invocationDirectory, "data/imports/source-releases.json"),
+);
 const resolvedProfessionDbRoot = resolve(invocationDirectory, professionDbRoot);
 const resolvedItemDbRoot = resolve(invocationDirectory, itemDbRoot);
 const resolvedOutputPath = resolve(invocationDirectory, outputPath);
@@ -112,9 +148,11 @@ const converted = convertProfessionDbSnapshot({
   itemNamesLua,
   itemCoreLua,
   profession: { id: "leatherworking", name: "Leatherworking", skillLineId: 165 },
-  professionDbVersion: "v1.9.1",
-  itemDbVersion: "v1.4.1",
-  sourceUrl: "https://www.curseforge.com/wow/addons/libprofessiondb/files/9095167",
+  professionDbVersion: process.env.PROFESSION_DB_VERSION?.trim() || pinnedSources.professionDb.version,
+  itemDbVersion: process.env.ITEM_DB_VERSION?.trim() || pinnedSources.itemDb.version,
+  sourceUrl:
+    process.env.PROFESSION_DB_SOURCE_URL?.trim() ||
+    pinnedSources.professionDb.pageUrl,
   gameVersion,
   ...(resolvedCanonicalItemNames === undefined
     ? {}

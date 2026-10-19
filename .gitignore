@@ -11,6 +11,9 @@ cdk.out/
 .cache/
 .tmp/
 .local-data/
+.pytest_cache/
+__pycache__/
+*.py[cod]
 *.tsbuildinfo
 cdk-outputs*.json
 
@@ -18,6 +21,11 @@ cdk-outputs*.json
 .env
 .env.*
 !.env.example
+!.env.admin.example
+
+# Local Python admin environment
+.venv-admin/
+admin/*.local.toml
 
 # Logs
 *.log

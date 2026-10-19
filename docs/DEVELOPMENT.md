@@ -35,7 +35,8 @@ The current product data is Leatherworking only:
 | --- | --- | --- |
 | Classic comparison baseline | `1.15.9.69722` | `data/imports/classic-era-1.15.9.69722-leatherworking.json` |
 | Forever target catalog | `1.60.1.69977` | `data/imports/forever-1.60.1.69977-leatherworking.json` |
-| Client icons and item labels | `1.60.1.70374` | `apps/web/public/icons/items/manifest.json` plus classification source metadata |
+| Client icons | `1.60.1.70374` | `apps/web/public/icons/items/manifest.json` |
+| Item labels and tooltip metadata | `1.60.1.70450` | Classification and client-data source metadata in the Forever catalog |
 
 The target contains 603 recipes and 760 referenced items. Its current Classic →
 Forever comparison is 289 New, 227 Updated, 0 Removed, and 87 Unchanged logical
@@ -90,10 +91,12 @@ pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
 pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
 ```
 
-The PostgreSQL container stores its database in `tmpfs`. Stopping/removing it clears
-normalized data. Raw objects under `.local-data/` are content-addressed and persist.
-The container includes `psql`; contributors do not need a host installation. For an
-interactive local query after `pnpm db:local:up`, run:
+The PostgreSQL container stores its database in a named Docker volume. Normalized data
+therefore survives container and Docker Desktop restarts. `pnpm db:local:down` stops
+the service without deleting the catalog; `pnpm db:local:reset` explicitly removes the
+volume when a clean import is required. Raw objects under `.local-data/` are
+content-addressed and persist. The container includes `psql`; contributors do not need
+a host installation. For an interactive local query after `pnpm db:local:up`, run:
 
 ```text
 docker compose -f docker-compose.local.yml exec postgres psql -U forever_professions -d forever_professions_local
@@ -104,7 +107,7 @@ docker compose -f docker-compose.local.yml exec postgres psql -U forever_profess
 `wow_build` binds one build ID to the exact imported raw hash. If a checked-in JSON
 snapshot is regenerated with different bytes but the same game build ID, importing it
 over the existing local row correctly reports an immutable-value conflict. Reset the
-disposable local database, reimport the baseline, and then reimport the target with
+local catalog volume, reimport the baseline, and then reimport the target with
 the comparison. Do not weaken the immutable writer to make this go away.
 
 The catalog reader serves the most recently imported build. The recipe-change reader
@@ -132,8 +135,9 @@ serves the latest stored comparison of the requested comparison type.
   client source product/build/locale because enrichment may come from a newer client
   than the recipe archive.
 - Tooltip records are also recipe-build scoped and retain their actual client source.
-  A missing `ItemSparse` row stays missing; do not backfill name, rarity, level, armor,
-  or sell price from another game version.
+  Ordered stat lines preserve both their numeric stat identity and the localized client
+  display text. A missing `ItemSparse` row stays missing; do not backfill name, rarity,
+  level, armor, stat lines, or sell price from another game version.
 - Missing auction prices are unavailable, never zero.
 
 ## Item assets
@@ -154,9 +158,11 @@ back to the smaller comparison snapshot because no current catalog record exists
 Calculator output and reagent icons are also buttons that pin the tooltip, move focus
 to its close control, and restore focus when the close button or Escape dismisses it;
 an outside click also closes it. Tooltip content is limited to catalog-backed item
-class, subclass, item rarity, equipment slot, armor, required level, vendor sell
-price, classification, quantity, recipe, market price, and ID facts. Do not infer
-binding, stats, or any other field absent from the imported data. Rarity comes from
+class, subclass, item rarity, equipment slot, armor, ordered item stats, required
+level, vendor sell price, classification, quantity, recipe, market price, and ID
+facts. Attribute stat lines use ordinary tooltip text and equip-effect lines use green
+text, with the effect meaning also stated in the content. Do not infer binding or any
+other field absent from the imported data. Rarity comes from
 `ItemSparse.OverallQualityID`; do not derive it from an item name or icon. Visible item
 and crafted-output names use the shared `getItemRarityNameClass` helper so the guide,
 catalog, calculator, changes view, route planner, shopping list, and tooltip stay
@@ -273,6 +279,13 @@ baseline/report under `data/guide-validation/`. Reference guides are diagnostic
 evidence only and must not be promoted into recipe overrides without a supported
 source.
 
+The optimizer exposes two evidence policies. `practical` is the default and ranks
+known acquisition and availability ahead of an otherwise cheaper unknown option,
+while still allowing an explicitly labeled unknown option when it is required to
+complete the route. `supported-only` rejects unknown acquisition and availability;
+an otherwise reachable route then returns `unsupported-recipe-evidence` at the first
+unsupported skill. Rejected recipe evidence is never routable under either policy.
+
 On some Windows sandboxed runs, parallel Vitest workers can lose transformed files
 from the sandbox temp directory and report `ENOENT` before tests execute. Re-run the
 suite outside that filesystem sandbox or run the focused suite separately; do not
@@ -290,7 +303,7 @@ misclassify that host-level temp failure as a product test failure.
   requests.
 - The add-on collection approach is deferred; the current pipeline relies on source
   archives, installed-client DB2 data, reviewed overrides, and quality reporting.
-- Aurora DSQL migrations 017–024 have not yet completed the same live revalidation as
+- Aurora DSQL migrations 017–026 have not yet completed the same live revalidation as
   migrations 001–016.
 
 ## Documentation maintenance

@@ -7,6 +7,7 @@ import type {
 } from "@forever-professions/contracts";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltipSummary } from "./ItemTooltip.js";
+import { ChevronDownIcon } from "./UiIcons.js";
 import { getItemRarityNameClass, type ItemTooltipData } from "./item-tooltip.js";
 import {
   DEFAULT_CHANGE_FILTERS,
@@ -317,7 +318,7 @@ function ChangeCard({
                   : `${changedFields.length} ${changedFields.length === 1 ? "field" : "fields"} changed`}
           </small>
         </span>
-        <span className="change-card-expand" aria-hidden="true">⌄</span>
+        <ChevronDownIcon className="change-card-expand" />
       </ItemTooltipSummary>
 
       <div className="change-card-details">
@@ -443,6 +444,7 @@ export function ForeverChanges({
     <section className="forever-changes" aria-labelledby="changes-title">
       <div className="changes-hero">
         <div>
+          <span className="section-kicker">Build comparison · Classic Era → Forever</span>
           <h1 id="changes-title">Forever Changes</h1>
           <p>See exactly what changed from Classic Era to Forever, with field-level evidence from the imported recipe builds.</p>
         </div>

@@ -251,6 +251,68 @@ export async function writeNormalizedBuild(
     batchOptions,
   );
 
+  const itemStats = itemClientData.flatMap((row) =>
+    (row.stats ?? []).map((stat, statIndex) => ({
+      itemId: row.itemId,
+      recipeBuildId: row.recipeBuildId,
+      statIndex,
+      ...stat,
+      source: row.source,
+    })),
+  );
+  batches.itemStats = await writeBatches(
+    runner,
+    itemStats,
+    {
+      label: (row) =>
+        `item stat ${row.itemId}@${row.recipeBuildId}[${row.statIndex}]`,
+      insertSql:
+        "INSERT INTO item_stat (item_id, recipe_build_id, stat_index, stat_id, stat_value, display_text, display_tone, source_product, source_build_id, source_locale) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING",
+      insertValues: (row) => [
+        row.itemId,
+        row.recipeBuildId,
+        row.statIndex,
+        row.statId,
+        row.value,
+        row.displayText,
+        row.displayTone,
+        row.source.product,
+        row.source.build,
+        row.source.locale,
+      ],
+      selectSql:
+        "SELECT item_id, recipe_build_id, stat_index, stat_id, stat_value, display_text, display_tone, source_product, source_build_id, source_locale FROM item_stat WHERE item_id = $1 AND recipe_build_id = $2 AND stat_index = $3",
+      selectValues: (row) => [row.itemId, row.recipeBuildId, row.statIndex],
+      expected: (row) => ({
+        item_id: row.itemId,
+        recipe_build_id: row.recipeBuildId,
+        stat_index: row.statIndex,
+        stat_id: row.statId,
+        stat_value: row.value,
+        display_text: row.displayText,
+        display_tone: row.displayTone,
+        source_product: row.source.product,
+        source_build_id: row.source.build,
+        source_locale: row.source.locale,
+      }),
+      assertReferences: async (database, row) => {
+        await assertExists(
+          database,
+          "SELECT 1 AS found FROM item WHERE item_id = $1",
+          [row.itemId],
+          `Missing item ${row.itemId}.`,
+        );
+        await assertExists(
+          database,
+          "SELECT 1 AS found FROM wow_build WHERE build_id = $1",
+          [row.recipeBuildId],
+          `Missing build ${row.recipeBuildId}.`,
+        );
+      },
+    },
+    batchOptions,
+  );
+
   batches.itemClientData = await writeBatches(
     runner,
     itemClientData,

@@ -149,11 +149,19 @@ export const itemClassificationSchema = z.object({
   source: itemClientSourceSchema,
 });
 
+export const itemStatSchema = z.object({
+  statId: z.number().int().nonnegative(),
+  value: z.number().int(),
+  displayText: z.string().min(1),
+  displayTone: z.enum(["attribute", "effect"]),
+});
+
 export const itemClientDataSchema = z.object({
   displayName: z.string().min(1),
   qualityId: z.number().int().nonnegative().optional(),
   equipmentSlot: z.string().min(1).optional(),
   armor: z.number().int().nonnegative().optional(),
+  stats: z.array(itemStatSchema).max(10).optional(),
   requiredLevel: z.number().int().nonnegative(),
   sellPriceCopper: z.number().int().nonnegative(),
   source: itemClientSourceSchema,
@@ -389,6 +397,11 @@ export const auctionPricesResponseSchema = z.object({
 
 export const routeObjectiveSchema = z.enum(["cost", "crafts", "materials"]);
 
+export const routeConfidencePolicySchema = z.enum([
+  "practical",
+  "supported-only",
+]);
+
 const recipeIdSelectionSchema = z.array(z.string().min(1)).max(3_000);
 
 export const routeConstraintsSchema = z.object({
@@ -399,6 +412,7 @@ export const routeConstraintsSchema = z.object({
   trainerOnly: z.boolean().optional(),
   excludedRecipeIds: recipeIdSelectionSchema.optional(),
   excludedItemIds: recipeIdSelectionSchema.optional(),
+  allowUnknownAcquisition: z.boolean().optional(),
   allowUnknownAvailability: z.boolean().optional(),
   allowUnknownFaction: z.boolean().optional(),
   allowCooldowns: z.boolean().optional(),
@@ -430,6 +444,7 @@ export const routeOptimizationRequestSchema = z
     startSkill: z.number().int().nonnegative(),
     targetSkill: z.number().int().nonnegative(),
     objective: routeObjectiveSchema,
+    confidencePolicy: routeConfidencePolicySchema.optional(),
     constraints: routeConstraintsSchema.optional(),
     policy: routeOptimizationPolicySchema.optional(),
   })
@@ -467,6 +482,23 @@ export const routeSkillStepSchema = z.object({
   expectedCostCopper: z.number().nonnegative().optional(),
 });
 
+export const routeEvidenceReasonSchema = z.enum([
+  "unknown-acquisition",
+  "unknown-availability",
+  "classic-fallback",
+  "unverified-recipe",
+  "rejected-recipe",
+]);
+
+export const routeRecipeEvidenceSchema = z.object({
+  level: z.enum(["verified", "unverified", "fallback", "unknown", "rejected"]),
+  reasons: z.array(routeEvidenceReasonSchema).max(5),
+  acquisition: recipeAcquisitionSchema,
+  availability: recipeAvailabilitySchema,
+  provenanceSource: dataSourceKindSchema,
+  verificationStatus: verificationStatusSchema,
+});
+
 export const routeAlternativeSchema = z.object({
   recipeId: z.string().min(1),
   recipeName: z.string().min(1),
@@ -476,6 +508,7 @@ export const routeAlternativeSchema = z.object({
   expectedCrafts: z.number().positive(),
   expectedMaterials: z.number().nonnegative(),
   expectedCostCopper: z.number().nonnegative().optional(),
+  evidence: routeRecipeEvidenceSchema,
 });
 
 export const routeSegmentSchema = routeAlternativeSchema.extend({
@@ -491,6 +524,7 @@ export const routeTotalsSchema = z.object({
 
 const routeOptimizationResultBase = {
   objective: routeObjectiveSchema,
+  confidencePolicy: routeConfidencePolicySchema,
   startSkill: z.number().int().nonnegative(),
   targetSkill: z.number().int().nonnegative(),
   steps: z.array(routeSkillStepSchema),
@@ -507,7 +541,11 @@ export const blockedRouteOptimizationResultSchema = z.object({
   status: z.literal("blocked"),
   ...routeOptimizationResultBase,
   blockedAtSkill: z.number().int().nonnegative(),
-  reason: z.enum(["no-eligible-recipe", "missing-price-data"]),
+  reason: z.enum([
+    "no-eligible-recipe",
+    "missing-price-data",
+    "unsupported-recipe-evidence",
+  ]),
 });
 
 export const routeOptimizationResultSchema = z.discriminatedUnion("status", [
@@ -550,6 +588,7 @@ export const shoppingQuantitySchema = z.object({
 export const shoppingPurchaseSchema = shoppingQuantitySchema.extend({
   unitPriceCopper: z.number().int().positive(),
   expectedCostCopper: z.number().nonnegative(),
+  priceObservedAt: z.iso.datetime().optional(),
 });
 
 export const shoppingCraftSchema = z.object({
@@ -604,6 +643,7 @@ export const shoppingListResponseSchema = z.object({
   professionId: z.string().min(1),
   marketId: z.string().min(1),
   attribution: auctionPriceAttributionSchema.optional(),
+  oldestPriceObservedAt: z.iso.datetime().optional(),
   plan: shoppingPlanSchema,
 });
 
@@ -681,6 +721,9 @@ export type AuctionPriceRequest = z.infer<typeof auctionPriceRequestSchema>;
 export type AuctionPricesResponse = z.infer<typeof auctionPricesResponseSchema>;
 export type RouteConstraints = z.infer<typeof routeConstraintsSchema>;
 export type RouteObjective = z.infer<typeof routeObjectiveSchema>;
+export type RouteConfidencePolicy = z.infer<typeof routeConfidencePolicySchema>;
+export type RouteEvidenceReason = z.infer<typeof routeEvidenceReasonSchema>;
+export type RouteRecipeEvidence = z.infer<typeof routeRecipeEvidenceSchema>;
 export type RouteOptimizationPolicy = z.infer<
   typeof routeOptimizationPolicySchema
 >;
@@ -719,6 +762,7 @@ export type ImportedRecipe = z.infer<typeof importedRecipeSchema>;
 export type ItemClientData = z.infer<typeof itemClientDataSchema>;
 export type ItemClientSource = z.infer<typeof itemClientSourceSchema>;
 export type ItemClassification = z.infer<typeof itemClassificationSchema>;
+export type ItemStat = z.infer<typeof itemStatSchema>;
 export type ItemModel = z.infer<typeof itemModelSchema>;
 export type NormalizedBuild = z.infer<typeof normalizedBuildSchema>;
 export type ProfessionModel = z.infer<typeof professionModelSchema>;

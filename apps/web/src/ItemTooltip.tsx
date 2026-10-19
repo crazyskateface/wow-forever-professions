@@ -232,9 +232,21 @@ export function ItemTooltipProvider({ children }: { readonly children: ReactNode
           {active.item.armor === undefined ? null : (
             <span className="item-tooltip-stat">{active.item.armor} Armor</span>
           )}
+          {active.item.stats?.filter(({ displayTone }) => displayTone === "attribute")
+            .map(({ displayText }, index) => (
+              <span className="item-tooltip-stat" key={`${displayText}-${index}`}>
+                {displayText}
+              </span>
+            ))}
           {active.item.requiredLevel === undefined || active.item.requiredLevel === 0 ? null : (
             <span className="item-tooltip-stat">Requires Level {active.item.requiredLevel}</span>
           )}
+          {active.item.stats?.filter(({ displayTone }) => displayTone === "effect")
+            .map(({ displayText }, index) => (
+              <span className="item-tooltip-stat is-effect" key={`${displayText}-${index}`}>
+                {displayText}
+              </span>
+            ))}
           {active.item.classification ? (
             <span className={`item-tooltip-classification${active.item.classification.label.toLowerCase() === "scarce" ? " is-scarce" : ""}`}>
               {active.item.classification.label}

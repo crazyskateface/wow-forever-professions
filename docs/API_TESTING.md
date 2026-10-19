@@ -23,7 +23,8 @@ pnpm dev:api
 The API reports `PostgreSQL catalog` on startup. This mode serves the 603-recipe
 Leatherworking catalog and stored recipe comparison. Reagent and output records also
 include build-scoped `clientData` when available: display name, equipment slot, armor,
-required level, sell price in integer copper, and client source metadata.
+ordered item stats with localized display text, required level, sell price in integer
+copper, and client source metadata.
 
 ### Fixture-only API
 
@@ -153,6 +154,27 @@ The optimizer command accepts `startSkill`, `targetSkill`, `objective`, and an o
 pnpm api:optimize -- 150 180 crafts https://m6ulu3zwch.execute-api.us-east-1.amazonaws.com
 ```
 
+Direct `POST /api/routes/optimize` requests may set `confidencePolicy` to
+`practical` or `supported-only`. Practical is the default and uses recipes with
+unknown acquisition or availability only when they are required to complete more of
+the route. Supported-only blocks rather than relaxing that evidence boundary:
+
+```json
+{
+  "professionId": "leatherworking",
+  "startSkill": 150,
+  "targetSkill": 225,
+  "objective": "crafts",
+  "confidencePolicy": "supported-only"
+}
+```
+
+Successful segments and alternatives include an `evidence` object with a confidence
+level, stable reason codes, acquisition, availability, provenance source, and
+verification status. An evidence-boundary gap returns
+`reason: "unsupported-recipe-evidence"` with `blockedAtSkill`. Missing prices and
+ordinary eligibility gaps remain `missing-price-data` and `no-eligible-recipe`.
+
 The shopping command accepts `expectedCrafts`, `strategy`, and an optional base URL:
 
 ```text
@@ -160,3 +182,7 @@ pnpm api:shopping -- 33.375 cheapest https://m6ulu3zwch.execute-api.us-east-1.am
 ```
 
 Valid shopping strategies are `cheapest`, `buy-only`, and `craft-first`.
+Available purchases include `priceObservedAt`, and the response includes
+`oldestPriceObservedAt` when at least one priced purchase contributed to the plan.
+Both values come from normalized stored observations. An absent timestamp means no
+priced purchase supplied one; it is not replaced with the request time.
