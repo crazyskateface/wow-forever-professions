@@ -1,19 +1,46 @@
 import {
+  assessDataQuality,
   assertTargetSkillWithinBaseCap,
   evaluateRecipeAtSkill,
   validateLevelingRecipe,
+  type ProvenanceSource,
   type LevelingRecipeAcquisition,
   type LevelingRecipe,
   type PlayerFaction,
   type RecipeEvaluationContext,
+  type VerificationStatus,
 } from "@forever-professions/domain";
 
 export * from "./route-validation.js";
 
 export type RouteObjective = "cost" | "crafts" | "materials";
+export type RouteConfidencePolicy = "practical" | "supported-only";
+export type RouteConfidenceLevel =
+  | "verified"
+  | "unverified"
+  | "fallback"
+  | "unknown"
+  | "rejected";
+export type RouteEvidenceReason =
+  | "unknown-acquisition"
+  | "unknown-availability"
+  | "classic-fallback"
+  | "unverified-recipe"
+  | "rejected-recipe";
+
+export interface RouteRecipeEvidence {
+  readonly level: RouteConfidenceLevel;
+  readonly reasons: readonly RouteEvidenceReason[];
+  readonly acquisition: LevelingRecipeAcquisition;
+  readonly availability: LevelingRecipe["availability"];
+  readonly provenanceSource: ProvenanceSource;
+  readonly verificationStatus: VerificationStatus;
+}
 
 export interface RouteRecipe extends LevelingRecipe {
   readonly name: string;
+  readonly provenanceSource: ProvenanceSource;
+  readonly verificationStatus: VerificationStatus;
 }
 
 export interface RouteConstraints {
@@ -24,6 +51,7 @@ export interface RouteConstraints {
   readonly trainerOnly?: boolean;
   readonly excludedRecipeIds?: readonly string[];
   readonly excludedItemIds?: readonly string[];
+  readonly allowUnknownAcquisition?: boolean;
   readonly allowUnknownAvailability?: boolean;
   readonly allowUnknownFaction?: boolean;
   readonly allowCooldowns?: boolean;
@@ -81,6 +109,7 @@ export interface OptimizeRouteInput {
   readonly startSkill: number;
   readonly targetSkill: number;
   readonly objective: RouteObjective;
+  readonly confidencePolicy?: RouteConfidencePolicy;
   readonly recipes: readonly RouteRecipe[];
   readonly scarceItemIds?: readonly string[];
   readonly constraints?: RouteConstraints;
@@ -95,6 +124,7 @@ export interface RouteSkillStep {
   readonly expectedCrafts: number;
   readonly expectedMaterials: number;
   readonly expectedCostCopper?: number;
+  readonly evidence: RouteRecipeEvidence;
 }
 
 export interface RouteAlternative {
@@ -106,6 +136,7 @@ export interface RouteAlternative {
   readonly expectedCrafts: number;
   readonly expectedMaterials: number;
   readonly expectedCostCopper?: number;
+  readonly evidence: RouteRecipeEvidence;
 }
 
 export interface RouteSegment extends RouteAlternative {
@@ -121,6 +152,7 @@ export interface RouteTotals {
 
 interface RouteResultBase {
   readonly objective: RouteObjective;
+  readonly confidencePolicy: RouteConfidencePolicy;
   readonly startSkill: number;
   readonly targetSkill: number;
   readonly steps: readonly RouteSkillStep[];
@@ -135,7 +167,10 @@ export interface CompleteRouteResult extends RouteResultBase {
 export interface BlockedRouteResult extends RouteResultBase {
   readonly status: "blocked";
   readonly blockedAtSkill: number;
-  readonly reason: "no-eligible-recipe" | "missing-price-data";
+  readonly reason:
+    | "no-eligible-recipe"
+    | "missing-price-data"
+    | "unsupported-recipe-evidence";
 }
 
 export type RouteOptimizationResult = CompleteRouteResult | BlockedRouteResult;
@@ -145,16 +180,19 @@ interface Candidate {
   readonly step: RouteSkillStep;
   readonly stepScore: number;
   readonly scarceMaterials: number;
+  readonly unknownEvidenceSteps: number;
 }
 
 interface PathCandidate extends Candidate {
   readonly totalScarceMaterials: number;
+  readonly totalUnknownEvidenceSteps: number;
   readonly totalScore: number;
   readonly changesRecipe: boolean;
 }
 
 interface PathScore {
   readonly scarceMaterials: number;
+  readonly unknownEvidenceSteps: number;
   readonly objectiveScore: number;
 }
 
@@ -231,11 +269,54 @@ function resolvePolicy(
   return resolved;
 }
 
+function resolveConfidencePolicy(
+  policy: RouteConfidencePolicy | undefined,
+): RouteConfidencePolicy {
+  return policy ?? "practical";
+}
+
+function evidenceFor(recipe: RouteRecipe): RouteRecipeEvidence {
+  const quality = assessDataQuality(
+    recipe.provenanceSource,
+    recipe.verificationStatus,
+  );
+  const reasons: RouteEvidenceReason[] = [];
+  if (recipe.acquisition === "unknown") reasons.push("unknown-acquisition");
+  if (recipe.availability === "unknown") reasons.push("unknown-availability");
+  if (quality.level === "fallback") reasons.push("classic-fallback");
+  if (quality.level === "unverified") reasons.push("unverified-recipe");
+  if (quality.level === "rejected") reasons.push("rejected-recipe");
+
+  const level: RouteConfidenceLevel =
+    quality.level === "rejected"
+      ? "rejected"
+      : recipe.acquisition === "unknown" || recipe.availability === "unknown"
+        ? "unknown"
+        : quality.level;
+
+  return {
+    level,
+    reasons,
+    acquisition: recipe.acquisition,
+    availability: recipe.availability,
+    provenanceSource: recipe.provenanceSource,
+    verificationStatus: recipe.verificationStatus,
+  };
+}
+
 function evaluationContext(
   input: OptimizeRouteInput,
   skill: number,
+  confidencePolicy: RouteConfidencePolicy,
 ): RecipeEvaluationContext {
   const constraints = input.constraints;
+  const supportedOnly = confidencePolicy === "supported-only";
+  const allowUnknownAcquisition = supportedOnly
+    ? false
+    : constraints?.allowUnknownAcquisition;
+  const allowUnknownAvailability = supportedOnly
+    ? false
+    : constraints?.allowUnknownAvailability;
   return {
     professionId: input.professionId,
     buildId: input.buildId,
@@ -259,9 +340,12 @@ function evaluationContext(
     ...(constraints?.excludedItemIds === undefined
       ? {}
       : { excludedItemIds: constraints.excludedItemIds }),
-    ...(constraints?.allowUnknownAvailability === undefined
+    ...(allowUnknownAcquisition === undefined
       ? {}
-      : { allowUnknownAvailability: constraints.allowUnknownAvailability }),
+      : { allowUnknownAcquisition }),
+    ...(allowUnknownAvailability === undefined
+      ? {}
+      : { allowUnknownAvailability }),
     ...(constraints?.allowUnknownFaction === undefined
       ? {}
       : { allowUnknownFaction: constraints.allowUnknownFaction }),
@@ -275,8 +359,13 @@ function createStep(
   recipe: RouteRecipe,
   input: OptimizeRouteInput,
   skill: number,
+  confidencePolicy: RouteConfidencePolicy,
 ): RouteSkillStep | undefined {
-  const evaluation = evaluateRecipeAtSkill(recipe, evaluationContext(input, skill));
+  if (recipe.verificationStatus === "rejected") return undefined;
+  const evaluation = evaluateRecipeAtSkill(
+    recipe,
+    evaluationContext(input, skill, confidencePolicy),
+  );
   if (evaluation.status === "ineligible") return undefined;
 
   return {
@@ -286,6 +375,7 @@ function createStep(
     skillUpProbability: evaluation.skillUpProbability,
     expectedCrafts: evaluation.expectedCrafts,
     expectedMaterials: evaluation.expectedMaterials,
+    evidence: evidenceFor(recipe),
     ...(evaluation.expectedCostCopper === undefined
       ? {}
       : { expectedCostCopper: evaluation.expectedCostCopper }),
@@ -301,6 +391,7 @@ function scoreFor(step: RouteSkillStep, objective: RouteObjective): number | und
 function comparePathCandidates(left: PathCandidate, right: PathCandidate): number {
   return (
     left.totalScarceMaterials - right.totalScarceMaterials ||
+    left.totalUnknownEvidenceSteps - right.totalUnknownEvidenceSteps ||
     left.totalScore - right.totalScore ||
     Number(left.changesRecipe) - Number(right.changesRecipe) ||
     left.step.expectedCrafts - right.step.expectedCrafts ||
@@ -344,6 +435,8 @@ function pathCandidate(
     ...candidate,
     totalScarceMaterials:
       candidate.scarceMaterials + futureScore.scarceMaterials,
+    totalUnknownEvidenceSteps:
+      candidate.unknownEvidenceSteps + futureScore.unknownEvidenceSteps,
     totalScore:
       candidate.stepScore * (1 + penaltyRatio) + futureScore.objectiveScore,
     changesRecipe,
@@ -354,9 +447,13 @@ function evaluateSkill(
   input: OptimizeRouteInput,
   skill: number,
   scarceItemIds: ReadonlySet<string>,
+  confidencePolicy: RouteConfidencePolicy,
 ): EvaluatedSkill {
   const possible = input.recipes
-    .map((recipe) => ({ recipe, step: createStep(recipe, input, skill) }))
+    .map((recipe) => ({
+      recipe,
+      step: createStep(recipe, input, skill, confidencePolicy),
+    }))
     .filter(
       (candidate): candidate is { recipe: RouteRecipe; step: RouteSkillStep } =>
         candidate.step !== undefined,
@@ -379,6 +476,11 @@ function evaluateSkill(
                 step,
                 scarceItemIds,
               ),
+              unknownEvidenceSteps:
+                recipe.acquisition === "unknown" ||
+                recipe.availability === "unknown"
+                  ? 1
+                  : 0,
             },
           ];
     }),
@@ -405,7 +507,7 @@ function reconstructOptimalSteps(
   let bestScoreAtNextSkill = new Map<ActiveRecipeState, PathScore>(
     routeStates.map((state) => [
       state,
-      { scarceMaterials: 0, objectiveScore: 0 },
+      { scarceMaterials: 0, unknownEvidenceSteps: 0, objectiveScore: 0 },
     ]),
   );
   const decisionsBySkill: Map<ActiveRecipeState, Candidate>[] = [];
@@ -469,6 +571,7 @@ function reconstructOptimalSteps(
     decisions.set(NO_ACTIVE_RECIPE, initial);
     scores.set(NO_ACTIVE_RECIPE, {
       scarceMaterials: initial.totalScarceMaterials,
+      unknownEvidenceSteps: initial.totalUnknownEvidenceSteps,
       objectiveScore: initial.totalScore,
     });
 
@@ -489,6 +592,7 @@ function reconstructOptimalSteps(
       decisions.set(previousRecipeId, selected);
       scores.set(previousRecipeId, {
         scarceMaterials: selected.totalScarceMaterials,
+        unknownEvidenceSteps: selected.totalUnknownEvidenceSteps,
         objectiveScore: selected.totalScore,
       });
     }
@@ -565,6 +669,7 @@ function aggregateAlternativeSteps(
       (total, step) => total + step.expectedMaterials,
       0,
     ),
+    evidence: first.evidence,
     ...(allCostsAvailable
       ? {
           expectedCostCopper: steps.reduce(
@@ -698,6 +803,7 @@ function segmentsFor(
       expectedSkillUps: 1,
       expectedCrafts: step.expectedCrafts,
       expectedMaterials: step.expectedMaterials,
+      evidence: step.evidence,
       alternatives: [],
       ...(step.expectedCostCopper === undefined
         ? {}
@@ -715,6 +821,26 @@ function segmentsFor(
   }));
 }
 
+function hasUnknownEvidenceCandidate(
+  input: OptimizeRouteInput,
+  skill: number,
+): boolean {
+  const context: RecipeEvaluationContext = {
+    ...evaluationContext(input, skill, "practical"),
+    allowUnknownAcquisition: true,
+    allowUnknownAvailability: true,
+  };
+  return input.recipes.some((recipe) => {
+    if (
+      recipe.verificationStatus === "rejected" ||
+      (recipe.acquisition !== "unknown" && recipe.availability !== "unknown")
+    ) {
+      return false;
+    }
+    return evaluateRecipeAtSkill(recipe, context).status === "eligible";
+  });
+}
+
 export function optimizeLevelingRoute(
   input: OptimizeRouteInput,
 ): RouteOptimizationResult {
@@ -722,6 +848,7 @@ export function optimizeLevelingRoute(
   assertTargetSkillWithinBaseCap(input.targetSkill, input.maxBaseSkill);
   validateRecipes(input.recipes);
   const policy = resolvePolicy(input.policy);
+  const confidencePolicy = resolveConfidencePolicy(input.confidencePolicy);
   const scarceItemIds = new Set(input.scarceItemIds ?? []);
   const scarceRecipeIds = new Set(
     input.recipes
@@ -732,7 +859,9 @@ export function optimizeLevelingRoute(
   );
   const evaluatedSkills: EvaluatedSkill[] = [];
   for (let skill = input.startSkill; skill < input.targetSkill; skill += 1) {
-    evaluatedSkills.push(evaluateSkill(input, skill, scarceItemIds));
+    evaluatedSkills.push(
+      evaluateSkill(input, skill, scarceItemIds, confidencePolicy),
+    );
   }
 
   const firstBlocked = evaluatedSkills.find(
@@ -750,11 +879,14 @@ export function optimizeLevelingRoute(
     return {
       status: "blocked",
       objective: input.objective,
+      confidencePolicy,
       startSkill: input.startSkill,
       targetSkill: input.targetSkill,
       blockedAtSkill: firstBlocked.skill,
       reason:
-        firstBlocked.possibleSteps.length > 0 && input.objective === "cost"
+        hasUnknownEvidenceCandidate(input, firstBlocked.skill)
+          ? "unsupported-recipe-evidence"
+          : firstBlocked.possibleSteps.length > 0 && input.objective === "cost"
           ? "missing-price-data"
           : "no-eligible-recipe",
       steps,
@@ -766,6 +898,7 @@ export function optimizeLevelingRoute(
   return {
     status: "complete",
     objective: input.objective,
+    confidencePolicy,
     startSkill: input.startSkill,
     targetSkill: input.targetSkill,
     steps,

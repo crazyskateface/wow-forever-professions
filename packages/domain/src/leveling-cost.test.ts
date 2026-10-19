@@ -131,25 +131,40 @@ describe("recipe eligibility", () => {
     });
   });
 
-  it("supports explicit strictness for unknown availability and faction", () => {
+  it("supports explicit strictness for unknown acquisition, availability, and faction", () => {
     expect(
       evaluateRecipeAtSkill(
-        { ...recipe, availability: "unknown", faction: "unknown" },
+        {
+          ...recipe,
+          acquisition: "unknown",
+          availability: "unknown",
+          faction: "unknown",
+        },
         context,
       ).status,
     ).toBe("eligible");
     expect(
       evaluateRecipeAtSkill(
-        { ...recipe, availability: "unknown", faction: "unknown" },
+        {
+          ...recipe,
+          acquisition: "unknown",
+          availability: "unknown",
+          faction: "unknown",
+        },
         {
           ...context,
+          allowUnknownAcquisition: false,
           allowUnknownAvailability: false,
           allowUnknownFaction: false,
         },
       ),
     ).toMatchObject({
       status: "ineligible",
-      reasons: ["unknown-availability", "unknown-faction"],
+      reasons: [
+        "unknown-acquisition",
+        "unknown-availability",
+        "unknown-faction",
+      ],
     });
   });
 

@@ -101,6 +101,8 @@ export async function optimizeFixtureRoute(
     faction: recipe.faction,
     specializationSpellId: recipe.specializationSpellId,
     cooldownSeconds: recipe.cooldownSeconds,
+    provenanceSource: recipe.provenance.source,
+    verificationStatus: recipe.provenance.verification.status,
     reagents: recipe.reagents.map((reagent) => {
       const price =
         reagent.gameItemId === undefined
@@ -141,6 +143,12 @@ export async function optimizeFixtureRoute(
           ...(request.constraints.excludedItemIds === undefined
             ? {}
             : { excludedItemIds: request.constraints.excludedItemIds }),
+          ...(request.constraints.allowUnknownAcquisition === undefined
+            ? {}
+            : {
+                allowUnknownAcquisition:
+                  request.constraints.allowUnknownAcquisition,
+              }),
           ...(request.constraints.allowUnknownAvailability === undefined
             ? {}
             : {
@@ -166,6 +174,9 @@ export async function optimizeFixtureRoute(
       startSkill: request.startSkill,
       targetSkill: request.targetSkill,
       objective: request.objective,
+      ...(request.confidencePolicy === undefined
+        ? {}
+        : { confidencePolicy: request.confidencePolicy }),
       recipes,
       scarceItemIds: getScarceLevelingReagentItemIds(profession),
       ...(constraints === undefined ? {} : { constraints }),

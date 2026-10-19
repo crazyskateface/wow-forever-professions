@@ -87,6 +87,13 @@ numerical growth targets.
 Priority: P0. Complete this before presenting the generated route as the safest
 default guide.
 
+Status: in progress as of October 19, 2026. Practical and supported-only policies,
+structured segment evidence, deterministic policy tests, and policy-stamped guide
+baselines are implemented. Reviewed threshold overrides exist for Cured Heavy Hide
+and Cured Thick Hide. The supported-only route currently stops at skill 175 because
+seven later route recipes still lack supported Forever acquisition and availability
+evidence.
+
 ### Work
 
 - Review the skill thresholds behind the current one-craft-per-skill result, starting
@@ -115,6 +122,16 @@ default guide.
   data that can be shown consistently by the API and web app.
 - Practical and supported-only behavior has deterministic domain and optimizer tests.
 - `pnpm guide:validate` produces a reviewed baseline for the chosen default policy.
+
+### Remaining evidence work
+
+- Resolve or explicitly retain the unknown Forever acquisition and availability for
+  Comfortable Leather Hat, Turtle Scale Gloves, Tough Scorpid Gloves, Wild Leather
+  Boots, Charged Scorpid Helm, Charged Scorpid Vest, and Charged Scorpid Boots.
+- Capture dated, structured comparison references for Mobalytics,
+  WoW-Professions, and WowTBC.gg without promoting their claims into canonical data.
+- Extend acquisition storage to field-level evidence for the richer acquisition
+  categories only when supported sources are available.
 
 ## Milestone 1 — Playable route checklist
 

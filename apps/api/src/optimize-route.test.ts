@@ -141,4 +141,61 @@ describe("leveling route application policy", () => {
       segments: [{ recipeId: "pristine-recipe" }],
     });
   });
+
+  it("returns segment evidence and enforces the supported-only boundary", async () => {
+    const baseRecipe = leatherworkingFixture.recipes[0]!;
+    const profession = {
+      ...leatherworkingFixture,
+      recipes: [{
+        ...baseRecipe,
+        acquisition: "unknown" as const,
+        availability: "unknown" as const,
+      }],
+    };
+
+    const practical = await optimizeFixtureRoute(
+      {
+        professionId: profession.id,
+        startSkill: 150,
+        targetSkill: 151,
+        objective: "materials",
+      },
+      profession,
+    );
+    expect(practical.result).toMatchObject({
+      status: "complete",
+      confidencePolicy: "practical",
+      segments: [{
+        evidence: {
+          level: "unknown",
+          reasons: [
+            "unknown-acquisition",
+            "unknown-availability",
+            "unverified-recipe",
+          ],
+          acquisition: "unknown",
+          availability: "unknown",
+          provenanceSource: "fixture",
+          verificationStatus: "unverified",
+        },
+      }],
+    });
+
+    const supportedOnly = await optimizeFixtureRoute(
+      {
+        professionId: profession.id,
+        startSkill: 150,
+        targetSkill: 151,
+        objective: "materials",
+        confidencePolicy: "supported-only",
+      },
+      profession,
+    );
+    expect(supportedOnly.result).toMatchObject({
+      status: "blocked",
+      confidencePolicy: "supported-only",
+      blockedAtSkill: 150,
+      reason: "unsupported-recipe-evidence",
+    });
+  });
 });

@@ -279,6 +279,13 @@ baseline/report under `data/guide-validation/`. Reference guides are diagnostic
 evidence only and must not be promoted into recipe overrides without a supported
 source.
 
+The optimizer exposes two evidence policies. `practical` is the default and ranks
+known acquisition and availability ahead of an otherwise cheaper unknown option,
+while still allowing an explicitly labeled unknown option when it is required to
+complete the route. `supported-only` rejects unknown acquisition and availability;
+an otherwise reachable route then returns `unsupported-recipe-evidence` at the first
+unsupported skill. Rejected recipe evidence is never routable under either policy.
+
 On some Windows sandboxed runs, parallel Vitest workers can lose transformed files
 from the sandbox temp directory and report `ENOENT` before tests execute. Re-run the
 suite outside that filesystem sandbox or run the focused suite separately; do not

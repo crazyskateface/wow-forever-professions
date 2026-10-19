@@ -51,6 +51,7 @@ export interface RecipeEvaluationContext {
   readonly trainerOnly?: boolean;
   readonly excludedRecipeIds?: readonly string[];
   readonly excludedItemIds?: readonly string[];
+  readonly allowUnknownAcquisition?: boolean;
   readonly allowUnknownAvailability?: boolean;
   readonly allowUnknownFaction?: boolean;
   readonly allowCooldowns?: boolean;
@@ -60,6 +61,7 @@ export type RecipeIneligibilityReason =
   | "profession-mismatch"
   | "build-mismatch"
   | "unavailable"
+  | "unknown-acquisition"
   | "unknown-availability"
   | "unknown-learn-skill"
   | "skill-too-low"
@@ -203,6 +205,12 @@ function eligibilityReasons(
   if (recipe.professionId !== context.professionId) reasons.push("profession-mismatch");
   if (recipe.buildId !== context.buildId) reasons.push("build-mismatch");
   if (recipe.availability === "unavailable") reasons.push("unavailable");
+  if (
+    recipe.acquisition === "unknown" &&
+    context.allowUnknownAcquisition === false
+  ) {
+    reasons.push("unknown-acquisition");
+  }
   if (
     recipe.availability === "unknown" &&
     context.allowUnknownAvailability === false
@@ -401,6 +409,9 @@ export function evaluateRecipeRange(
         ...(input.excludedItemIds === undefined
           ? {}
           : { excludedItemIds: input.excludedItemIds }),
+        ...(input.allowUnknownAcquisition === undefined
+          ? {}
+          : { allowUnknownAcquisition: input.allowUnknownAcquisition }),
         ...(input.allowUnknownAvailability === undefined
           ? {}
           : { allowUnknownAvailability: input.allowUnknownAvailability }),

@@ -26,11 +26,24 @@ The generated report currently finds:
 - 299 skill decisions compared and no matching decisions;
 - 299 expected crafts in the generated route versus 473 in the reference;
 - 13 generated route segments, all using recipes that remain unverified;
-- eight selected recipes with unknown acquisition and availability;
+- seven selected recipes with unknown acquisition and availability, all between skill
+  175 and 300;
 - no selected recipe using a client-labeled `Scarce` reagent;
 - one ambiguous reference name, `Turtle Scale Breastplate`, because the imported
   build contains two spells with that display name;
 - one generated segment spanning 40 skill points.
+
+The practical policy now prefers Fine Leather Boots from 81–96 over Forceful Medium
+Armor Kit because the former has reviewed acquisition and availability evidence. A
+supported-only route reaches skill 175 and then returns
+`unsupported-recipe-evidence`; it does not relax the evidence boundary to finish the
+route.
+
+Cured Heavy Hide and Cured Thick Hide have reviewed trainer, availability, learning,
+and color-threshold overrides in
+`data/imports/forever-leatherworking-overrides.json`. Their recipes still retain the
+snapshot's overall `unverified` status, so the baseline exposes that uncertainty
+instead of presenting the thresholds as fully verified in-game facts.
 
 Zero overlap is a diagnostic signal, not proof that either route is correct. The
 reference uses a newer beta build, a smaller candidate set, different accessibility
@@ -63,16 +76,19 @@ repeatable baseline.
 
 ## Review order
 
-1. Confirm the threshold ranges behind the generated route's one-craft-per-skill
-   result, especially Cured Heavy Hide and Cured Thick Hide.
-2. Investigate acquisition and availability for Forceful Medium Armor Kit,
-   Comfortable Leather Hat, Turtle Scale Gloves, Tough Scorpid Gloves, Wild Leather
-   Boots, and the selected Charged Scorpid recipes.
+1. Corroborate the reviewed Cured Heavy Hide and Cured Thick Hide overrides with
+   direct in-game evidence when available; do not discard their field-level source
+   and verification state.
+2. Investigate Forever acquisition and availability for Comfortable Leather Hat,
+   Turtle Scale Gloves, Tough Scorpid Gloves, Wild Leather Boots, Charged Scorpid
+   Helm, Charged Scorpid Vest, and Charged Scorpid Boots. Classic-borrowed source
+   kinds are not sufficient evidence for a Forever fact.
 3. Resolve same-name recipe ambiguity using supported spell/build evidence rather
    than choosing a row by name.
-4. Decide whether the product should compare a trainer-friendly route in addition to
-   its default practical fewest-crafts route.
-5. Add additional dated reference guides to determine which disagreements persist
+4. Add a trainer-friendly comparison only if it represents a clearly named product
+   policy rather than an implicit relaxation of evidence rules.
+5. Add dated captures of the Mobalytics, WoW-Professions, and WowTBC.gg routes to
+   determine which disagreements persist
    across independent methodologies.
 
 Only supported client, observed, or reviewed evidence may change recipe data. A route

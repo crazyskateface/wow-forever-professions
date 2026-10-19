@@ -30,10 +30,14 @@ data.
   configured once in the shared domain package.
 - Optimizes expected crafts, material units, or stored auction cost per skill point.
 - Uses dynamic programming with configurable recipe-switch and acquisition friction.
+- Uses a Practical confidence policy by default: supported acquisition and availability
+  win over unknown evidence whenever they can complete the same route. A Supported-only
+  policy blocks at the first skill that would require unknown evidence.
 - Supports known-recipe selection, trainer-only mode, faction/specialization/cooldown
   constraints, and explicit recipe or reagent exclusions at the API boundary.
 - Groups adjacent decisions into practical guide steps and exposes ordinary
-  alternatives.
+  alternatives. Every returned segment and alternative includes machine-readable
+  acquisition, availability, provenance, verification, confidence, and risk reasons.
 - Treats reagents carrying Forever's client-defined `Scarce` label as a last resort:
   a complete non-Scarce route wins even when its ordinary objective score is higher.
 - Opens each guide step in the calculator at the relevant skill and shows New/Updated

@@ -28,6 +28,19 @@ Supported objectives and constraints:
 - faction, specialization, branch, availability, unknown-data, and cooldown rules;
 - configurable switch and acquisition-friction policy.
 
+The default `practical` confidence policy treats unknown acquisition or availability
+as a route-level last resort. After Scarce avoidance, the dynamic-programming score
+minimizes skill decisions backed by unknown evidence before optimizing cost, crafts,
+or materials. `supported-only` instead rejects unknown acquisition and availability;
+if that evidence boundary prevents completion, the route reports
+`unsupported-recipe-evidence` at the blocked skill. Rejected recipe evidence is never
+eligible in either policy.
+
+Each returned segment and alternative carries structured evidence: confidence level,
+risk reason codes, acquisition, availability, provenance source, and verification
+status. Consumers should render these fields rather than reconstructing confidence
+from recipe names or UI assumptions.
+
 The application identifies scarce reagent item IDs from the build-stamped Forever
 client `ItemNameDescription` classification imported with the recipe catalog.
 Scarcity is optimized lexicographically ahead of the selected cost, craft, or material
@@ -35,7 +48,9 @@ objective, so a complete route without scarce materials always wins. Scarce reci
 remain usable when they are the only way through a skill range and are hidden from
 ordinary route alternatives. The optimizer does not own a list of scarce item names.
 
-Missing prices never become zero. A cost route reports `missing-price-data`; a gap in available recipes reports `no-eligible-recipe` and identifies the blocked skill.
+Missing prices never become zero. A cost route reports `missing-price-data`; a gap in
+available recipes reports `no-eligible-recipe`; and a strict evidence boundary reports
+`unsupported-recipe-evidence`. Every blocked result identifies the affected skill.
 
 Run the focused tests with:
 

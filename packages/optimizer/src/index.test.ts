@@ -13,6 +13,8 @@ const changingChanceRecipe: RouteRecipe = {
   learnSkill: 1,
   availability: "available",
   acquisition: "trainer",
+  provenanceSource: "observed-in-game",
+  verificationStatus: "verified",
   faction: "both",
   specializationSpellId: null,
   cooldownSeconds: null,
@@ -631,6 +633,110 @@ describe("human-friendly route policy", () => {
 
     expect(practical.steps[0]?.recipeId).toBe("trainer-recipe");
     expect(ignoreAcquisition.steps[0]?.recipeId).toBe("drop-recipe");
+  });
+
+  it("uses unknown acquisition or availability only when a supported route is unavailable", () => {
+    const supported: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "supported",
+      reagents: [{ itemId: "leather", quantity: 100 }],
+    };
+    const unknown: RouteRecipe = {
+      ...supported,
+      id: "unknown",
+      acquisition: "unknown",
+      availability: "unknown",
+      provenanceSource: "client-data",
+      verificationStatus: "unverified",
+      reagents: [{ itemId: "leather", quantity: 1 }],
+    };
+
+    const supportedRoute = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 2,
+      targetSkill: 3,
+      objective: "materials",
+      recipes: [unknown, supported],
+    });
+    expect(supportedRoute).toMatchObject({
+      status: "complete",
+      confidencePolicy: "practical",
+      segments: [{
+        recipeId: "supported",
+        evidence: {
+          level: "verified",
+          reasons: [],
+          acquisition: "trainer",
+          availability: "available",
+        },
+      }],
+    });
+
+    const fallbackRoute = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 2,
+      targetSkill: 3,
+      objective: "materials",
+      recipes: [{ ...unknown, provenanceSource: "classic-fallback" }],
+    });
+    expect(fallbackRoute).toMatchObject({
+      status: "complete",
+      confidencePolicy: "practical",
+      segments: [{
+        recipeId: "unknown",
+        evidence: {
+          level: "unknown",
+          reasons: [
+            "unknown-acquisition",
+            "unknown-availability",
+            "classic-fallback",
+          ],
+        },
+      }],
+    });
+  });
+
+  it("blocks supported-only routes instead of relaxing unknown evidence", () => {
+    const result = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 2,
+      targetSkill: 3,
+      objective: "materials",
+      confidencePolicy: "supported-only",
+      recipes: [{
+        ...changingChanceRecipe,
+        acquisition: "unknown",
+        availability: "unknown",
+      }],
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      confidencePolicy: "supported-only",
+      blockedAtSkill: 2,
+      reason: "unsupported-recipe-evidence",
+      steps: [],
+      segments: [],
+    });
+  });
+
+  it("never routes through rejected recipe evidence", () => {
+    const result = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 2,
+      targetSkill: 3,
+      objective: "materials",
+      recipes: [{
+        ...changingChanceRecipe,
+        verificationStatus: "rejected",
+      }],
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      blockedAtSkill: 2,
+      reason: "no-eligible-recipe",
+    });
   });
 
   it("accounts for specialization and cooldown friction when they are allowed", () => {

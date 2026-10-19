@@ -299,11 +299,13 @@ describe("shared contracts", () => {
         startSkill: 150,
         targetSkill: 180,
         objective: "cost",
+        confidencePolicy: "supported-only",
         constraints: {
           faction: "horde",
           specializationSpellIds: [10656],
           professionBranchId: "dragonscale",
           knownRecipeIds: ["heavy-armor-kit"],
+          allowUnknownAcquisition: false,
           allowUnknownAvailability: true,
           allowUnknownFaction: true,
           allowCooldowns: false,
@@ -360,6 +362,7 @@ describe("shared contracts", () => {
   it("accepts complete and blocked route results", () => {
     const base = {
       objective: "crafts",
+      confidencePolicy: "practical",
       startSkill: 150,
       targetSkill: 151,
       steps: [
@@ -381,6 +384,14 @@ describe("shared contracts", () => {
           expectedSkillUps: 1,
           expectedCrafts: 1,
           expectedMaterials: 6,
+          evidence: {
+            level: "verified",
+            reasons: [],
+            acquisition: "trainer",
+            availability: "available",
+            provenanceSource: "observed-in-game",
+            verificationStatus: "verified",
+          },
         },
       ],
       totals: {
