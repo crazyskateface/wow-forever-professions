@@ -42,6 +42,10 @@ data.
   a complete non-Scarce route wins even when its ordinary objective score is higher.
 - Opens each guide step in the calculator at the relevant skill and shows New/Updated
   Forever badges when comparison data exists.
+- Presents generated segments as an execution checklist with the active skill range,
+  expected crafts, primary and total materials, market estimate, acquisition, and
+  expandable confidence details. Completion is saved only for the exact matching
+  build, range, objective, confidence policy, constraints, market, and route.
 
 ### Recipe catalog and calculator
 
@@ -106,8 +110,11 @@ data.
 
 ### Personalization without accounts
 
-- Saves current and target skill, route objective, trainer-only mode, shopping
-  strategy, region, market, faction, and Forever Changes filters in the browser.
+- Saves current and target skill, route objective, confidence policy, current-skill
+  linking, trainer-only mode, shopping strategy, region, market, faction, and Forever
+  Changes filters in the browser.
+- Saves route-step completion under a separate route fingerprint and exposes
+  mark-through-current-skill and resume-at-current-skill actions.
 - Restores the saved profile when generating the initial guide and uses its market and
   faction in price, route, and shopping-list requests.
 - Validates and versions stored preferences, falls back safely when storage is corrupt

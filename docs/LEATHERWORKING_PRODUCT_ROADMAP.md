@@ -137,6 +137,13 @@ evidence.
 
 Priority: P0. Make the route as easy to follow in game as the strongest static guides.
 
+Status: in progress as of October 19, 2026. Route segments now render as responsive
+execution cards with completion checkboxes, active-step guidance, materials, market
+estimate, acquisition and confidence states, local fingerprinted progress,
+mark-through-skill, resume, recipe-detail navigation, a shared-by-default current
+skill/route start, and a user-selectable confidence policy. Price freshness and
+supported trainer milestone placement remain open.
+
 ### Work
 
 - Turn each route segment into a compact execution card showing:

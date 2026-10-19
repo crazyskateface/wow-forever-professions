@@ -1,4 +1,5 @@
 import type {
+  RouteConfidencePolicy,
   RouteObjective,
   ShoppingStrategy,
 } from "@forever-professions/contracts";
@@ -31,8 +32,10 @@ export interface PersonalizationPreferences {
   readonly version: 1;
   readonly currentSkill: number;
   readonly routeStartSkill: number;
+  readonly routeStartLinked: boolean;
   readonly targetSkill: number;
   readonly routeObjective: RouteObjective;
+  readonly routeConfidencePolicy: RouteConfidencePolicy;
   readonly shoppingStrategy: ShoppingStrategy;
   readonly trainerOnly: boolean;
   readonly region: string;
@@ -63,8 +66,10 @@ export const DEFAULT_PERSONALIZATION: PersonalizationPreferences = {
   version: 1,
   currentSkill: 1,
   routeStartSkill: 1,
+  routeStartLinked: true,
   targetSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
   routeObjective: "crafts",
+  routeConfidencePolicy: "practical",
   shoppingStrategy: "cheapest",
   trainerOnly: false,
   region: "us",
@@ -75,6 +80,7 @@ export const DEFAULT_PERSONALIZATION: PersonalizationPreferences = {
 };
 
 const ROUTE_OBJECTIVES = ["cost", "crafts", "materials"] as const;
+const ROUTE_CONFIDENCE_POLICIES = ["practical", "supported-only"] as const;
 const SHOPPING_STRATEGIES = ["cheapest", "buy-only", "craft-first"] as const;
 const PLAYER_FACTIONS = ["alliance", "horde"] as const;
 const CHANGE_FILTERS = [
@@ -137,19 +143,26 @@ export function parsePersonalization(value: unknown): PersonalizationPreferences
     0,
     FOREVER_BUILD_CONFIG.maxBaseSkill,
   );
+  const currentSkill = boundedInteger(
+    value.currentSkill,
+    DEFAULT_PERSONALIZATION.currentSkill,
+    0,
+    FOREVER_BUILD_CONFIG.maxBaseSkill,
+  );
+  const routeStartLinked = booleanValue(
+    value.routeStartLinked,
+    routeStartSkill === currentSkill,
+  );
+  const resolvedRouteStartSkill = routeStartLinked ? currentSkill : routeStartSkill;
   const changeFilters = isRecord(value.changeFilters) ? value.changeFilters : {};
 
   return {
     version: 1,
-    currentSkill: boundedInteger(
-      value.currentSkill,
-      DEFAULT_PERSONALIZATION.currentSkill,
-      0,
-      FOREVER_BUILD_CONFIG.maxBaseSkill,
-    ),
-    routeStartSkill,
+    currentSkill,
+    routeStartSkill: resolvedRouteStartSkill,
+    routeStartLinked,
     targetSkill: Math.max(
-      routeStartSkill,
+      resolvedRouteStartSkill,
       boundedInteger(
         value.targetSkill,
         DEFAULT_PERSONALIZATION.targetSkill,
@@ -161,6 +174,11 @@ export function parsePersonalization(value: unknown): PersonalizationPreferences
       value.routeObjective,
       ROUTE_OBJECTIVES,
       DEFAULT_PERSONALIZATION.routeObjective,
+    ),
+    routeConfidencePolicy: oneOf(
+      value.routeConfidencePolicy,
+      ROUTE_CONFIDENCE_POLICIES,
+      DEFAULT_PERSONALIZATION.routeConfidencePolicy,
     ),
     shoppingStrategy: oneOf(
       value.shoppingStrategy,

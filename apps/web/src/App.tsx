@@ -21,6 +21,7 @@ import {
   type RecipeChange,
   type RecipeChangeCounts,
   type RecipeChangeType,
+  type RouteConfidencePolicy,
   type RouteObjective,
   type RouteOptimizationResponse,
   type ShoppingListResponse,
@@ -39,6 +40,7 @@ import { leatherworkingFixture } from "@forever-professions/fixtures";
 import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
+import { RouteChecklist } from "./RouteChecklist.js";
 import { SiteFooter } from "./SiteFooter.js";
 import { ChevronDownIcon, SearchIcon } from "./UiIcons.js";
 import {
@@ -62,6 +64,14 @@ import {
   type RecipeListView,
 } from "./request-policy.js";
 import { buildSkillChartData } from "./skill-chart.js";
+import {
+  completedThroughSkill,
+  createRouteProgressFingerprint,
+  readRouteProgress,
+  routeSegmentKey,
+  writeRouteProgress,
+  type RouteProgressState,
+} from "./route-progress.js";
 
 type WorkspaceView = "calculator" | "planner";
 
@@ -289,6 +299,7 @@ interface RouteRequestOptions {
   readonly startSkill: number;
   readonly targetSkill: number;
   readonly objective: RouteObjective;
+  readonly confidencePolicy: RouteConfidencePolicy;
   readonly knownRecipeIds: readonly string[];
   readonly trainerOnly: boolean;
   readonly signal?: AbortSignal;
@@ -301,6 +312,7 @@ async function requestOptimizedRoute({
   startSkill,
   targetSkill,
   objective,
+  confidencePolicy,
   knownRecipeIds,
   trainerOnly,
   signal,
@@ -314,6 +326,7 @@ async function requestOptimizedRoute({
       startSkill,
       targetSkill,
       objective,
+      confidencePolicy,
       constraints: { faction, knownRecipeIds, trainerOnly },
     }),
     ...(signal === undefined ? {} : { signal }),
@@ -491,17 +504,25 @@ export function App() {
   const [routeStartSkill, setRouteStartSkill] = useState(
     initialPreferences.routeStartSkill,
   );
+  const [routeStartLinked, setRouteStartLinked] = useState(
+    initialPreferences.routeStartLinked,
+  );
   const [routeTargetSkill, setRouteTargetSkill] = useState(
     initialPreferences.targetSkill,
   );
   const [routeObjective, setRouteObjective] = useState<RouteObjective>(
     initialPreferences.routeObjective,
   );
+  const [routeConfidencePolicy, setRouteConfidencePolicy] =
+    useState<RouteConfidencePolicy>(initialPreferences.routeConfidencePolicy);
   const [knownRecipeIds, setKnownRecipeIds] = useState<readonly string[]>(
     leatherworkingFixture.recipes.map(({ id }) => id),
   );
   const [trainerOnly, setTrainerOnly] = useState(initialPreferences.trainerOnly);
   const [routeResponse, setRouteResponse] = useState<RouteOptimizationResponse>();
+  const [routeProgress, setRouteProgress] = useState<RouteProgressState>();
+  const [routeProgressStorageAvailable, setRouteProgressStorageAvailable] =
+    useState(true);
   const [routeError, setRouteError] = useState<string>();
   const [routeLoading, setRouteLoading] = useState(false);
   const [shoppingStrategy, setShoppingStrategy] = useState<ShoppingStrategy>(
@@ -530,8 +551,10 @@ export function App() {
       version: 1,
       currentSkill: skill,
       routeStartSkill,
+      routeStartLinked,
       targetSkill: routeTargetSkill,
       routeObjective,
+      routeConfidencePolicy,
       shoppingStrategy,
       trainerOnly,
       region,
@@ -547,6 +570,8 @@ export function App() {
     marketId,
     region,
     routeObjective,
+    routeConfidencePolicy,
+    routeStartLinked,
     routeStartSkill,
     routeTargetSkill,
     shoppingStrategy,
@@ -635,23 +660,25 @@ export function App() {
     routeAbortControllerRef.current = controller;
     setRouteLoading(true);
     setRouteError(undefined);
-    requestOptimizedRoute({
+    const request = {
       faction,
       marketId,
       professionId: profession.id,
       startSkill: routeStartSkill,
       targetSkill: routeTargetSkill,
       objective: routeObjective,
+      confidencePolicy: routeConfidencePolicy,
       knownRecipeIds: profession.recipes.map(({ id }) => id),
       trainerOnly,
       signal: controller.signal,
-    })
+    } satisfies RouteRequestOptions;
+    requestOptimizedRoute(request)
       .then((response) => {
         if (
           !controller.signal.aborted &&
           routeRequestGuardRef.current.isCurrent(requestId)
         ) {
-          setRouteResponse(response);
+          activateRouteResponse(response, request);
         }
       })
       .catch((error: unknown) => {
@@ -847,10 +874,6 @@ export function App() {
     );
     return [...matches].sort((left, right) => left.name.localeCompare(right.name));
   }, [profession.recipes, search]);
-  const recipeById = useMemo(
-    () => new Map(profession.recipes.map((candidate) => [candidate.id, candidate] as const)),
-    [profession.recipes],
-  );
   const recipeTooltipBySpellId = useMemo(() => {
     const tooltips = new Map<number, ItemTooltipData>();
     for (const candidate of profession.recipes) {
@@ -886,6 +909,10 @@ export function App() {
       : recipeChangeTypes.get(`${profession.id}:${candidate.spellId}`);
   }
   const selectedRecipeIndex = filteredRecipes.findIndex(({ id }) => id === recipe.id);
+  const completedRouteSegmentKeys = useMemo(
+    () => new Set(routeProgress?.completedSegmentKeys ?? []),
+    [routeProgress],
+  );
   const guideRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     return (routeResponse?.result.segments ?? []).flatMap((segment) => {
@@ -986,6 +1013,62 @@ export function App() {
   );
   const profileLabel = `${region.toUpperCase()} - ${faction === "horde" ? "Horde" : "Alliance"}`;
 
+  function activateRouteResponse(
+    response: RouteOptimizationResponse,
+    request: RouteRequestOptions,
+  ): void {
+    const fingerprint = createRouteProgressFingerprint({
+      build: profession.build,
+      professionId: response.professionId,
+      startSkill: response.result.startSkill,
+      targetSkill: response.result.targetSkill,
+      objective: response.result.objective,
+      confidencePolicy: response.result.confidencePolicy,
+      marketId: response.marketId ?? request.marketId,
+      faction: request.faction,
+      trainerOnly: request.trainerOnly,
+      knownRecipeIds: request.knownRecipeIds,
+      segments: response.result.segments,
+    });
+    setRouteResponse(response);
+    setRouteProgress(readRouteProgress(fingerprint));
+  }
+
+  function persistRouteProgress(completedSegmentKeys: readonly string[]): void {
+    if (routeProgress === undefined) return;
+    const next = { ...routeProgress, completedSegmentKeys };
+    setRouteProgress(next);
+    setRouteProgressStorageAvailable(writeRouteProgress(next));
+  }
+
+  function toggleRouteSegment(segmentKey: string, complete: boolean): void {
+    const next = new Set(routeProgress?.completedSegmentKeys ?? []);
+    if (complete) next.add(segmentKey);
+    else next.delete(segmentKey);
+    persistRouteProgress([...next]);
+  }
+
+  function markRouteThroughCurrentSkill(): void {
+    if (routeResponse === undefined) return;
+    persistRouteProgress(completedThroughSkill(
+      routeResponse.result.segments,
+      completedRouteSegmentKeys,
+      skill,
+    ));
+  }
+
+  function resumeRouteAt(segmentKey: string | undefined): void {
+    if (segmentKey === undefined) return;
+    setWorkspaceView("planner");
+    window.requestAnimationFrame(() => {
+      const entry = [...document.querySelectorAll<HTMLElement>(
+        "[data-route-segment-key]",
+      )].find((candidate) => candidate.dataset.routeSegmentKey === segmentKey);
+      entry?.scrollIntoView({ behavior: "auto", block: "center" });
+      entry?.focus({ preventScroll: true });
+    });
+  }
+
   function invalidateShoppingResults(): void {
     shoppingRequestGuardRef.current.invalidate();
     shoppingAbortControllerRef.current?.abort();
@@ -1000,6 +1083,7 @@ export function App() {
     routeAbortControllerRef.current?.abort();
     routeAbortControllerRef.current = null;
     setRouteResponse(undefined);
+    setRouteProgress(undefined);
     setRouteError(undefined);
     setRouteLoading(false);
     invalidateShoppingResults();
@@ -1030,8 +1114,10 @@ export function App() {
     clearPersonalization();
     setSkill(DEFAULT_PERSONALIZATION.currentSkill);
     setRouteStartSkill(DEFAULT_PERSONALIZATION.routeStartSkill);
+    setRouteStartLinked(DEFAULT_PERSONALIZATION.routeStartLinked);
     setRouteTargetSkill(DEFAULT_PERSONALIZATION.targetSkill);
     setRouteObjective(DEFAULT_PERSONALIZATION.routeObjective);
+    setRouteConfidencePolicy(DEFAULT_PERSONALIZATION.routeConfidencePolicy);
     setShoppingStrategy(DEFAULT_PERSONALIZATION.shoppingStrategy);
     setTrainerOnly(DEFAULT_PERSONALIZATION.trainerOnly);
     setRegion(DEFAULT_PERSONALIZATION.region);
@@ -1041,6 +1127,7 @@ export function App() {
       DEFAULT_PERSONALIZATION.legacyProfessionSkillBonus,
     );
     setChangeFilters(DEFAULT_PERSONALIZATION.changeFilters);
+    setRouteProgressStorageAvailable(true);
   }
 
   function selectRecipe(nextRecipe: Recipe, historyMode: "push" | "replace" = "push"): void {
@@ -1050,10 +1137,20 @@ export function App() {
     scrollToWorkspaceOnMobile();
   }
 
-  function nudgeSkill(amount: number): void {
-    setSkill((current) =>
-      Math.min(maxBaseSkill, Math.max(MIN_PROFESSION_SKILL, current + amount)),
+  function updateCurrentSkill(value: number): void {
+    const nextSkill = Math.min(
+      maxBaseSkill,
+      Math.max(MIN_PROFESSION_SKILL, Math.round(value)),
     );
+    setSkill(nextSkill);
+    if (routeStartLinked) {
+      setRouteStartSkill(nextSkill);
+      setRouteTargetSkill((current) => Math.max(nextSkill, current));
+    }
+  }
+
+  function nudgeSkill(amount: number): void {
+    updateCurrentSkill(skill + amount);
   }
 
   function updateRouteStartSkill(value: number): void {
@@ -1065,6 +1162,11 @@ export function App() {
     setRouteTargetSkill((current) =>
       Math.max(nextStartSkill, Math.min(maxBaseSkill, current)),
     );
+  }
+
+  function updateRouteStartLinked(linked: boolean): void {
+    setRouteStartLinked(linked);
+    if (linked) updateRouteStartSkill(skill);
   }
 
   function updateRouteTargetSkill(value: number): void {
@@ -1103,19 +1205,21 @@ export function App() {
     setRouteLoading(true);
     setRouteError(undefined);
     try {
-      const response = await requestOptimizedRoute({
+      const request = {
         faction,
         marketId,
         professionId: profession.id,
         startSkill: routeStartSkill,
         targetSkill: routeTargetSkill,
         objective: routeObjective,
+        confidencePolicy: routeConfidencePolicy,
         knownRecipeIds,
         trainerOnly,
         signal: controller.signal,
-      });
+      } satisfies RouteRequestOptions;
+      const response = await requestOptimizedRoute(request);
       if (!routeRequestGuardRef.current.isCurrent(requestId)) return;
-      setRouteResponse(response);
+      activateRouteResponse(response, request);
       setRecipeListView("guide");
     } catch {
       if (!routeRequestGuardRef.current.isCurrent(requestId)) return;
@@ -1285,7 +1389,7 @@ export function App() {
                 aria-label={recipeListView === "guide" ? "Current leveling skill" : "Current skill for changed recipes"}
                 max={recipeListView === "guide" ? guideTargetSkill : maxBaseSkill}
                 min={recipeListView === "guide" ? guideStartSkill : MIN_PROFESSION_SKILL}
-                onChange={(event) => setSkill(Number(event.target.value))}
+                onChange={(event) => updateCurrentSkill(Number(event.target.value))}
                 step={1}
                 type="range"
                 value={recipeListView === "guide" ? currentGuideSkill : skill}
@@ -1298,7 +1402,7 @@ export function App() {
                 aria-label="Current profession skill"
                 max={maxBaseSkill}
                 min={MIN_PROFESSION_SKILL}
-                onChange={(event) => setSkill(Number(event.target.value))}
+                onChange={(event) => updateCurrentSkill(Number(event.target.value))}
                 step={1}
                 type="range"
                 value={skill}
@@ -1362,8 +1466,10 @@ export function App() {
                 </div>
               ) : null}
               {guideRows.map(({ alternatives, recipe: guideRecipe, segment }, index) => {
+                const segmentProgressKey = routeSegmentKey(segment);
+                const complete = completedRouteSegmentKeys.has(segmentProgressKey);
                 const active =
-                  guideRecipe.id === recipe.id &&
+                  !complete &&
                   skill >= segment.startSkill &&
                   skill < segment.endSkill;
                 return (
@@ -1377,12 +1483,14 @@ export function App() {
                     </div>
                     <ItemTooltipButton
                       aria-current={active ? "step" : undefined}
-                      className={active ? "guide-step active" : "guide-step"}
+                      className={`guide-step${active ? " active" : ""}${complete ? " complete" : ""}`}
                       item={outputTooltipItem(guideRecipe, profession.name)}
                       onClick={() => openRouteRecipe(segment.recipeId)}
                       type="button"
                     >
-                      <span className="guide-step-number">{index + 1}</span>
+                      <span className="guide-step-number" aria-hidden="true">
+                        {complete ? "✓" : index + 1}
+                      </span>
                       <span className="guide-step-title">
                         <ItemIcon className="guide-item-icon" gameItemId={guideRecipe.outputs[0]?.gameItemId} name={guideRecipe.name} />
                         <span>
@@ -1591,10 +1699,15 @@ export function App() {
               ) : null}
               <form className="route-form" onSubmit={submitRoute}>
                 <div className="route-field-grid">
-                  <label><span>Starting skill</span><input max={maxBaseSkill} min={MIN_PROFESSION_SKILL} onChange={(event) => updateRouteStartSkill(Number(event.target.value))} type="number" value={routeStartSkill} /></label>
+                  <label><span>Starting skill</span><input aria-describedby="route-start-help" max={maxBaseSkill} min={MIN_PROFESSION_SKILL} onChange={(event) => updateRouteStartSkill(Number(event.target.value))} readOnly={routeStartLinked} type="number" value={routeStartSkill} /></label>
                   <label><span>Target skill</span><input max={maxBaseSkill} min={routeStartSkill} onChange={(event) => updateRouteTargetSkill(Number(event.target.value))} type="number" value={routeTargetSkill} /></label>
                   <label><span>Optimize for</span><select onChange={(event) => setRouteObjective(event.target.value as RouteObjective)} value={routeObjective}><option value="cost">Expected cost</option><option value="crafts">Expected crafts</option><option value="materials">Material units</option></select></label>
+                  <label><span>Route confidence</span><select onChange={(event) => setRouteConfidencePolicy(event.target.value as RouteConfidencePolicy)} value={routeConfidencePolicy}><option value="practical">Practical</option><option value="supported-only">Supported only</option></select></label>
                 </div>
+                <label className="route-link-option">
+                  <input checked={routeStartLinked} onChange={(event) => updateRouteStartLinked(event.target.checked)} type="checkbox" />
+                  <span id="route-start-help">Use current skill as the route start</span>
+                </label>
                 <fieldset className="known-recipes">
                   <legend>Recipes you know</legend>
                   <div className="known-recipes-toolbar">
@@ -1660,10 +1773,22 @@ export function App() {
 
               {routeError ? <p className="route-error">{routeError}</p> : null}
               {routeResponse ? (
-                <div className="route-result" aria-live="polite">
+                <div className="route-result">
                   <div className="route-summary"><article><span>Expected crafts</span><strong>{formatNumber(routeResponse.result.totals.expectedCrafts)}</strong></article><article><span>Material units</span><strong>{formatNumber(routeResponse.result.totals.expectedMaterials)}</strong></article><article><span>Expected cost</span><strong>{routeResponse.result.totals.expectedCostCopper === undefined ? "—" : formatCopper(routeResponse.result.totals.expectedCostCopper)}</strong></article></div>
-                  {routeResponse.result.status === "blocked" ? <p className="route-warning">Route blocked at skill {routeResponse.result.blockedAtSkill}: {routeResponse.result.reason === "missing-price-data" ? "one or more required prices are unavailable." : "no eligible recipe covers this skill."}</p> : null}
-                  <ol className="route-segments">{routeResponse.result.segments.map((segment) => <li key={`${segment.recipeId}-${segment.startSkill}`}><span className="route-range">{segment.startSkill} → {segment.endSkill}</span><div><strong className={getItemRarityNameClass(recipeOutputQualityId(recipeById.get(segment.recipeId)))}>{segment.recipeName}</strong><small>{formatNumber(segment.expectedCrafts)} crafts · {formatNumber(segment.expectedMaterials)} materials</small></div><button onClick={() => openRouteRecipe(segment.recipeId)} type="button">Open recipe</button></li>)}</ol>
+                  <RouteChecklist
+                    completedSegmentKeys={completedRouteSegmentKeys}
+                    currentSkill={skill}
+                    getRecipeChangeType={getRecipeChangeType}
+                    onMarkThroughSkill={markRouteThroughCurrentSkill}
+                    onOpenRecipe={openRouteRecipe}
+                    onResume={resumeRouteAt}
+                    onToggleSegment={toggleRouteSegment}
+                    recipes={profession.recipes}
+                    result={routeResponse.result}
+                  />
+                  {!routeProgressStorageAvailable ? (
+                    <p className="route-warning">Browser storage is unavailable, so checklist progress will last only for this tab.</p>
+                  ) : null}
                   {routeResponse.attribution ? <a className="attribution" href={routeResponse.attribution.url} rel="noreferrer" target="_blank">{routeResponse.attribution.text}</a> : null}
 
                   <section className="shopping-list" aria-labelledby="shopping-title">
