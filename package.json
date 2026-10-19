@@ -48,6 +48,7 @@
     "api:smoke": "pnpm --filter @forever-professions/api smoke",
     "api:smoke:cloud": "pnpm --filter @forever-professions/api smoke:cloud",
     "db:local:down": "docker compose -f docker-compose.local.yml down",
+    "db:local:reset": "docker compose -f docker-compose.local.yml down --volumes",
     "db:local:test": "pnpm --filter @forever-professions/ingestion test:local-db",
     "db:local:up": "docker compose -f docker-compose.local.yml up -d --wait",
     "db:roles:dsql": "pnpm --filter @forever-professions/ingestion bootstrap:dsql-roles",

@@ -91,10 +91,12 @@ pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
 pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
 ```
 
-The PostgreSQL container stores its database in `tmpfs`. Stopping/removing it clears
-normalized data. Raw objects under `.local-data/` are content-addressed and persist.
-The container includes `psql`; contributors do not need a host installation. For an
-interactive local query after `pnpm db:local:up`, run:
+The PostgreSQL container stores its database in a named Docker volume. Normalized data
+therefore survives container and Docker Desktop restarts. `pnpm db:local:down` stops
+the service without deleting the catalog; `pnpm db:local:reset` explicitly removes the
+volume when a clean import is required. Raw objects under `.local-data/` are
+content-addressed and persist. The container includes `psql`; contributors do not need
+a host installation. For an interactive local query after `pnpm db:local:up`, run:
 
 ```text
 docker compose -f docker-compose.local.yml exec postgres psql -U forever_professions -d forever_professions_local
@@ -105,7 +107,7 @@ docker compose -f docker-compose.local.yml exec postgres psql -U forever_profess
 `wow_build` binds one build ID to the exact imported raw hash. If a checked-in JSON
 snapshot is regenerated with different bytes but the same game build ID, importing it
 over the existing local row correctly reports an immutable-value conflict. Reset the
-disposable local database, reimport the baseline, and then reimport the target with
+local catalog volume, reimport the baseline, and then reimport the target with
 the comparison. Do not weaken the immutable writer to make this go away.
 
 The catalog reader serves the most recently imported build. The recipe-change reader

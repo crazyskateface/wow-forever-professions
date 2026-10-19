@@ -72,6 +72,34 @@ def test_combined_local_update_job_runs_refresh_before_catalog_sync() -> None:
     assert job.commands[1][1:] == ("-m", "forever_admin.local_catalog_sync")
 
 
+def test_frontend_is_registered_as_a_managed_local_service() -> None:
+    config = load_config()
+    job = next(job for job in config.jobs if job.id == "serve-frontend")
+
+    assert job.service is True
+    assert job.service_url == "http://127.0.0.1:5173"
+    assert job.service_link_label == "Open frontend"
+    assert job.commands == (("pnpm", "dev:web"),)
+
+
+def test_local_api_service_uses_the_loopback_postgres_catalog_without_aws() -> None:
+    config = load_config()
+    job = next(job for job in config.jobs if job.id == "serve-local-api")
+
+    assert job.service is True
+    assert job.service_url == "http://127.0.0.1:3001/api/ready"
+    assert job.service_link_label == "Check API readiness"
+    assert job.environment == {
+        "LOCAL_DATABASE_URL": (
+            "postgresql://forever_professions:local-only@127.0.0.1:55432/"
+            "forever_professions_local"
+        ),
+        "PORT": "3001",
+    }
+    assert job.required_environment == ()
+    assert job.commands == (("pnpm", "dev:api"),)
+
+
 def test_recent_error_refresh_accepts_timestamp_less_entries(tmp_path) -> None:
     path = tmp_path / "api.log"
     path.write_text("ERROR database unavailable\n", encoding="utf-8")

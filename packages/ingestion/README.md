@@ -50,7 +50,7 @@ The files in `sql/` are intentionally one DDL statement each. Apply them in file
 
 ## Local database test
 
-From the repository root, run `pnpm db:local:up`, `pnpm db:local:test`, and `pnpm db:local:down`. The smoke test uses bare `pg` only as a local transaction adapter. It imports the same two-recipe payload twice, confirms the second raw write is already present, verifies the normalized row counts are unchanged, and checks application-level references. Production Aurora DSQL code uses the official connector.
+From the repository root, run `pnpm db:local:up`, `pnpm db:local:test`, and `pnpm db:local:down`. The smoke test creates a temporary database inside the local PostgreSQL container and drops it afterward, so it never clears or replaces the application catalog. It uses bare `pg` only as a local transaction adapter, imports the same two-recipe payload twice, confirms the second raw write is already present, verifies the normalized row counts are unchanged, and checks application-level references. Production Aurora DSQL code uses the official connector.
 
 ## Forever client-data conversion
 
@@ -65,10 +65,12 @@ pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --c
 ```
 
 The local admin dashboard first runs `pnpm data:status:local <classic.json>
-<forever.json>`. This checks the exact raw SHA-256 values in `wow_build` and verifies
-that the Classic-to-Forever comparison exists. A current catalog skips both imports.
-A missing or mismatched catalog is disposable and must be recreated before importing
-Classic and Forever in the order above; existing build rows are never rewritten.
+<forever.json>`. This checks the exact raw SHA-256 values in `wow_build`, verifies that
+the Classic-to-Forever comparison exists, and compares every recorded catalog
+migration checksum with the repository. A current catalog skips both imports. A
+missing, outdated, or drifted catalog must be reset before
+importing Classic and Forever in the order above; existing build rows are never
+rewritten.
 
 The full converter already performs client-data enrichment when the WoW installation root
 is supplied. When the addon archives are unchanged and only the pinned client metadata needs

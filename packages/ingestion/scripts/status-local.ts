@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { Pool } from "pg";
-import { normalizeScriptArguments, parseRawDatasetBytes } from "../src/index.js";
+import {
+  loadSqlMigrations,
+  normalizeScriptArguments,
+  parseRawDatasetBytes,
+} from "../src/index.js";
 
 const defaultConnectionUrl =
   "postgresql://forever_professions:local-only@127.0.0.1:55432/forever_professions_local";
@@ -40,19 +44,27 @@ const expected = await Promise.all(
     };
   }),
 );
+const migrations = await loadSqlMigrations(new URL("../sql/", import.meta.url));
 
 const pool = new Pool({ connectionString: localConnectionUrl(), max: 1 });
 let current = false;
-let reason = "local catalog schema is missing";
+let reason = "local catalog schema or migration ledger is missing";
 try {
-  const tables = await pool.query<{ wow_build: string | null; recipe_comparison: string | null }>(
-    "SELECT to_regclass('public.wow_build')::text AS wow_build, to_regclass('public.recipe_comparison')::text AS recipe_comparison",
+  const tables = await pool.query<{
+    wow_build: string | null;
+    recipe_comparison: string | null;
+    schema_migration: string | null;
+  }>(
+    "SELECT to_regclass('public.wow_build')::text AS wow_build, to_regclass('public.recipe_comparison')::text AS recipe_comparison, to_regclass('public.schema_migration')::text AS schema_migration",
   );
   const schemaReady =
     typeof tables.rows[0]?.wow_build === "string" &&
-    typeof tables.rows[0]?.recipe_comparison === "string";
+    typeof tables.rows[0]?.recipe_comparison === "string" &&
+    typeof tables.rows[0]?.schema_migration === "string";
   if (!schemaReady) {
-    process.stdout.write("Local catalog is empty; an initial import is required.\n");
+    process.stdout.write(
+      "Local catalog schema or migration ledger is incomplete; a rebuild is required.\n",
+    );
   } else {
     const builds = await pool.query<{ build_id: string; raw_sha256: string }>(
       "SELECT build_id, raw_sha256 FROM wow_build WHERE build_id = ANY($1::text[])",
@@ -69,15 +81,33 @@ try {
       [expected[0]!.buildId, expected[1]!.buildId],
     );
     const comparisonReady = comparison.rows[0]?.count === "1";
+    const ledger = await pool.query<{
+      migration_name: string;
+      checksum_sha256: string;
+    }>(
+      "SELECT migration_name, checksum_sha256 FROM schema_migration WHERE migration_scope = 'catalog' ORDER BY migration_name",
+    );
+    const appliedMigrations = new Map(
+      ledger.rows.map(({ migration_name, checksum_sha256 }) => [
+        migration_name,
+        checksum_sha256,
+      ] as const),
+    );
+    const migrationsMatch =
+      appliedMigrations.size === migrations.length &&
+      migrations.every(
+        ({ filename, checksum }) => appliedMigrations.get(filename) === checksum,
+      );
 
-    if (hashesMatch && comparisonReady) {
+    if (hashesMatch && comparisonReady && migrationsMatch) {
       current = true;
-      reason = "exact dataset hashes and comparison are present";
+      reason = "exact dataset hashes, comparison, and migrations are present";
       process.stdout.write("Local catalog already matches both exact source snapshots.\n");
     } else {
       reason = [
         ...(hashesMatch ? [] : ["dataset hash mismatch"]),
         ...(comparisonReady ? [] : ["comparison missing"]),
+        ...(migrationsMatch ? [] : ["migration mismatch"]),
       ].join(", ");
       process.stdout.write(
         `Local catalog requires an update: ${reason}.\n`,

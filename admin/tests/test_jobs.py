@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -128,6 +129,25 @@ def test_job_timeout(tmp_path: Path) -> None:
 
         assert execution.status is JobState.TIMED_OUT
         assert "timeout" in (execution.error or "")
+
+    asyncio.run(scenario())
+
+
+def test_service_ignores_command_timeout_and_stops_on_shutdown(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        service = replace(
+            _job("frontend", "import time; time.sleep(30)", timeout=0.05),
+            service=True,
+        )
+        executor = JobExecutor((service,), _policy(tmp_path))
+
+        execution = await executor.start(service.id)
+        await asyncio.sleep(0.2)
+
+        assert execution.status is JobState.RUNNING
+        await executor.shutdown()
+        execution = await asyncio.wait_for(executor.wait(execution.execution_id), timeout=15)
+        assert execution.status is JobState.CANCELLED
 
     asyncio.run(scenario())
 

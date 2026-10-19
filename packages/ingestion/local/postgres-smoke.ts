@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import type { ImportedBuildDataset } from "@forever-professions/contracts";
 import {
@@ -27,6 +28,16 @@ function localConnectionUrl(): string {
   }
 
   return value;
+}
+
+function temporaryDatabaseUrl(connectionUrl: string, databaseName: string): string {
+  const parsed = new URL(connectionUrl);
+  parsed.pathname = `/${databaseName}`;
+  return parsed.toString();
+}
+
+function quoteIdentifier(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
 function sampleDataset(): ImportedBuildDataset {
@@ -326,20 +337,29 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
 }
 
 async function main(): Promise<void> {
-  const pool = new Pool({ connectionString: localConnectionUrl(), max: 3 });
+  const connectionUrl = localConnectionUrl();
+  const databaseName = `forever_professions_smoke_${randomUUID().replaceAll("-", "")}`;
+  const adminPool = new Pool({ connectionString: connectionUrl, max: 1 });
+  let pool: Pool | undefined;
   const rawStore = new MemoryRawDatasetStore();
-  const transactionRunner = createLocalTransactionRunner(pool);
   const baseDataset = sampleDataset();
   const rawBytes = new TextEncoder().encode(JSON.stringify(baseDataset));
   const targetRawBytes = new TextEncoder().encode(JSON.stringify(targetDataset()));
 
   try {
+    await adminPool.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`);
+    const testPool = new Pool({
+      connectionString: temporaryDatabaseUrl(connectionUrl, databaseName),
+      max: 3,
+    });
+    pool = testPool;
+    const transactionRunner = createLocalTransactionRunner(testPool);
     const migrations = await applySqlMigrations(transactionRunner, {
       dialect: "postgres",
       scope: "catalog",
       migrations: await loadSqlMigrations(new URL("../sql/", import.meta.url)),
     });
-    await clearLocalRows(pool);
+    await clearLocalRows(testPool);
     const firstImport = await ingestBuildDataset({
       rawBytes,
       rawStore,
@@ -380,10 +400,12 @@ async function main(): Promise<void> {
         },
       ],
     });
-    const rows = await verifyDatabase(pool);
+    const rows = await verifyDatabase(testPool);
     const database: SqlExecutor = {
       query: async (sql, values): Promise<SqlQueryResult> => {
-        const result = values === undefined ? await pool.query(sql) : await pool.query(sql, [...values]);
+        const result = values === undefined
+          ? await testPool.query(sql)
+          : await testPool.query(sql, [...values]);
         return {
           rowCount: result.rowCount,
           rows: result.rows as readonly Record<string, unknown>[],
@@ -435,7 +457,11 @@ async function main(): Promise<void> {
       )}\n`,
     );
   } finally {
-    await pool.end();
+    await pool?.end();
+    await adminPool.query(
+      `DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)} WITH (FORCE)`,
+    );
+    await adminPool.end();
   }
 }
 

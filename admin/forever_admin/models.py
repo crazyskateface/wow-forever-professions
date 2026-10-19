@@ -57,6 +57,9 @@ class JobDefinition:
     confirmation: str | None = None
     required_environment: tuple[str, ...] = ()
     environment: dict[str, str] = field(default_factory=dict)
+    service: bool = False
+    service_url: str | None = None
+    service_link_label: str | None = None
 
 
 @dataclass(frozen=True)

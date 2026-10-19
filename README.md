@@ -197,10 +197,14 @@ AWS permissions, and troubleshooting. The dashboard never runs imports or deploy
 startup; data-writing jobs require confirmation. **Update latest local catalog**
 checks for newer compatible LibProfessionDB and LibItemDB releases, regenerates only
 when a source file ID changed, and checks the exact hashes already loaded in local
-PostgreSQL. It skips imports when the catalog is current; otherwise it recreates the
-disposable database and imports Classic followed by Forever in one fail-fast workflow.
+PostgreSQL. It skips imports when the catalog is current; otherwise it resets the
+local catalog volume and imports Classic followed by Forever in one fail-fast workflow.
 The Jobs page reports the pinned source versions and whether that operation changed
-them. Staging and production publication remain separate reviewable operations.
+them. It also provides a managed Start/Stop button for the local Vite frontend at
+`http://127.0.0.1:5173` and a separate local API button that automatically uses the
+loopback PostgreSQL catalog at `127.0.0.1:55432`. These local services require no AWS
+login or token. Staging and production publication remain separate reviewable
+operations.
 
 ## Full local start
 
@@ -210,7 +214,7 @@ Install dependencies once:
 pnpm install
 ```
 
-Start disposable PostgreSQL, import the Classic baseline, then import Forever while
+Start local PostgreSQL, import the Classic baseline, then import Forever while
 generating the comparison:
 
 ```text
@@ -243,9 +247,11 @@ pnpm dev:web
 - API: `http://localhost:3001`
 - PostgreSQL: `127.0.0.1:55432`
 
-Vite proxies `/api` to the local API. PostgreSQL uses container `tmpfs`; `pnpm
-db:local:down` removes the normalized database. Content-addressed raw imports under
-ignored `.local-data/` remain on disk.
+Vite proxies `/api` to the local API. PostgreSQL uses a named Docker volume, so the
+normalized catalog survives container and Docker Desktop restarts. `pnpm db:local:down`
+stops the database without deleting it; `pnpm db:local:reset` explicitly removes the
+local catalog volume when an immutable dataset or migration mismatch requires a clean
+import. Content-addressed raw imports under ignored `.local-data/` remain on disk.
 
 The API can run without `LOCAL_DATABASE_URL`, but it then serves only the small
 illustrative fixture. The browser also falls back to that fixture if the API cannot

@@ -42,10 +42,10 @@ def sync_local_catalog() -> int:
         return 0
 
     print(
-        "Local catalog status: update required — recreating the disposable database.",
+        "Local catalog status: update required — resetting the persistent catalog volume.",
         flush=True,
     )
-    _run(["pnpm", "db:local:down"], environment)
+    _run(["pnpm", "db:local:reset"], environment)
     _run(["pnpm", "db:local:up"], environment)
     _run(["pnpm", "data:import:local", CLASSIC_DATASET], environment)
     _run(

@@ -242,6 +242,25 @@ def load_config(path: Path | None = None) -> DashboardConfig:
             commands.append(tuple(command))
         required = {_string(value, "required environment name") for value in job.get("required_environment", [])}
         required.update(missing)
+        service = job.get("service", False)
+        if not isinstance(service, bool):
+            raise ConfigurationError(f"jobs[{index}].service must be true or false.")
+        service_url = (
+            _string(job["service_url"], f"jobs[{index}].service_url")
+            if job.get("service_url")
+            else None
+        )
+        if service_url is not None and not service:
+            raise ConfigurationError(f"jobs[{index}].service_url requires service = true.")
+        service_link_label = (
+            _string(job["service_link_label"], f"jobs[{index}].service_link_label")
+            if job.get("service_link_label")
+            else None
+        )
+        if service_link_label is not None and service_url is None:
+            raise ConfigurationError(
+                f"jobs[{index}].service_link_label requires service_url."
+            )
         job_environment: dict[str, str] = {}
         for name, value in _table(job.get("environment", {}), f"jobs[{index}].environment").items():
             environment_name = _string(name, "job environment name")
@@ -262,6 +281,9 @@ def load_config(path: Path | None = None) -> DashboardConfig:
                 confirmation=str(job["confirmation"]).strip() if job.get("confirmation") else None,
                 required_environment=tuple(sorted(required)),
                 environment=job_environment,
+                service=service,
+                service_url=service_url,
+                service_link_label=service_link_label,
             )
         )
 

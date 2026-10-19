@@ -83,6 +83,8 @@ class CommandPolicy:
     def validate_job(self, job: JobDefinition) -> Path:
         if not job.commands:
             raise JobValidationError("A job must contain at least one command.")
+        if job.service and len(job.commands) != 1:
+            raise JobValidationError("A managed service must contain exactly one command.")
         working_directory = (self.repo_root / job.working_directory).resolve()
         if not working_directory.is_relative_to(self.repo_root):
             raise JobValidationError("Job working directory must stay inside the repository.")
@@ -190,6 +192,22 @@ class JobExecutor:
             await self._terminate(process)
         return True
 
+    async def shutdown(self) -> None:
+        active = tuple(self._active.values())
+        if not active:
+            return
+        await asyncio.gather(
+            *(self.cancel(execution.job_id) for execution in active),
+            return_exceptions=True,
+        )
+        tasks = [
+            self._tasks[execution.execution_id]
+            for execution in active
+            if execution.execution_id in self._tasks
+        ]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
     def latest(self, job_id: str) -> JobExecution | None:
         return next((execution for execution in self.history if execution.job_id == job_id), None)
 
@@ -237,7 +255,7 @@ class JobExecutor:
 
     async def _run(self, job: JobDefinition, execution: JobExecution) -> None:
         working_directory = self.policy.validate_job(job)
-        deadline = asyncio.get_running_loop().time() + job.timeout_seconds
+        deadline = None if job.service else asyncio.get_running_loop().time() + job.timeout_seconds
         try:
             for index, raw_command in enumerate(job.commands, start=1):
                 if execution.cancel_requested:
@@ -263,11 +281,14 @@ class JobExecutor:
                     asyncio.create_task(self._drain(process.stdout, execution, "stdout")),
                     asyncio.create_task(self._drain(process.stderr, execution, "stderr")),
                 )
-                remaining = deadline - asyncio.get_running_loop().time()
                 try:
-                    if remaining <= 0:
-                        raise TimeoutError
-                    execution.exit_code = await asyncio.wait_for(process.wait(), timeout=remaining)
+                    if deadline is None:
+                        execution.exit_code = await process.wait()
+                    else:
+                        remaining = deadline - asyncio.get_running_loop().time()
+                        if remaining <= 0:
+                            raise TimeoutError
+                        execution.exit_code = await asyncio.wait_for(process.wait(), timeout=remaining)
                 except TimeoutError:
                     await self._terminate(process)
                     execution.status = JobState.TIMED_OUT

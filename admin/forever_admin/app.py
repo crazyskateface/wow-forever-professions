@@ -8,7 +8,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 
-from nicegui import ui
+from nicegui import app, ui
 
 from forever_admin.aws import AwsMonitor
 from forever_admin.config import DashboardConfig, load_config
@@ -561,7 +561,7 @@ def register_pages(runtime: DashboardRuntime) -> None:
 
     @ui.page("/jobs")
     async def jobs_page() -> None:
-        _shell(runtime, "Jobs", "Controlled imports, validation, and deployments")
+        _shell(runtime, "Jobs", "Controlled services, imports, validation, and deployments")
         container = ui.column().classes("page-shell")
         expanded_outputs: dict[str, bool] = {}
         last_render_signature: tuple[object, ...] | None = None
@@ -634,13 +634,28 @@ def register_pages(runtime: DashboardRuntime) -> None:
                                     ui.label(f"Missing environment: {', '.join(missing)}").classes("warning-callout")
                                 with ui.row().classes("w-full items-center"):
                                     ui.label(f"{len(job.commands)} step{'s' if len(job.commands) != 1 else ''}").classes("text-xs text-slate-500")
-                                    ui.label(f"timeout {job.timeout_seconds:g}s").classes("text-xs text-slate-500")
+                                    ui.label(
+                                        "runs until stopped"
+                                        if job.service
+                                        else f"timeout {job.timeout_seconds:g}s"
+                                    ).classes("text-xs text-slate-500")
                                     ui.space()
                                     if latest and latest.status is JobState.RUNNING:
-                                        ui.button("Cancel", icon="stop", on_click=lambda job_id=job.id: cancel(job_id), color="warning").props("outline")
+                                        if job.service_url:
+                                            ui.link(
+                                                job.service_link_label or "Open service",
+                                                job.service_url,
+                                                new_tab=True,
+                                            ).classes("text-amber-400 text-sm")
+                                        ui.button(
+                                            "Stop" if job.service else "Cancel",
+                                            icon="stop",
+                                            on_click=lambda job_id=job.id: cancel(job_id),
+                                            color="warning",
+                                        ).props("outline")
                                     else:
                                         run_button = ui.button(
-                                            "Run",
+                                            "Start" if job.service else "Run",
                                             icon="play_arrow",
                                             on_click=lambda job_id=job.id: ask_to_run(job_id),
                                             color="primary",
@@ -825,6 +840,7 @@ def main() -> None:
     config = load_config()
     configure_ui()
     runtime = DashboardRuntime(config)
+    app.on_shutdown(runtime.jobs.shutdown)
     register_pages(runtime)
     ui.run(
         host=config.app.host,

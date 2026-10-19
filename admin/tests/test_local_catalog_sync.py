@@ -51,7 +51,7 @@ def test_outdated_catalog_recreates_and_imports_both_snapshots_in_order(
 
     assert commands[:4] == [
         ("pnpm", "db:local:up"),
-        ("pnpm", "db:local:down"),
+        ("pnpm", "db:local:reset"),
         ("pnpm", "db:local:up"),
         (
             "pnpm",

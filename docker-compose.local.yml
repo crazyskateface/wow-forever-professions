@@ -13,5 +13,8 @@ services:
       interval: 2s
       timeout: 3s
       retries: 20
-    tmpfs:
-      - /var/lib/postgresql/data
+    volumes:
+      - forever-professions-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  forever-professions-postgres-data:

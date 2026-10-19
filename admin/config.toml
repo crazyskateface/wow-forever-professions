@@ -64,6 +64,29 @@ timeout_seconds = 2400
 commands = [["pnpm", "verify"]]
 
 [[jobs]]
+id = "serve-frontend"
+name = "Frontend development server"
+description = "Serve the local React application with Vite at http://127.0.0.1:5173. API requests proxy to the separately managed local API on port 3001."
+category = "Local services"
+working_directory = "."
+service = true
+service_url = "http://127.0.0.1:5173"
+service_link_label = "Open frontend"
+commands = [["pnpm", "dev:web"]]
+
+[[jobs]]
+id = "serve-local-api"
+name = "Local API server"
+description = "Serve the HTTP API at http://127.0.0.1:3001 using the imported local PostgreSQL catalog. No AWS credentials are used."
+category = "Local services"
+working_directory = "."
+service = true
+service_url = "http://127.0.0.1:3001/api/ready"
+service_link_label = "Check API readiness"
+environment = { LOCAL_DATABASE_URL = "postgresql://forever_professions:local-only@127.0.0.1:55432/forever_professions_local", PORT = "3001" }
+commands = [["pnpm", "dev:api"]]
+
+[[jobs]]
 id = "update-latest-local-catalog"
 name = "Update latest local catalog"
 description = "Check for newer compatible sources, regenerate changed snapshots, and import only when the exact local catalog is missing or outdated."
@@ -71,7 +94,7 @@ category = "Data"
 working_directory = "."
 timeout_seconds = 5400
 required_environment = ["WOW_CLIENT_ROOT"]
-confirmation = "This runs the complete local data update in order and stops at the first failed step. It skips database imports when the exact Classic and Forever hashes and comparison are already present. When an import is needed, it recreates the disposable local database and loads both snapshots in comparison order."
+confirmation = "This runs the complete local data update in order and stops at the first failed step. It skips database imports when the exact Classic and Forever hashes and comparison are already present. When an import is needed, it resets the persistent local catalog volume and loads both snapshots in comparison order."
 commands = [
   ["${ADMIN_PYTHON}", "-m", "forever_admin.source_refresh", "refresh"],
   ["${ADMIN_PYTHON}", "-m", "forever_admin.local_catalog_sync"],
@@ -134,7 +157,7 @@ commands = [
 [[jobs]]
 id = "test-local-database"
 name = "Test local database"
-description = "Run the repository's isolated local PostgreSQL ingestion smoke test."
+description = "Run the ingestion smoke test in a temporary PostgreSQL database without changing the application's imported catalog."
 category = "Local tools"
 working_directory = "."
 timeout_seconds = 900
