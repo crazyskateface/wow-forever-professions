@@ -588,6 +588,7 @@ export const shoppingQuantitySchema = z.object({
 export const shoppingPurchaseSchema = shoppingQuantitySchema.extend({
   unitPriceCopper: z.number().int().positive(),
   expectedCostCopper: z.number().nonnegative(),
+  priceObservedAt: z.iso.datetime().optional(),
 });
 
 export const shoppingCraftSchema = z.object({
@@ -642,6 +643,7 @@ export const shoppingListResponseSchema = z.object({
   professionId: z.string().min(1),
   marketId: z.string().min(1),
   attribution: auctionPriceAttributionSchema.optional(),
+  oldestPriceObservedAt: z.iso.datetime().optional(),
   plan: shoppingPlanSchema,
 });
 

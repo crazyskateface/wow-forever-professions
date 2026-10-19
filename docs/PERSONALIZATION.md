@@ -35,6 +35,13 @@ trainer-only state, known-recipe selection, and generated segment identities. A
 materially different route therefore starts with no checked steps. The checklist can
 mark every finished segment through current skill or focus the next incomplete step.
 
+Shopping progress uses the same route fingerprint in a separate versioned record.
+It stores only nonzero owned quantities and checked material identifiers. Changing
+an owned quantity recalculates the remaining amount in the browser without changing
+the route's expected quantities or the canonical shopping plan. Rebuilding the same
+route restores those values; a materially different route starts with a clean
+shopping checklist.
+
 The Legacy profession bonus is saved but intentionally not applied to calculations.
 Forever-specific modifier behavior has not been verified, so applying the number to
 recipe thresholds or learning requirements would present an unsupported assumption as
@@ -52,8 +59,8 @@ preferences**, which restores defaults and replaces the stored profile on the ne
 state update.
 
 No character name, account identifier, credentials, auction data, or imported game
-data is stored in the browser profile or route-progress records. Preferences and
-checklist completion do not sync between browsers or devices.
+data is stored in the browser profile, route-progress, or shopping-progress records.
+Preferences and checklist completion do not sync between browsers or devices.
 
 Known recipes remain session-only. Their identifiers participate in the current
 route fingerprint so completion cannot leak onto a different selection, but the

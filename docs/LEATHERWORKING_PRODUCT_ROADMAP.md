@@ -186,6 +186,12 @@ supported trainer milestone placement remain open.
 
 Priority: P1. Convert the calculated shopping plan into a usable pre-run checklist.
 
+Status: In progress. The primary shopping workspace, aggregate and per-step
+materials, owned/remaining quantities, separate buy and craft results, unresolved
+and cycle states, price observation timestamps, partial-total treatment, local
+progress, and copy/print summaries are implemented. Vendor-specific sourcing and a
+defined stale-price threshold remain open; no rounding or safety buffer is applied.
+
 ### Work
 
 - Promote shopping from a planner result into a primary route workspace.

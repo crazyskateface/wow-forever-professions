@@ -41,6 +41,7 @@ import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
 import { RouteChecklist } from "./RouteChecklist.js";
+import { ShoppingChecklist } from "./ShoppingChecklist.js";
 import { SiteFooter } from "./SiteFooter.js";
 import { ChevronDownIcon, SearchIcon } from "./UiIcons.js";
 import {
@@ -72,8 +73,14 @@ import {
   writeRouteProgress,
   type RouteProgressState,
 } from "./route-progress.js";
+import {
+  readShoppingProgress,
+  writeShoppingProgress,
+  type ShoppingProgressState,
+} from "./shopping-progress.js";
 
 type WorkspaceView = "calculator" | "planner";
+type PlannerResultView = "route" | "shopping";
 
 const MIN_PROFESSION_SKILL = 0;
 const RECIPE_ROW_HEIGHT = 78;
@@ -529,6 +536,11 @@ export function App() {
     initialPreferences.shoppingStrategy,
   );
   const [shoppingResponse, setShoppingResponse] = useState<ShoppingListResponse>();
+  const [shoppingProgress, setShoppingProgress] = useState<ShoppingProgressState>();
+  const [shoppingProgressStorageAvailable, setShoppingProgressStorageAvailable] =
+    useState(true);
+  const [plannerResultView, setPlannerResultView] =
+    useState<PlannerResultView>("route");
   const [shoppingError, setShoppingError] = useState<string>();
   const [shoppingLoading, setShoppingLoading] = useState(false);
   const [markets, setMarkets] = useState<readonly AuctionMarket[]>([]);
@@ -1032,6 +1044,7 @@ export function App() {
     });
     setRouteResponse(response);
     setRouteProgress(readRouteProgress(fingerprint));
+    setPlannerResultView("route");
   }
 
   function persistRouteProgress(completedSegmentKeys: readonly string[]): void {
@@ -1074,8 +1087,39 @@ export function App() {
     shoppingAbortControllerRef.current?.abort();
     shoppingAbortControllerRef.current = null;
     setShoppingResponse(undefined);
+    setShoppingProgress(undefined);
     setShoppingError(undefined);
     setShoppingLoading(false);
+  }
+
+  function persistShoppingProgress(next: ShoppingProgressState): void {
+    setShoppingProgress(next);
+    setShoppingProgressStorageAvailable(writeShoppingProgress(next));
+  }
+
+  function updateOwnedQuantity(itemId: string, quantity: number): void {
+    if (shoppingProgress === undefined) return;
+    const normalized = Number.isFinite(quantity)
+      ? Math.min(1_000_000, Math.max(0, quantity))
+      : 0;
+    persistShoppingProgress({
+      ...shoppingProgress,
+      ownedQuantities: {
+        ...shoppingProgress.ownedQuantities,
+        [itemId]: normalized,
+      },
+    });
+  }
+
+  function toggleShoppingItem(itemKey: string, checked: boolean): void {
+    if (shoppingProgress === undefined) return;
+    const next = new Set(shoppingProgress.checkedItemIds);
+    if (checked) next.add(itemKey);
+    else next.delete(itemKey);
+    persistShoppingProgress({
+      ...shoppingProgress,
+      checkedItemIds: [...next],
+    });
   }
 
   function invalidatePlanningResults(): void {
@@ -1128,6 +1172,7 @@ export function App() {
     );
     setChangeFilters(DEFAULT_PERSONALIZATION.changeFilters);
     setRouteProgressStorageAvailable(true);
+    setShoppingProgressStorageAvailable(true);
   }
 
   function selectRecipe(nextRecipe: Recipe, historyMode: "push" | "replace" = "push"): void {
@@ -1261,6 +1306,10 @@ export function App() {
       const parsed = shoppingListResponseSchema.parse(await response.json());
       if (!shoppingRequestGuardRef.current.isCurrent(requestId)) return;
       setShoppingResponse(parsed);
+      if (routeProgress !== undefined) {
+        setShoppingProgress(readShoppingProgress(routeProgress.fingerprint));
+      }
+      setPlannerResultView("shopping");
     } catch {
       if (!shoppingRequestGuardRef.current.isCurrent(requestId)) return;
       setShoppingResponse(undefined);
@@ -1775,38 +1824,53 @@ export function App() {
               {routeResponse ? (
                 <div className="route-result">
                   <div className="route-summary"><article><span>Expected crafts</span><strong>{formatNumber(routeResponse.result.totals.expectedCrafts)}</strong></article><article><span>Material units</span><strong>{formatNumber(routeResponse.result.totals.expectedMaterials)}</strong></article><article><span>Expected cost</span><strong>{routeResponse.result.totals.expectedCostCopper === undefined ? "—" : formatCopper(routeResponse.result.totals.expectedCostCopper)}</strong></article></div>
-                  <RouteChecklist
-                    completedSegmentKeys={completedRouteSegmentKeys}
-                    currentSkill={skill}
-                    getRecipeChangeType={getRecipeChangeType}
-                    onMarkThroughSkill={markRouteThroughCurrentSkill}
-                    onOpenRecipe={openRouteRecipe}
-                    onResume={resumeRouteAt}
-                    onToggleSegment={toggleRouteSegment}
-                    recipes={profession.recipes}
-                    result={routeResponse.result}
-                  />
-                  {!routeProgressStorageAvailable ? (
-                    <p className="route-warning">Browser storage is unavailable, so checklist progress will last only for this tab.</p>
-                  ) : null}
-                  {routeResponse.attribution ? <a className="attribution" href={routeResponse.attribution.url} rel="noreferrer" target="_blank">{routeResponse.attribution.text}</a> : null}
+                  <nav className="planner-result-nav" aria-label="Route workspace">
+                    <button className={plannerResultView === "route" ? "active" : ""} onClick={() => setPlannerResultView("route")} type="button">Route checklist</button>
+                    <button className={plannerResultView === "shopping" ? "active" : ""} onClick={() => setPlannerResultView("shopping")} type="button">Shopping checklist</button>
+                  </nav>
 
-                  <section className="shopping-list" aria-labelledby="shopping-title">
-                    <div className="shopping-heading"><div><span className="section-kicker">Route supplies</span><h2 id="shopping-title">Shopping list</h2><p>Aggregate the route and compare buying reagents with crafting known intermediates.</p></div><label><span>Strategy</span><select onChange={(event) => { setShoppingStrategy(event.target.value as ShoppingStrategy); setShoppingResponse(undefined); }} value={shoppingStrategy}><option value="cheapest">Cheapest</option><option value="buy-only">Buy only</option><option value="craft-first">Craft first</option></select></label></div>
-                    <button className="secondary-action" disabled={shoppingLoading || routeResponse.result.segments.length === 0} onClick={buildShoppingList} type="button">{shoppingLoading ? "Building…" : "Build shopping list"}</button>
-                    {shoppingError ? <p className="route-error">{shoppingError}</p> : null}
-                    {shoppingResponse ? (
-                      <div className="shopping-result" aria-live="polite">
-                        <div className="shopping-total"><span>{shoppingResponse.plan.status === "complete" ? "Expected total" : "Known subtotal"}</span><strong>{formatCopper(shoppingResponse.plan.expectedCostCopper ?? shoppingResponse.plan.knownSubtotalCopper)}</strong></div>
-                        <div className="shopping-columns">
-                          <div><h3>Buy</h3>{shoppingResponse.plan.purchases.length === 0 ? <p className="empty-list">Nothing to buy.</p> : <ul>{shoppingResponse.plan.purchases.map((purchase) => <li key={purchase.itemId}><span className={getItemRarityNameClass(itemQualityById.get(purchase.itemId))}>{purchase.itemName}<small>{formatCopper(purchase.unitPriceCopper)} each</small></span><strong>{formatNumber(purchase.quantity)} · {formatCopper(purchase.expectedCostCopper)}</strong></li>)}</ul>}</div>
-                          <div><h3>Craft intermediates</h3>{shoppingResponse.plan.crafts.length === 0 ? <p className="empty-list">No intermediate crafts chosen.</p> : <ul>{shoppingResponse.plan.crafts.map((craft) => <li key={`${craft.recipeId}-${craft.outputItemId}`}><span className={getItemRarityNameClass(itemQualityById.get(craft.outputItemId))}>{craft.recipeName}<small className={getItemRarityNameClass(itemQualityById.get(craft.outputItemId))}>{craft.outputItemName}</small></span><strong>{formatNumber(craft.expectedCrafts)} crafts</strong></li>)}</ul>}</div>
-                        </div>
-                        {shoppingResponse.plan.unresolved.length > 0 ? <div className="shopping-warning"><strong>Needs attention</strong><ul>{shoppingResponse.plan.unresolved.map((item) => <li key={`${item.itemId}-${item.reason}`}><span className={getItemRarityNameClass(itemQualityById.get(item.itemId))}>{item.itemName}</span>: {formatNumber(item.quantity)} ({item.reason.replaceAll("-", " ")})</li>)}</ul></div> : null}
-                        {shoppingResponse.plan.cycles.length > 0 ? <p className="shopping-warning">Recursive crafting cycle blocked: {shoppingResponse.plan.cycles.map((cycle) => cycle.join(" → ")).join("; ")}</p> : null}
+                  {plannerResultView === "route" ? (
+                    <>
+                      <RouteChecklist
+                        completedSegmentKeys={completedRouteSegmentKeys}
+                        currentSkill={skill}
+                        getRecipeChangeType={getRecipeChangeType}
+                        onMarkThroughSkill={markRouteThroughCurrentSkill}
+                        onOpenRecipe={openRouteRecipe}
+                        onResume={resumeRouteAt}
+                        onToggleSegment={toggleRouteSegment}
+                        recipes={profession.recipes}
+                        result={routeResponse.result}
+                      />
+                      {!routeProgressStorageAvailable ? (
+                        <p className="route-warning">Browser storage is unavailable, so checklist progress will last only for this tab.</p>
+                      ) : null}
+                      {routeResponse.attribution ? <a className="attribution" href={routeResponse.attribution.url} rel="noreferrer" target="_blank">{routeResponse.attribution.text}</a> : null}
+                    </>
+                  ) : (
+                    <section className="shopping-workspace" aria-labelledby="shopping-workspace-title">
+                      <div className="shopping-workspace-controls">
+                        <div><span className="section-kicker">Shopping mode</span><h2 id="shopping-workspace-title">Plan route supplies</h2><p>Choose how intermediates should be sourced, then build the checklist from this exact route.</p></div>
+                        <label><span>Strategy</span><select onChange={(event) => { setShoppingStrategy(event.target.value as ShoppingStrategy); setShoppingResponse(undefined); setShoppingProgress(undefined); }} value={shoppingStrategy}><option value="cheapest">Cheapest</option><option value="buy-only">Buy only</option><option value="craft-first">Craft first</option></select></label>
+                        <button className="secondary-action" disabled={shoppingLoading || routeResponse.result.segments.length === 0} onClick={buildShoppingList} type="button">{shoppingLoading ? "Building…" : shoppingResponse === undefined ? "Build shopping checklist" : "Rebuild shopping checklist"}</button>
                       </div>
-                    ) : null}
-                  </section>
+                      {shoppingError ? <p className="route-error">{shoppingError}</p> : null}
+                      {shoppingResponse !== undefined && shoppingProgress !== undefined ? (
+                        <ShoppingChecklist
+                          itemQualityById={itemQualityById}
+                          onOwnedQuantityChange={updateOwnedQuantity}
+                          onToggleItem={toggleShoppingItem}
+                          progress={shoppingProgress}
+                          recipes={profession.recipes}
+                          response={shoppingResponse}
+                          route={routeResponse.result}
+                          storageAvailable={shoppingProgressStorageAvailable}
+                        />
+                      ) : !shoppingLoading ? (
+                        <div className="shopping-empty"><strong>Build this route's supply plan</strong><p>Expected quantities, purchase paths, craft choices, missing prices, and cycles will stay explicit.</p></div>
+                      ) : null}
+                    </section>
+                  )}
                 </div>
               ) : (
                 <div className="planner-empty"><span aria-hidden="true">⌁</span><h2>Your route will appear here</h2><p>Choose your range and goal, then build a route to compare the best recipes skill by skill.</p></div>

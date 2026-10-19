@@ -445,6 +445,7 @@ describe("shared contracts", () => {
               quantity: 62.5,
               unitPriceCopper: 125,
               expectedCostCopper: 7_812.5,
+              priceObservedAt: "2026-10-19T12:00:00.000Z",
             },
           ],
           crafts: [],
@@ -453,6 +454,7 @@ describe("shared contracts", () => {
           knownSubtotalCopper: 7_812.5,
           expectedCostCopper: 7_812.5,
         },
+        oldestPriceObservedAt: "2026-10-19T12:00:00.000Z",
       }),
     ).toBeDefined();
   });

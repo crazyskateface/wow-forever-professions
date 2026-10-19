@@ -90,10 +90,16 @@ data.
 
 ### Shopping and pricing
 
-- Aggregates a generated route into expected shopping quantities.
+- Promotes a generated route into a first-class shopping checklist with aggregate
+  and per-step material views.
+- Saves owned quantities and checked materials under the exact route fingerprint;
+  remaining quantities never change the route's canonical expected totals.
 - Supports cheapest, buy-only, and craft-first strategies with guarded recursive
   intermediate crafting.
-- Keeps missing prices and unresolved crafting sources explicit and detects cycles.
+- Keeps buy and craft paths separate, preserves missing prices and unresolved
+  crafting sources, and detects cycles.
+- Labels complete totals versus partial known subtotals, shows the oldest price
+  observation used, and provides copy and print-friendly summaries.
 - Normalizes AH Ledger observations to integer copper and preserves attribution.
 - Reads prices refreshed ahead of time; API requests never call an auction provider
   directly.
@@ -115,6 +121,8 @@ data.
   Changes filters in the browser.
 - Saves route-step completion under a separate route fingerprint and exposes
   mark-through-current-skill and resume-at-current-skill actions.
+- Saves shopping owned quantities and checked materials separately under that same
+  exact-route fingerprint.
 - Restores the saved profile when generating the initial guide and uses its market and
   faction in price, route, and shopping-list requests.
 - Validates and versions stored preferences, falls back safely when storage is corrupt

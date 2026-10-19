@@ -182,3 +182,7 @@ pnpm api:shopping -- 33.375 cheapest https://m6ulu3zwch.execute-api.us-east-1.am
 ```
 
 Valid shopping strategies are `cheapest`, `buy-only`, and `craft-first`.
+Available purchases include `priceObservedAt`, and the response includes
+`oldestPriceObservedAt` when at least one priced purchase contributed to the plan.
+Both values come from normalized stored observations. An absent timestamp means no
+priced purchase supplied one; it is not replaced with the request time.

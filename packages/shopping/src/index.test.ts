@@ -5,8 +5,18 @@ const baseInput: ShoppingPlanInput = {
   route: [{ recipeId: "final", expectedCrafts: 3 }],
   items: [
     { id: "final-item", name: "Final Item" },
-    { id: "intermediate", name: "Intermediate", unitPriceCopper: 100 },
-    { id: "base", name: "Base", unitPriceCopper: 10 },
+    {
+      id: "intermediate",
+      name: "Intermediate",
+      unitPriceCopper: 100,
+      priceObservedAt: "2026-10-08T06:00:00.000Z",
+    },
+    {
+      id: "base",
+      name: "Base",
+      unitPriceCopper: 10,
+      priceObservedAt: "2026-10-08T05:00:00.000Z",
+    },
   ],
   recipes: [
     {
@@ -49,6 +59,7 @@ describe("shopping planner", () => {
           quantity: 15,
           unitPriceCopper: 10,
           expectedCostCopper: 150,
+          priceObservedAt: "2026-10-08T05:00:00.000Z",
         },
       ],
       expectedCostCopper: 150,
