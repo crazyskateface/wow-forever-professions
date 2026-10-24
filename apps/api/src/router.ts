@@ -3,6 +3,7 @@ import {
   auctionPriceRequestSchema,
   auctionPricesResponseSchema,
   healthResponseSchema,
+  productEventSchema,
   professionFixtureSchema,
   professionsResponseSchema,
   readinessResponseSchema,
@@ -14,6 +15,7 @@ import {
   recipesResponseSchema,
   routeOptimizationRequestSchema,
   shoppingListRequestSchema,
+  type ProductEvent,
 } from "@forever-professions/contracts";
 import { professionFixtures } from "@forever-professions/fixtures";
 import type {
@@ -45,6 +47,7 @@ export interface ApiDependencies {
   readonly changes?: RecipeChangeReader;
   readonly pricing?: CurrentAuctionPriceReader;
   readonly readiness?: () => Promise<void>;
+  readonly productEventSink?: (event: ProductEvent) => Promise<void> | void;
   readonly corsOrigin?: string;
 }
 
@@ -155,6 +158,23 @@ export async function routeRequest(
         return json(503, { error: error.message });
       }
       return json(503, { error: "Shopping list is temporarily unavailable." });
+    }
+  }
+
+  if (normalizedPath === "/product-events") {
+    if (method !== "POST") return json(405, { error: "Method not allowed." });
+    const event = productEventSchema.safeParse(body);
+    if (!event.success) {
+      return json(400, { error: "A valid anonymous product event is required." });
+    }
+    if (dependencies.productEventSink === undefined) {
+      return json(503, { error: "Product analytics are not configured." });
+    }
+    try {
+      await dependencies.productEventSink(event.data);
+      return { statusCode: 204, headers, body: "" };
+    } catch {
+      return json(503, { error: "Product analytics are temporarily unavailable." });
     }
   }
 

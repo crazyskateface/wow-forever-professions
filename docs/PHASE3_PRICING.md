@@ -84,6 +84,11 @@ Pass an API Gateway base URL to test a deployment: `pnpm api:smoke -- https://ex
 
 Phase 3 delivers the current-price product path: normalized contracts, live and fallback providers, bounded DSQL persistence, scheduled refreshes, stored-price API routes, manual endpoint tools, calculator material costs, and visible provider attribution.
 
+The Leatherworking shopping workspace treats an observation as stale when its oldest
+price is more than two hours old. That allows eight missed 15-minute refresh windows
+before the UI warns the player. Missing or invalid timestamps remain explicitly
+unknown, and neither stale nor missing prices become zero.
+
 The AWS path was validated on October 8, 2026. The scoped worker role applied three pricing migrations, a manual Lambda invocation fetched and stored all four configured reagent prices, the scoped reader role returned them through every API route, and the same smoke suite passed through both API Gateway and CloudFront. The EventBridge schedule is enabled at `rate(15 minutes)` with its retry and dead-letter settings verified from the live resource.
 
 Long-term history is deliberately deferred. Current observations belong in DSQL; economical analytical storage will be added only when historical charts or analysis justify it.

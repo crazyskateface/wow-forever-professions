@@ -1,6 +1,5 @@
 import type {
-  RouteConfidencePolicy,
-  RouteObjective,
+  RoutePreset,
   ShoppingStrategy,
 } from "@forever-professions/contracts";
 import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
@@ -29,15 +28,10 @@ export interface ForeverChangeFilters {
 }
 
 export interface PersonalizationPreferences {
-  readonly version: 1;
+  readonly version: 2;
   readonly currentSkill: number;
-  readonly routeStartSkill: number;
-  readonly routeStartLinked: boolean;
-  readonly targetSkill: number;
-  readonly routeObjective: RouteObjective;
-  readonly routeConfidencePolicy: RouteConfidencePolicy;
+  readonly routePreset: RoutePreset;
   readonly shoppingStrategy: ShoppingStrategy;
-  readonly trainerOnly: boolean;
   readonly region: string;
   readonly marketId: string;
   readonly faction: PlayerFaction;
@@ -52,6 +46,8 @@ interface BrowserStorage {
 }
 
 export const PERSONALIZATION_STORAGE_KEY =
+  "forever-professions.personalization.v2";
+const LEGACY_PERSONALIZATION_STORAGE_KEY =
   "forever-professions.personalization.v1";
 
 export const DEFAULT_CHANGE_FILTERS: ForeverChangeFilters = {
@@ -63,15 +59,10 @@ export const DEFAULT_CHANGE_FILTERS: ForeverChangeFilters = {
 };
 
 export const DEFAULT_PERSONALIZATION: PersonalizationPreferences = {
-  version: 1,
+  version: 2,
   currentSkill: 1,
-  routeStartSkill: 1,
-  routeStartLinked: true,
-  targetSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
-  routeObjective: "crafts",
-  routeConfidencePolicy: "practical",
+  routePreset: "practical",
   shoppingStrategy: "cheapest",
-  trainerOnly: false,
   region: "us",
   marketId: "forever.pvp.horde.us",
   faction: "horde",
@@ -79,8 +70,14 @@ export const DEFAULT_PERSONALIZATION: PersonalizationPreferences = {
   changeFilters: DEFAULT_CHANGE_FILTERS,
 };
 
-const ROUTE_OBJECTIVES = ["cost", "crafts", "materials"] as const;
-const ROUTE_CONFIDENCE_POLICIES = ["practical", "supported-only"] as const;
+const ROUTE_PRESETS = [
+  "practical",
+  "trainer-friendly",
+  "cheapest",
+  "fewest-crafts",
+  "fewest-materials",
+  "experimental",
+] as const;
 const SHOPPING_STRATEGIES = ["cheapest", "buy-only", "craft-first"] as const;
 const PLAYER_FACTIONS = ["alliance", "horde"] as const;
 const CHANGE_FILTERS = [
@@ -134,60 +131,40 @@ function booleanValue(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
-export function parsePersonalization(value: unknown): PersonalizationPreferences {
-  if (!isRecord(value) || value.version !== 1) return DEFAULT_PERSONALIZATION;
+function savedRoutePreset(value: Record<string, unknown>): RoutePreset {
+  if (
+    typeof value.routePreset === "string" &&
+    ROUTE_PRESETS.includes(value.routePreset as RoutePreset)
+  ) {
+    return value.routePreset as RoutePreset;
+  }
+  if (value.trainerOnly === true) return "trainer-friendly";
+  if (value.routeObjective === "cost") return "cheapest";
+  if (value.routeObjective === "materials") return "fewest-materials";
+  if (value.routeConfidencePolicy === "supported-only") return "fewest-crafts";
+  return DEFAULT_PERSONALIZATION.routePreset;
+}
 
-  const routeStartSkill = boundedInteger(
-    value.routeStartSkill,
-    DEFAULT_PERSONALIZATION.routeStartSkill,
-    0,
-    FOREVER_BUILD_CONFIG.maxBaseSkill,
-  );
+export function parsePersonalization(value: unknown): PersonalizationPreferences {
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2)) {
+    return DEFAULT_PERSONALIZATION;
+  }
   const currentSkill = boundedInteger(
     value.currentSkill,
     DEFAULT_PERSONALIZATION.currentSkill,
-    0,
+    1,
     FOREVER_BUILD_CONFIG.maxBaseSkill,
   );
-  const routeStartLinked = booleanValue(
-    value.routeStartLinked,
-    routeStartSkill === currentSkill,
-  );
-  const resolvedRouteStartSkill = routeStartLinked ? currentSkill : routeStartSkill;
   const changeFilters = isRecord(value.changeFilters) ? value.changeFilters : {};
 
   return {
-    version: 1,
+    version: 2,
     currentSkill,
-    routeStartSkill: resolvedRouteStartSkill,
-    routeStartLinked,
-    targetSkill: Math.max(
-      resolvedRouteStartSkill,
-      boundedInteger(
-        value.targetSkill,
-        DEFAULT_PERSONALIZATION.targetSkill,
-        0,
-        FOREVER_BUILD_CONFIG.maxBaseSkill,
-      ),
-    ),
-    routeObjective: oneOf(
-      value.routeObjective,
-      ROUTE_OBJECTIVES,
-      DEFAULT_PERSONALIZATION.routeObjective,
-    ),
-    routeConfidencePolicy: oneOf(
-      value.routeConfidencePolicy,
-      ROUTE_CONFIDENCE_POLICIES,
-      DEFAULT_PERSONALIZATION.routeConfidencePolicy,
-    ),
+    routePreset: savedRoutePreset(value),
     shoppingStrategy: oneOf(
       value.shoppingStrategy,
       SHOPPING_STRATEGIES,
       DEFAULT_PERSONALIZATION.shoppingStrategy,
-    ),
-    trainerOnly: booleanValue(
-      value.trainerOnly,
-      DEFAULT_PERSONALIZATION.trainerOnly,
     ),
     region: nonEmptyString(value.region, DEFAULT_PERSONALIZATION.region),
     marketId: nonEmptyString(value.marketId, DEFAULT_PERSONALIZATION.marketId),
@@ -236,7 +213,8 @@ export function readPersonalization(
       typeof window === "undefined" ? undefined : window.localStorage
     );
     if (resolvedStorage === undefined) return DEFAULT_PERSONALIZATION;
-    const stored = resolvedStorage.getItem(PERSONALIZATION_STORAGE_KEY);
+    const stored = resolvedStorage.getItem(PERSONALIZATION_STORAGE_KEY) ??
+      resolvedStorage.getItem(LEGACY_PERSONALIZATION_STORAGE_KEY);
     return stored === null
       ? DEFAULT_PERSONALIZATION
       : parsePersonalization(JSON.parse(stored));
@@ -268,6 +246,7 @@ export function clearPersonalization(storage?: BrowserStorage): boolean {
     );
     if (resolvedStorage === undefined) return false;
     resolvedStorage.removeItem(PERSONALIZATION_STORAGE_KEY);
+    resolvedStorage.removeItem(LEGACY_PERSONALIZATION_STORAGE_KEY);
     return true;
   } catch {
     return false;

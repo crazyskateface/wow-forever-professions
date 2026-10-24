@@ -1,6 +1,7 @@
 import type {
   RouteConfidencePolicy,
   RouteObjective,
+  RoutePreset,
   RouteSegment,
 } from "@forever-professions/contracts";
 
@@ -14,11 +15,11 @@ export interface RouteProgressFingerprintInput {
   readonly professionId: string;
   readonly startSkill: number;
   readonly targetSkill: number;
+  readonly preset: RoutePreset;
   readonly objective: RouteObjective;
   readonly confidencePolicy: RouteConfidencePolicy;
   readonly marketId: string;
   readonly faction: string;
-  readonly trainerOnly: boolean;
   readonly knownRecipeIds: readonly string[];
   readonly segments: readonly Pick<
     RouteSegment,
@@ -69,12 +70,12 @@ export function createRouteProgressFingerprint(
     build: input.build,
     professionId: input.professionId,
     range: [input.startSkill, input.targetSkill],
+    preset: input.preset,
     objective: input.objective,
     confidencePolicy: input.confidencePolicy,
     marketId: input.marketId,
     constraints: {
       faction: input.faction,
-      trainerOnly: input.trainerOnly,
       knownRecipeIds: [...input.knownRecipeIds].sort(),
     },
     segments: input.segments.map((segment) => [

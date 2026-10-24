@@ -1,5 +1,8 @@
 export type ValidationRouteObjective = "cost" | "crafts" | "materials";
-export type ValidationRouteConfidencePolicy = "practical" | "supported-only";
+export type ValidationRouteConfidencePolicy =
+  | "practical"
+  | "supported-only"
+  | "experimental";
 
 export interface ComparableRouteStep {
   readonly skill: number;

@@ -9,6 +9,7 @@ import {
   remainingShoppingQuantity,
   type ShoppingProgressState,
 } from "./shopping-progress.js";
+import { getPriceFreshness, priceFreshnessLabel } from "./price-freshness.js";
 
 interface ShoppingChecklistProps {
   readonly itemQualityById: ReadonlyMap<string, number>;
@@ -113,6 +114,7 @@ export function ShoppingChecklist({
     ? "Expected total"
     : "Known subtotal";
   const total = response.plan.expectedCostCopper ?? response.plan.knownSubtotalCopper;
+  const aggregateFreshness = getPriceFreshness(response.oldestPriceObservedAt);
 
   async function copySummary(): Promise<void> {
     try {
@@ -141,9 +143,10 @@ export function ShoppingChecklist({
         </div>
       </div>
 
-      <div className="shopping-context">
+      <div className={`shopping-context freshness-${aggregateFreshness}`}>
         <div><span>Market</span><strong>{response.marketId}</strong></div>
         <div><span>Oldest price used</span><strong>{formatObservedAt(response.oldestPriceObservedAt)}</strong></div>
+        <div><span>Price freshness</span><strong>{priceFreshnessLabel(aggregateFreshness)}</strong></div>
         <div>
           <span>Price source</span>
           {response.attribution === undefined ? (
@@ -232,6 +235,7 @@ export function ShoppingChecklist({
                 const key = `buy:${purchase.itemId}`;
                 const owned = ownedQuantity(progress, purchase.itemId);
                 const remaining = remainingShoppingQuantity(purchase.quantity, owned);
+                const freshness = getPriceFreshness(purchase.priceObservedAt);
                 return (
                   <li className={checked.has(key) ? "checked" : ""} key={purchase.itemId}>
                     <label className="shopping-check">
@@ -244,12 +248,26 @@ export function ShoppingChecklist({
                       <div><dt>Unit price</dt><dd>{formatCopper(purchase.unitPriceCopper)}</dd></div>
                       <div><dt>Plan cost</dt><dd>{formatCopper(purchase.expectedCostCopper)}</dd></div>
                     </dl>
-                    <small>Observed {formatObservedAt(purchase.priceObservedAt)}</small>
+                    <small className={`price-freshness freshness-${freshness}`}>
+                      Observed {formatObservedAt(purchase.priceObservedAt)} · {priceFreshnessLabel(freshness)}
+                    </small>
                   </li>
                 );
               })}
             </ul>
           )}
+        </section>
+
+        <section className="shopping-section" aria-labelledby="shopping-vendor-title">
+          <div className="shopping-section-heading">
+            <div><span className="section-kicker">Vendor path</span><h3 id="shopping-vendor-title">Buy from vendors</h3></div>
+            <span>Evidence unavailable</span>
+          </div>
+          <p className="empty-list">
+            The current build-scoped item data has no supported vendor material,
+            price, stock, or location records. Vendor sourcing stays separate and
+            unknown instead of being folded into auction purchases.
+          </p>
         </section>
 
         <section className="shopping-section" aria-labelledby="shopping-craft-title">

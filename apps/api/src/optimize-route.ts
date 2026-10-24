@@ -8,6 +8,7 @@ import {
 import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 import {
   optimizeLevelingRoute,
+  resolveRoutePreset,
   type RouteRecipe,
 } from "@forever-professions/optimizer";
 import type { CurrentAuctionPriceReader } from "@forever-professions/pricing";
@@ -62,13 +63,29 @@ export async function optimizeFixtureRoute(
     throw new RouteSkillCapExceededError();
   }
 
+  const presetConfiguration = request.preset === undefined
+    ? undefined
+    : resolveRoutePreset(request.preset);
+  const objective = presetConfiguration?.objective ?? request.objective;
+  if (objective === undefined) {
+    throw new Error("A route preset or legacy objective is required.");
+  }
+
   const pricesByGameItemId = new Map<number, number>();
   let attribution: AuctionPriceAttribution | undefined;
 
-  if (request.objective === "cost") {
-    if (pricing === undefined || request.marketId === undefined) {
-      throw new RoutePricingUnavailableError();
-    }
+  const shouldReadPrices = objective === "cost" || request.preset === "practical";
+  if (
+    objective === "cost" &&
+    (pricing === undefined || request.marketId === undefined)
+  ) {
+    throw new RoutePricingUnavailableError();
+  }
+  if (
+    shouldReadPrices &&
+    pricing !== undefined &&
+    request.marketId !== undefined
+  ) {
     const gameItemIds = [
       ...new Set(
         profession.recipes.flatMap(({ reagents }) =>
@@ -173,14 +190,17 @@ export async function optimizeFixtureRoute(
       maxBaseSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
       startSkill: request.startSkill,
       targetSkill: request.targetSkill,
-      objective: request.objective,
-      ...(request.confidencePolicy === undefined
+      objective,
+      ...(request.preset === undefined ? {} : { preset: request.preset }),
+      ...(request.preset !== undefined || request.confidencePolicy === undefined
         ? {}
         : { confidencePolicy: request.confidencePolicy }),
       recipes,
       scarceItemIds: getScarceLevelingReagentItemIds(profession),
       ...(constraints === undefined ? {} : { constraints }),
-      ...(request.policy === undefined ? {} : { policy: request.policy }),
+      ...(request.preset !== undefined || request.policy === undefined
+        ? {}
+        : { policy: request.policy }),
     }),
   });
 }

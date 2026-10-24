@@ -170,6 +170,14 @@ consistent. Missing or unsupported quality IDs inherit the surrounding text colo
 instead of being guessed. Provisional output quantities must remain visibly labeled
 provisional.
 
+The production web build runs `apps/web/scripts/check-build-budget.mjs` after Vite.
+It caps total bootstrap assets at 3.25 MB, JavaScript at 525 KB raw/155 KB gzip, CSS
+at 115 KB raw/28 KB gzip, the item-icon manifest at 80 KB, and each lazy item icon at
+10 KB. These thresholds provide modest headroom over the October 20, 2026 release
+candidate and are regression limits, not performance targets. A deliberate budget
+increase requires a measured product reason and review; do not raise a threshold just
+to make the build pass.
+
 The converter queries the installed client with `wowdata`. It resolves `latest` once,
 then pins all DB2 and icon reads to the returned build. It joins `Item` and
 `ItemSparse` for names, rarity, item types, slots, required levels, and sell prices. Base
@@ -179,10 +187,12 @@ back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID`
 
 ## Static site pages
 
-`apps/web/src/main.tsx` resolves `/privacy`, `/terms`, and `/contact` before mounting
-the planner. Their content and metadata live in `StaticPage.tsx`, while both the
-planner and static pages reuse `SiteFooter.tsx`. Navigation uses ordinary links so
-direct loads, refreshes, and browser history work without a client router dependency.
+`apps/web/src/main.tsx` resolves `/privacy`, `/terms`, `/contact`, and the focused
+`/leatherworking/*` knowledge pages before mounting the planner. Legal/support content
+and metadata live in `StaticPage.tsx`; build-scoped profession content lives in
+`LeatherworkingKnowledgePage.tsx`; every surface reuses `SiteFooter.tsx`. Navigation
+uses ordinary links so direct loads, refreshes, and browser history work without a
+client router dependency.
 CloudFront rewrites extensionless paths to `index.html` only on the default frontend
 behavior; keep that SPA fallback when changing hosting or these clean paths will fail
 on direct load. Never restore a distribution-wide 403/404 custom error response,
@@ -239,8 +249,9 @@ LibItemDB class/subclass metadata and uses name heuristics only as a display fal
 ## Browser-local personalization
 
 The web client owns a versioned local profile in `apps/web/src/personalization.ts`.
-It persists skill range, route and shopping preferences, region, market, faction, the
-Legacy profession-bonus input, and Forever Changes filters. The profile contains no
+It persists current skill, route and shopping preferences, region, market, faction,
+the Legacy profession-bonus input, and Forever Changes filters. The guide range is
+always 1–300 and is not browser state. The profile contains no
 credentials or imported game data. Keep its parser defensive and migrate by adding a
 new storage version rather than changing the meaning of an existing version.
 

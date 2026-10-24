@@ -32,6 +32,30 @@ describe("leveling route application policy", () => {
     ).rejects.toThrow(/base profession cap/);
   });
 
+  it("resolves named presets without accepting raw optimizer settings", async () => {
+    const response = await optimizeFixtureRoute(
+      {
+        professionId: leatherworkingFixture.id,
+        startSkill: 150,
+        targetSkill: 151,
+        preset: "fewest-materials",
+      },
+      leatherworkingFixture,
+    );
+
+    expect(response.result).toMatchObject({
+      preset: "fewest-materials",
+      objective: "materials",
+      confidencePolicy: "supported-only",
+      segments: [{
+        recommendation: {
+          reasons: expect.any(Array),
+          summary: expect.any(String),
+        },
+      }],
+    });
+  });
+
   it("uses imported client classification and avoids scarce reagents when possible", async () => {
     const baseRecipe = leatherworkingFixture.recipes[0]!;
     const pristineRecipe = {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   healthResponseSchema,
+  productEventSchema,
   professionFixtureSchema,
   readinessResponseSchema,
   recipeChangesResponseSchema,
@@ -32,6 +33,34 @@ describe("fixture API router", () => {
   it("omits cross-origin headers unless an origin is explicitly configured", async () => {
     const response = await routeRequest("GET", "/api/health");
     expect(response.headers).not.toHaveProperty("access-control-allow-origin");
+  });
+
+  it("accepts only contract-valid anonymous product events", async () => {
+    const captured: unknown[] = [];
+    const event = productEventSchema.parse({
+      name: "route-blocked",
+      buildId: "1.60.1.69977",
+      preset: "practical",
+      reason: "unsupported-recipe-evidence",
+    });
+    const accepted = await routeRequest("POST", "/api/product-events", {}, {
+      productEventSink(value) {
+        captured.push(value);
+      },
+    }, event);
+    expect(accepted).toMatchObject({ statusCode: 204, body: "" });
+    expect(captured).toEqual([event]);
+
+    const rejected = await routeRequest("POST", "/api/product-events", {}, {
+      productEventSink(value) {
+        captured.push(value);
+      },
+    }, { ...event, characterName: "Private" });
+    expect(rejected.statusCode).toBe(400);
+    expect(captured).toEqual([event]);
+
+    const unavailable = await routeRequest("POST", "/api/product-events", {}, {}, event);
+    expect(unavailable.statusCode).toBe(503);
   });
 
   it("returns a contract-valid health response", async () => {

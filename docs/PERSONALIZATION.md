@@ -2,14 +2,12 @@
 
 Forever Professions remembers planning preferences without requiring an account. The
 web client stores one versioned JSON profile under the local-storage key
-`forever-professions.personalization.v1`.
+`forever-professions.personalization.v2`.
 
 ## Saved preferences
 
 - current calculator and guide-progress skill;
-- route starting skill, whether it follows current skill, and target skill;
-- route optimization objective and confidence policy;
-- trainer-only preference;
+- route preset;
 - shopping-list strategy;
 - region, auction market, and character faction;
 - the Legacy profession skill-bonus input;
@@ -20,18 +18,22 @@ recipe prices, cost optimization, and shopping-list requests. The market remains
 the stored profile for request stability, but its direct selector is hidden until
 live market choices are ready for users. The selected faction is sent to the optimizer
 as an eligibility constraint.
-The browser restores saved route settings when it generates the initial guide.
-New profiles link the route start to current skill by default. Existing profiles keep
-an explicitly different route start unlinked, and players can unlink the fields from
-the planner when they need to model a different range.
+The browser restores the saved route preset when it generates the initial guide. The
+guide always covers skill 1 through the configured base profession cap of 300. Current
+skill highlights and scrolls to the relevant guide segment; it does not change or
+truncate the generated route.
 Changing region or faction cancels in-flight planning requests and clears
 route and shopping results that were calculated with the previous profile. The
 session's known-recipe selection is preserved so the next route rebuild uses the
 player's active choices.
 
+Version-1 profiles are migrated when read. Their current skill and supported
+preferences are retained, objective/confidence/trainer-only controls are mapped to the
+closest named preset, and obsolete route start, target, and linkage fields are dropped.
+
 Checklist completion is stored separately under a route fingerprint containing the
-recipe build, profession, skill range, objective, confidence policy, market, faction,
-trainer-only state, known-recipe selection, and generated segment identities. A
+recipe build, profession, skill range, preset, resolved objective and confidence
+policy, market, faction, known-recipe selection, and generated segment identities. A
 materially different route therefore starts with no checked steps. The checklist can
 mark every finished segment through current skill or focus the next incomplete step.
 
@@ -50,8 +52,8 @@ game behavior.
 ## Safety and failure behavior
 
 The stored object has a schema version and is parsed defensively. Unknown versions,
-invalid enum values, malformed JSON, and out-of-range skill values fall back to safe
-defaults. A target below its route starting skill is raised to the starting skill.
+invalid enum values, malformed JSON, and out-of-range current-skill values fall back
+to safe defaults.
 
 If browser storage is blocked or unavailable, the UI remains usable and explains that
 changes will last only for the current tab. The profile menu includes **Reset

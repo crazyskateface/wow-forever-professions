@@ -25,19 +25,26 @@ data.
 
 ### Leveling guide
 
-- Generates a complete current-skill → target-skill route from the loaded catalog.
-- Limits normal route targets to the current Forever base profession cap of 300,
-  configured once in the shared domain package.
-- Optimizes expected crafts, material units, or stored auction cost per skill point.
-- Uses dynamic programming with configurable recipe-switch and acquisition friction.
-- Uses a Practical confidence policy by default: supported acquisition and availability
-  win over unknown evidence whenever they can complete the same route. A Supported-only
-  policy blocks at the first skill that would require unknown evidence.
-- Supports known-recipe selection, trainer-only mode, faction/specialization/cooldown
+- Generates a complete 1–300 route from the loaded catalog. Current skill highlights
+  and scrolls to the player's place without removing earlier or later guide ranges.
+- Limits the full guide to the current Forever base profession cap of 300, configured
+  once in the shared domain package.
+- Offers Practical, Trainer friendly, Cheapest, Fewest crafts, Fewest materials, and
+  visibly risk-labeled Experimental presets instead of exposing raw optimizer weights.
+- Uses dynamic programming with preset-owned recipe-switch, acquisition-friction,
+  evidence, and cost policies. Practical uses complete stored price coverage as a
+  deterministic tie-breaker when the stronger safeguards and craft score are equal.
+- Uses Practical by default: supported acquisition and availability win over unknown
+  evidence whenever they can complete the same route. Supported presets block at the
+  first skill that would require unknown evidence; Experimental may use those gaps but
+  never rejected evidence.
+- Supports known-recipe selection, faction/specialization/cooldown
   constraints, and explicit recipe or reagent exclusions at the API boundary.
 - Groups adjacent decisions into practical guide steps and exposes ordinary
   alternatives. Every returned segment and alternative includes machine-readable
   acquisition, availability, provenance, verification, confidence, and risk reasons.
+  Selected recipes and alternatives also carry stable recommendation/loss reason
+  codes and optimizer-authored explanations.
 - Treats reagents carrying Forever's client-defined `Scarce` label as a last resort:
   a complete non-Scarce route wins even when its ordinary objective score is higher.
 - Opens each guide step in the calculator at the relevant skill and shows New/Updated
@@ -45,13 +52,32 @@ data.
 - Presents generated segments as an execution checklist with the active skill range,
   expected crafts, primary and total materials, market estimate, acquisition, and
   expandable confidence details. Completion is saved only for the exact matching
-  build, range, objective, confidence policy, constraints, market, and route.
+  build, range, preset, resolved objective and confidence policy, constraints,
+  market, and route.
 
 ### Recipe catalog and calculator
 
 - Loads the full 603-recipe Leatherworking catalog from PostgreSQL/Aurora DSQL.
 - Provides a virtualized, searchable All Recipes list and URL-addressable recipe
   selection (`?recipe=<recipe-id>`).
+- Filters the full catalog by acquisition, learning range, item type,
+  specialization, faction compatibility, availability, verification, and stored
+  Forever comparison state. Sorts cover learning rank, current-skill usefulness,
+  expected market cost, and each difficulty threshold; incomplete price coverage
+  remains explicit and sorts after supported totals.
+- Shows compact orange/yellow/green/grey thresholds without relying on color alone,
+  keeps unknown source facts visible, and compares a selected catalog recipe with
+  the active route segment without discarding route or checklist context.
+- Provides directly addressable Leatherworking field-guide pages for the current
+  build, stored Forever changes, trainer evidence, specializations, Merchant's Favor,
+  Camping, and supported vendor, quest, reputation, and drop acquisition records.
+  Unsupported names, locations, rates, and unlock rules remain visibly unknown.
+- Generates privacy-safe guide links containing only the route preset. Current skill,
+  local market, faction, known recipes, owned materials, and checklist progress are
+  deliberately excluded.
+- Records a strict set of first-party anonymous product events for the route-to-
+  shopping funnel. The accepted fields and retention boundary are documented in
+  [`docs/PRODUCT_ANALYTICS.md`](docs/PRODUCT_ANALYTICS.md).
 - Calculates difficulty, skill-up probability, expected crafts, expected reagents,
   and stored-price cost at the selected profession skill.
 - Shows the skill curve only through the configured base profession cap. Recipes
@@ -116,9 +142,9 @@ data.
 
 ### Personalization without accounts
 
-- Saves current and target skill, route objective, confidence policy, current-skill
-  linking, trainer-only mode, shopping strategy, region, market, faction, and Forever
-  Changes filters in the browser.
+- Saves current skill, route preset, shopping strategy, region, market, faction, and
+  Forever Changes filters in the browser. Route bounds are fixed at 1–300 and are not
+  persisted.
 - Saves route-step completion under a separate route fingerprint and exposes
   mark-through-current-skill and resume-at-current-skill actions.
 - Saves shopping owned quantities and checked materials separately under that same

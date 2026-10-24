@@ -21,6 +21,8 @@ const catalogTables = [
   "recipe_output",
   "provenance",
   "recipe_metadata",
+  "recipe_acquisition_detail",
+  "recipe_source_kind",
   "recipe_comparison",
   "recipe_change",
   "item_classification",

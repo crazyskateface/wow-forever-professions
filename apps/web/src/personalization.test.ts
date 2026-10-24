@@ -33,7 +33,7 @@ describe("browser personalization", () => {
     storage.setItem(PERSONALIZATION_STORAGE_KEY, "not json");
     expect(readPersonalization(storage)).toEqual(DEFAULT_PERSONALIZATION);
 
-    expect(parsePersonalization({ version: 2, currentSkill: 250 })).toEqual(
+    expect(parsePersonalization({ version: 3, currentSkill: 250 })).toEqual(
       DEFAULT_PERSONALIZATION,
     );
   });
@@ -63,15 +63,10 @@ describe("browser personalization", () => {
         },
       }),
     ).toEqual({
-      version: 1,
+      version: 2,
       currentSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
-      routeStartSkill: 225,
-      routeStartLinked: false,
-      targetSkill: 225,
-      routeObjective: "crafts",
-      routeConfidencePolicy: "practical",
+      routePreset: "trainer-friendly",
       shoppingStrategy: "craft-first",
-      trainerOnly: true,
       region: "eu",
       marketId: "forever.pve.alliance.eu",
       faction: "alliance",
@@ -86,21 +81,55 @@ describe("browser personalization", () => {
     });
   });
 
-  it("keeps a linked route start aligned with current skill", () => {
+  it("migrates version-1 profiles without retaining route bounds or linkage", () => {
     expect(parsePersonalization({
       ...DEFAULT_PERSONALIZATION,
+      version: 1,
       currentSkill: 175,
       routeStartSkill: 20,
       routeStartLinked: true,
       targetSkill: 100,
+      routePreset: undefined,
       routeConfidencePolicy: "supported-only",
     })).toMatchObject({
+      version: 2,
       currentSkill: 175,
-      routeStartSkill: 175,
-      routeStartLinked: true,
-      targetSkill: 175,
-      routeConfidencePolicy: "supported-only",
+      routePreset: "fewest-crafts",
     });
+    expect(parsePersonalization({
+      ...DEFAULT_PERSONALIZATION,
+      version: 1,
+      routeStartSkill: 20,
+      routeStartLinked: true,
+      targetSkill: 100,
+    })).not.toHaveProperty("routeStartSkill");
+  });
+
+  it("clamps persisted current skill to the playable 1-300 range", () => {
+    expect(parsePersonalization({
+      ...DEFAULT_PERSONALIZATION,
+      currentSkill: 0,
+    })).toMatchObject({
+      currentSkill: 1,
+    });
+  });
+
+  it("reads legacy storage into the range-free version-2 profile", () => {
+    const storage = memoryStorage();
+    storage.setItem("forever-professions.personalization.v1", JSON.stringify({
+      ...DEFAULT_PERSONALIZATION,
+      version: 1,
+      currentSkill: 144,
+      routeStartSkill: 120,
+      routeStartLinked: false,
+      targetSkill: 180,
+    }));
+
+    expect(readPersonalization(storage)).toMatchObject({
+      version: 2,
+      currentSkill: 144,
+    });
+    expect(readPersonalization(storage)).not.toHaveProperty("targetSkill");
   });
 
   it("round-trips and clears a valid profile", () => {
@@ -108,13 +137,12 @@ describe("browser personalization", () => {
     const profile = {
       ...DEFAULT_PERSONALIZATION,
       currentSkill: 137,
-      routeStartSkill: 137,
-      targetSkill: 225,
-      routeObjective: "materials" as const,
+      routePreset: "fewest-materials" as const,
     };
 
     expect(writePersonalization(profile, storage)).toBe(true);
     expect(readPersonalization(storage)).toEqual(profile);
+    storage.setItem("forever-professions.personalization.v1", "legacy");
     expect(clearPersonalization(storage)).toBe(true);
     expect(storage.values.size).toBe(0);
   });

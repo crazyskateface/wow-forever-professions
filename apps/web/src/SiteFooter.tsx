@@ -1,4 +1,5 @@
 const FOOTER_LINKS = [
+  { href: "/leatherworking", label: "Leatherworking guide" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
   { href: "/contact", label: "Contact" },
@@ -23,7 +24,7 @@ export function SiteFooter() {
           </a>
           <p>A community-built profession planner for WoW Forever players.</p>
         </div>
-        <nav aria-label="Legal and support">
+        <nav aria-label="Site links">
           {FOOTER_LINKS.map(({ href, label }) => (
             <a aria-current={pathname === href ? "page" : undefined} href={href} key={href}>
               {label}

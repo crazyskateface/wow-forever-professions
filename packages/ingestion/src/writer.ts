@@ -554,6 +554,78 @@ export async function writeNormalizedBuild(
     batchOptions,
   );
 
+  const recipeAcquisitionDetails = build.recipeMetadata.flatMap((row) =>
+    row.teachingItemId === undefined && row.sourceDataOrigin === undefined
+      ? []
+      : [{
+          recipeVersionId: row.recipeVersionId,
+          teachingItemId: row.teachingItemId ?? null,
+          sourceDataOrigin: row.sourceDataOrigin ?? null,
+        }],
+  );
+  batches.recipeAcquisitionDetails = await writeBatches(
+    runner,
+    recipeAcquisitionDetails,
+    {
+      label: (row) => `recipe acquisition detail ${row.recipeVersionId}`,
+      insertSql:
+        "INSERT INTO recipe_acquisition_detail (recipe_version_id, teaching_item_id, source_data_origin) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+      insertValues: (row) => [
+        row.recipeVersionId,
+        row.teachingItemId,
+        row.sourceDataOrigin,
+      ],
+      selectSql:
+        "SELECT recipe_version_id, teaching_item_id, source_data_origin FROM recipe_acquisition_detail WHERE recipe_version_id = $1",
+      selectValues: (row) => [row.recipeVersionId],
+      expected: (row) => ({
+        recipe_version_id: row.recipeVersionId,
+        teaching_item_id: row.teachingItemId,
+        source_data_origin: row.sourceDataOrigin,
+      }),
+      assertReferences: (database, row) =>
+        assertExists(
+          database,
+          "SELECT 1 AS found FROM recipe_version WHERE recipe_version_id = $1",
+          [row.recipeVersionId],
+          `Missing recipe version ${row.recipeVersionId}.`,
+        ),
+    },
+    batchOptions,
+  );
+
+  const recipeSourceKinds = build.recipeMetadata.flatMap((row) =>
+    (row.sourceKinds ?? []).map((sourceKind) => ({
+      recipeVersionId: row.recipeVersionId,
+      sourceKind,
+    })),
+  );
+  batches.recipeSourceKinds = await writeBatches(
+    runner,
+    recipeSourceKinds,
+    {
+      label: (row) => `recipe source kind ${row.recipeVersionId}/${row.sourceKind}`,
+      insertSql:
+        "INSERT INTO recipe_source_kind (recipe_version_id, source_kind) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+      insertValues: (row) => [row.recipeVersionId, row.sourceKind],
+      selectSql:
+        "SELECT recipe_version_id, source_kind FROM recipe_source_kind WHERE recipe_version_id = $1 AND source_kind = $2",
+      selectValues: (row) => [row.recipeVersionId, row.sourceKind],
+      expected: (row) => ({
+        recipe_version_id: row.recipeVersionId,
+        source_kind: row.sourceKind,
+      }),
+      assertReferences: (database, row) =>
+        assertExists(
+          database,
+          "SELECT 1 AS found FROM recipe_version WHERE recipe_version_id = $1",
+          [row.recipeVersionId],
+          `Missing recipe version ${row.recipeVersionId}.`,
+        ),
+    },
+    batchOptions,
+  );
+
   batches.thresholds = await writeBatches(
     runner,
     build.thresholds,

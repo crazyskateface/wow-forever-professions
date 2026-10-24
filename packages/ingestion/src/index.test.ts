@@ -25,6 +25,9 @@ function buildDataset(buildId: string): ImportedBuildDataset {
               spellId: 3780,
               learnSkill: 150,
               acquisition: "trainer",
+              teachingItemId: 9999,
+              sourceKinds: ["trainer"],
+              sourceDataOrigin: "forever",
               faction: "both",
               specializationSpellId: null,
               cooldownSeconds: null,
@@ -99,6 +102,9 @@ describe("build normalization", () => {
       recipeVersionId: "heavy-armor-kit@11.2.7.65000",
       spellId: 3780,
       learnSkill: 150,
+      teachingItemId: 9999,
+      sourceKinds: ["trainer"],
+      sourceDataOrigin: "forever",
     });
     expect(normalized.items.map(({ id }) => id)).toEqual([
       "heavy-armor-kit-item",

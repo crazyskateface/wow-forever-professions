@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 import {
   optimizeLevelingRoute,
+  resolveRoutePreset,
   type RouteRecipe,
 } from "./index.js";
 
@@ -29,6 +30,61 @@ const routeDataset = {
 } as const;
 
 describe("leveling route optimizer", () => {
+  it.each([
+    ["practical", "crafts", "practical"],
+    ["trainer-friendly", "crafts", "supported-only"],
+    ["cheapest", "cost", "supported-only"],
+    ["fewest-crafts", "crafts", "supported-only"],
+    ["fewest-materials", "materials", "supported-only"],
+    ["experimental", "crafts", "experimental"],
+  ] as const)(
+    "resolves the %s preset into a stable optimizer policy",
+    (preset, objective, confidencePolicy) => {
+      expect(resolveRoutePreset(preset)).toMatchObject({
+        preset,
+        objective,
+        confidencePolicy,
+      });
+      expect(optimizeLevelingRoute({
+        ...routeDataset,
+        startSkill: 1,
+        targetSkill: 2,
+        objective: "materials",
+        preset,
+        recipes: [changingChanceRecipe],
+      })).toMatchObject({
+        status: "complete",
+        preset,
+        objective,
+        confidencePolicy,
+      });
+    },
+  );
+
+  it("uses complete price evidence as a deterministic Practical tie-breaker", () => {
+    const expensive: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "a-expensive",
+      name: "Expensive",
+      reagents: [{ itemId: "expensive", quantity: 2, unitPriceCopper: 100 }],
+    };
+    const affordable: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "z-affordable",
+      name: "Affordable",
+      reagents: [{ itemId: "affordable", quantity: 2, unitPriceCopper: 10 }],
+    };
+
+    expect(optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 1,
+      targetSkill: 2,
+      objective: "materials",
+      preset: "practical",
+      recipes: [expensive, affordable],
+    }).segments[0]?.recipeId).toBe("z-affordable");
+  });
+
   it("rejects a normal leveling target above the configured base skill cap", () => {
     expect(() =>
       optimizeLevelingRoute({
@@ -183,8 +239,67 @@ describe("leveling route optimizer", () => {
         expectedSkillUps: 2,
         expectedCrafts: 2,
         expectedMaterials: 2,
+        lossReason: "shorter-coverage",
+        lossSummary: expect.any(String),
       },
     ]);
+    expect(result.segments[0]?.recommendation).toMatchObject({
+      reasons: ["practical-balance"],
+      summary: expect.any(String),
+    });
+  });
+
+  it("makes trainer preference and experimental evidence risk explicit", () => {
+    const vendor: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "a-vendor",
+      name: "Vendor Option",
+      acquisition: "vendor",
+    };
+    const trainer: RouteRecipe = {
+      ...changingChanceRecipe,
+      id: "z-trainer",
+      name: "Trainer Option",
+    };
+    const trainerRoute = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 1,
+      targetSkill: 2,
+      objective: "materials",
+      preset: "trainer-friendly",
+      recipes: [vendor, trainer],
+    });
+    expect(trainerRoute.segments[0]).toMatchObject({
+      recipeId: "z-trainer",
+      recommendation: { reasons: ["trainer-preference"] },
+    });
+    expect(trainerRoute.segments[0]?.alternatives[0]).toMatchObject({
+      recipeId: "a-vendor",
+      lossReason: "trainer-preference",
+    });
+
+    const unknown: RouteRecipe = {
+      ...trainer,
+      id: "a-unknown",
+      name: "Unknown Option",
+      acquisition: "unknown",
+      availability: "unknown",
+    };
+    const experimental = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 1,
+      targetSkill: 2,
+      objective: "materials",
+      preset: "experimental",
+      recipes: [unknown, trainer],
+    });
+    expect(experimental.segments[0]).toMatchObject({
+      recipeId: "a-unknown",
+      evidence: { level: "unknown" },
+      recommendation: {
+        reasons: ["experimental-evidence-accepted"],
+      },
+    });
   });
 
   it("treats scarce reagents as a last resort and omits them from ordinary alternatives", () => {
@@ -278,15 +393,41 @@ describe("leveling route optimizer", () => {
       id: "no-price",
       reagents: [{ itemId: "unknown", quantity: 1 }],
     };
+    const missingPrice = optimizeLevelingRoute({
+      ...routeDataset,
+      startSkill: 2,
+      targetSkill: 3,
+      objective: "cost",
+      recipes: [noPrice],
+    });
+    expect(missingPrice).toMatchObject({
+      status: "blocked",
+      reason: "missing-price-data",
+    });
+    expect(missingPrice.totals.expectedCostCopper).toBeUndefined();
+
     expect(
       optimizeLevelingRoute({
         ...routeDataset,
         startSkill: 2,
         targetSkill: 3,
-        objective: "cost",
-        recipes: [noPrice],
+        objective: "crafts",
+        preset: "cheapest",
+        recipes: [
+          noPrice,
+          {
+            ...noPrice,
+            id: "unknown-evidence",
+            acquisition: "unknown",
+            availability: "unknown",
+          },
+        ],
       }),
-    ).toMatchObject({ status: "blocked", reason: "missing-price-data" });
+    ).toMatchObject({
+      status: "blocked",
+      reason: "missing-price-data",
+      explanation: expect.stringContaining("Missing prices were not treated as zero"),
+    });
 
     expect(
       optimizeLevelingRoute({
@@ -677,6 +818,7 @@ describe("human-friendly route policy", () => {
       startSkill: 2,
       targetSkill: 3,
       objective: "materials",
+      preset: "practical",
       recipes: [{ ...unknown, provenanceSource: "classic-fallback" }],
     });
     expect(fallbackRoute).toMatchObject({
@@ -691,6 +833,9 @@ describe("human-friendly route policy", () => {
             "unknown-availability",
             "classic-fallback",
           ],
+        },
+        recommendation: {
+          reasons: ["practical-evidence-fallback"],
         },
       }],
     });
@@ -715,6 +860,7 @@ describe("human-friendly route policy", () => {
       confidencePolicy: "supported-only",
       blockedAtSkill: 2,
       reason: "unsupported-recipe-evidence",
+      explanation: expect.stringContaining("supported acquisition or availability"),
       steps: [],
       segments: [],
     });

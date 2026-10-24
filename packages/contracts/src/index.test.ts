@@ -5,6 +5,7 @@ import {
   healthResponseSchema,
   importedBuildDatasetSchema,
   itemClientDataSchema,
+  productEventSchema,
   professionFixtureSchema,
   readinessResponseSchema,
   recipeOutputSchema,
@@ -68,6 +69,31 @@ describe("shared contracts", () => {
     }
   });
 
+  it("accepts only privacy-bounded anonymous product events", () => {
+    expect(productEventSchema.parse({
+      name: "route-generated",
+      buildId: "1.60.1.69977",
+      preset: "practical",
+      status: "complete",
+      segmentCount: 12,
+    })).toBeDefined();
+    expect(productEventSchema.safeParse({
+      name: "route-generated",
+      buildId: "1.60.1.69977",
+      preset: "practical",
+      status: "complete",
+      segmentCount: 12,
+      characterName: "Must not cross the boundary",
+    }).success).toBe(false);
+    expect(productEventSchema.safeParse({
+      name: "checklist-progress",
+      buildId: "1.60.1.69977",
+      preset: "practical",
+      completedSegments: 4,
+      totalSegments: 3,
+    }).success).toBe(false);
+  });
+
   it("rejects unordered thresholds", () => {
     expect(() =>
       skillThresholdsSchema.parse({ orange: 150, yellow: 180, green: 170, gray: 190 }),
@@ -81,8 +107,7 @@ describe("shared contracts", () => {
   });
 
   it("preserves structured source and verification metadata for recipe data", () => {
-    expect(
-      professionFixtureSchema.parse({
+    const parsed = professionFixtureSchema.parse({
         build: "fixture-0",
         id: "leatherworking",
         name: "Leatherworking",
@@ -95,6 +120,9 @@ describe("shared contracts", () => {
             buildId: "fixture-0",
             learnSkill: 150,
             acquisition: "trainer",
+            teachingItemId: 9999,
+            sourceKinds: ["trainer"],
+            sourceDataOrigin: "forever",
             faction: "both",
             specializationSpellId: null,
             cooldownSeconds: null,
@@ -112,12 +140,17 @@ describe("shared contracts", () => {
             },
           },
         ],
-      }).recipes[0]?.provenance,
-    ).toEqual({
+      });
+    expect(parsed.recipes[0]?.provenance).toEqual({
       source: "classic-fallback",
       sourceLabel: "Classic reference",
       verification: { status: "unverified" },
       notes: "Awaiting Forever verification.",
+    });
+    expect(parsed.recipes[0]).toMatchObject({
+      teachingItemId: 9999,
+      sourceKinds: ["trainer"],
+      sourceDataOrigin: "forever",
     });
   });
 
@@ -332,6 +365,47 @@ describe("shared contracts", () => {
       }),
     ).toThrow("marketId");
     expect(
+      routeOptimizationRequestSchema.parse({
+        professionId: "leatherworking",
+        startSkill: 150,
+        targetSkill: 180,
+        preset: "practical",
+      }),
+    ).toMatchObject({ preset: "practical" });
+    for (const preset of [
+      "practical",
+      "trainer-friendly",
+      "cheapest",
+      "fewest-crafts",
+      "fewest-materials",
+      "experimental",
+    ] as const) {
+      expect(routeOptimizationRequestSchema.parse({
+        professionId: "leatherworking",
+        marketId: "forever.pvp.horde.us",
+        startSkill: 150,
+        targetSkill: 180,
+        preset,
+      }).preset).toBe(preset);
+    }
+    expect(() =>
+      routeOptimizationRequestSchema.parse({
+        professionId: "leatherworking",
+        startSkill: 150,
+        targetSkill: 180,
+        preset: "cheapest",
+      }),
+    ).toThrow("marketId");
+    expect(() =>
+      routeOptimizationRequestSchema.parse({
+        professionId: "leatherworking",
+        startSkill: 150,
+        targetSkill: 180,
+        preset: "practical",
+        objective: "crafts",
+      }),
+    ).toThrow("cannot be combined");
+    expect(
       routeOptimizationRequestSchema.safeParse({
         professionId: "leatherworking",
         startSkill: 150,
@@ -361,6 +435,7 @@ describe("shared contracts", () => {
 
   it("accepts complete and blocked route results", () => {
     const base = {
+      preset: "practical",
       objective: "crafts",
       confidencePolicy: "practical",
       startSkill: 150,
@@ -392,6 +467,10 @@ describe("shared contracts", () => {
             provenanceSource: "observed-in-game",
             verificationStatus: "verified",
           },
+          recommendation: {
+            reasons: ["only-eligible-recipe"],
+            summary: "This was the only eligible recipe.",
+          },
         },
       ],
       totals: {
@@ -414,6 +493,7 @@ describe("shared contracts", () => {
           ...base,
           blockedAtSkill: 151,
           reason: "no-eligible-recipe",
+          explanation: "No eligible recipe satisfied the active constraints.",
         },
       }),
     ).toBeDefined();

@@ -1,6 +1,6 @@
 # Leatherworking product roadmap
 
-Status: current product plan as of October 19, 2026.
+Status: current product plan as of October 20, 2026.
 
 This roadmap starts from the implemented Leatherworking vertical slice and focuses on
 making it more trustworthy, easier to follow while playing, and more competitive with
@@ -189,8 +189,10 @@ Priority: P1. Convert the calculated shopping plan into a usable pre-run checkli
 Status: In progress. The primary shopping workspace, aggregate and per-step
 materials, owned/remaining quantities, separate buy and craft results, unresolved
 and cycle states, price observation timestamps, partial-total treatment, local
-progress, and copy/print summaries are implemented. Vendor-specific sourcing and a
-defined stale-price threshold remain open; no rounding or safety buffer is applied.
+progress, copy/print summaries, and a two-hour stale-price threshold are implemented.
+The vendor path is first-class but remains explicitly empty because no supported
+build-scoped vendor material, price, stock, or location records exist; no rounding or
+safety buffer is applied.
 
 ### Work
 
@@ -218,6 +220,12 @@ defined stale-price threshold remain open; no rounding or safety buffer is appli
 ## Milestone 3 — Route presets and recommendation explanations
 
 Priority: P1. Offer meaningful choices without exposing raw optimizer weights.
+
+Status: Implemented. The six named presets own deterministic optimizer policies;
+Experimental is visibly distinct and may use labeled unknown evidence but never
+rejected evidence. Segment recommendations, alternative loss explanations, and
+blocked-route explanations come from shared optimizer output and are validated at
+the contract boundary.
 
 ### Presets
 
@@ -255,6 +263,8 @@ Priority: P1. Offer meaningful choices without exposing raw optimizer weights.
 
 Priority: P2. Make the catalog competitive for players researching alternatives.
 
+Status: Implemented locally on October 20, 2026; awaiting review and publication.
+
 ### Work
 
 - Add filters for acquisition source, skill range, item type, specialization,
@@ -277,10 +287,33 @@ Priority: P2. Make the catalog competitive for players researching alternatives.
 - Search, filter, sort, deep-link, keyboard focus, and virtualization behaviors have
   regression coverage.
 
+### Implemented shape
+
+- The virtualized 603-recipe catalog now combines reagent-aware search with filters
+  for acquisition, learning range, semantic item type, specialization, faction
+  compatibility, availability, verification, and stored comparison state.
+- Learning rank, current-skill usefulness, expected cost, and all four difficulty
+  thresholds are deterministic sort options. Expected-cost sorting requires complete
+  reagent price coverage and places unresolved totals last instead of treating them
+  as free.
+- Rows show text-labelled orange, yellow, green, and grey thresholds, current
+  learning or price context, New/Updated state, lazy icons, and initials fallbacks.
+- Recipe selection remains URL-addressable and can be compared with the active route
+  segment in place. The route and its checklist remain intact while browsing.
+- Additive acquisition-detail and source-kind tables preserve teaching items and
+  supported source classifications without rewriting immutable imported recipe
+  metadata. Unsupported locations remain explicitly unknown.
+
 ## Milestone 5 — Forever Leatherworking knowledge pages
 
 Priority: P2. Add focused context around the planner without burying it in a long
 article.
+
+Status: Implemented locally on October 20, 2026; awaiting review and publication.
+Every page is directly addressable, build-scoped, linked from relevant recipe and
+route evidence, and explicit about unsupported locations or mechanics. Client-side
+metadata, retry/error states, responsive navigation, recipe anchors, and planner
+return links are included.
 
 ### Pages
 
@@ -312,6 +345,16 @@ article.
 
 Priority: P2. Finish the combined workflow after the core route is trustworthy and
 executable.
+
+Status: Implemented locally on October 20, 2026, with runtime review pending. Stable
+route inputs can be shared without local or imported player state; anonymous product
+events have a strict documented privacy contract; loading, empty, stale, partial,
+blocked, retry, focus, reduced-motion, and narrow-layout states are represented; and
+the production build enforces JavaScript, CSS, bootstrap-asset, manifest, and icon
+budgets. The full `pnpm verify` gate and request-level direct-route smoke checks pass.
+Browser-assisted keyboard, 200% zoom, 320px reflow, and visual
+inspection remain pending because the configured computer-use service is temporarily
+unavailable; source inspection is not treated as equivalent coverage.
 
 ### Work
 

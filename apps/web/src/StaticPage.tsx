@@ -47,7 +47,7 @@ function LegalSection({ children, title }: { readonly children: ReactNode; reado
 function PrivacyPolicy() {
   return (
     <>
-      <p className="legal-effective-date">Effective October 15, 2026</p>
+      <p className="legal-effective-date">Effective October 20, 2026</p>
       <p>
         This policy explains what Forever Professions stores or processes when you use
         the planner. The site is designed to work without an account and to keep
@@ -56,8 +56,8 @@ function PrivacyPolicy() {
 
       <LegalSection title="Information stored in your browser">
         <p>
-          The site uses browser local storage to remember current and target skill,
-          route and shopping preferences, region, market identifier, faction, Legacy
+          The site uses browser local storage to remember current skill, route and
+          shopping preferences, region, market identifier, faction, Legacy
           profession bonus, and Forever Changes filters. Known-recipe selections are
           currently limited to the active browser session.
         </p>
@@ -87,6 +87,22 @@ function PrivacyPolicy() {
           processing, newsletters, advertising cookies, or third-party behavioral
           analytics. It does not ask for a character name, Battle.net credentials, or
           other game-account credentials.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Anonymous product measurement">
+        <p>
+          The site records a small set of first-party product events for route
+          generation, blocked routes, first-step engagement, aggregate checklist
+          progress, shopping use, and broad missing-data categories. These events can
+          include the public game build, route style, result status, and aggregate
+          counts.
+        </p>
+        <p>
+          Product events do not include character or account identity, credentials,
+          recipe or item identifiers, market or realm, faction, known recipes, owned
+          materials, imported game data, free-form text, or a user/session identifier.
+          Event requests omit browser credentials and referrer information.
         </p>
       </LegalSection>
 
@@ -280,6 +296,7 @@ export function StaticPage({ page }: { readonly page: StaticPageId }) {
 
   return (
     <div className="static-shell">
+      <a className="skip-link" href="#legal-main">Skip to content</a>
       <header className="static-topbar">
         <a className="brand" href="/" aria-label="Forever Professions home">
           <span className="brand-mark" aria-hidden="true">F</span>
@@ -287,7 +304,7 @@ export function StaticPage({ page }: { readonly page: StaticPageId }) {
         </a>
         <a className="back-to-planner" href="/">Back to planner</a>
       </header>
-      <main className="legal-main">
+      <main className="legal-main" id="legal-main" tabIndex={-1}>
         <header className="legal-hero">
           <span className="section-kicker">{definition.eyebrow}</span>
           <h1>{definition.title}</h1>

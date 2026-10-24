@@ -29,11 +29,11 @@ describe("route progress", () => {
       professionId: "leatherworking",
       startSkill: 1,
       targetSkill: 75,
+      preset: "practical" as const,
       objective: "crafts" as const,
       confidencePolicy: "practical" as const,
       marketId: "forever.pvp.horde.us",
       faction: "horde",
-      trainerOnly: false,
       knownRecipeIds: ["third", "first", "second"],
       segments,
     };
@@ -45,6 +45,11 @@ describe("route progress", () => {
     expect(createRouteProgressFingerprint({
       ...input,
       confidencePolicy: "supported-only",
+    })).not.toBe(first);
+    expect(createRouteProgressFingerprint({
+      ...input,
+      preset: "experimental",
+      confidencePolicy: "experimental",
     })).not.toBe(first);
     expect(createRouteProgressFingerprint({
       ...input,

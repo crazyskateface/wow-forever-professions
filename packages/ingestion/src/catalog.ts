@@ -123,9 +123,9 @@ export class SqlRecipeCatalogReader implements RecipeCatalogReader {
     const profession = professionResult.rows[0];
     if (!profession) return undefined;
 
-    const [recipeResult, reagentResult, outputResult, itemStatResult] = await Promise.all([
+    const [recipeResult, reagentResult, outputResult, itemStatResult, sourceKindResult] = await Promise.all([
       this.database.query(
-        "SELECT r.recipe_id, rv.recipe_version_id, rv.name, rm.spell_id, rm.learn_skill, rm.acquisition, rm.faction, rm.specialization_spell_id, rm.cooldown_seconds, rm.availability, t.orange, t.yellow, t.green, t.gray, s.source_kind, s.label AS source_label, v.status AS verification_status, v.verified_at, v.verified_by, v.notes AS verification_notes, p.notes AS provenance_notes FROM recipe r JOIN recipe_version rv ON rv.recipe_id = r.recipe_id JOIN recipe_metadata rm ON rm.recipe_version_id = rv.recipe_version_id JOIN recipe_threshold t ON t.recipe_version_id = rv.recipe_version_id JOIN provenance p ON p.recipe_version_id = rv.recipe_version_id JOIN data_source s ON s.source_id = p.source_id JOIN verification v ON v.verification_id = p.verification_id WHERE r.profession_id = $1 AND rv.build_id = $2 AND v.status <> 'rejected' ORDER BY rv.name, r.recipe_id",
+        "SELECT r.recipe_id, rv.recipe_version_id, rv.name, rm.spell_id, rm.learn_skill, rm.acquisition, rad.recipe_version_id AS acquisition_detail_recipe_version_id, rad.teaching_item_id, rad.source_data_origin, rm.faction, rm.specialization_spell_id, rm.cooldown_seconds, rm.availability, t.orange, t.yellow, t.green, t.gray, s.source_kind, s.label AS source_label, v.status AS verification_status, v.verified_at, v.verified_by, v.notes AS verification_notes, p.notes AS provenance_notes FROM recipe r JOIN recipe_version rv ON rv.recipe_id = r.recipe_id JOIN recipe_metadata rm ON rm.recipe_version_id = rv.recipe_version_id LEFT JOIN recipe_acquisition_detail rad ON rad.recipe_version_id = rv.recipe_version_id JOIN recipe_threshold t ON t.recipe_version_id = rv.recipe_version_id JOIN provenance p ON p.recipe_version_id = rv.recipe_version_id JOIN data_source s ON s.source_id = p.source_id JOIN verification v ON v.verification_id = p.verification_id WHERE r.profession_id = $1 AND rv.build_id = $2 AND v.status <> 'rejected' ORDER BY rv.name, r.recipe_id",
         [professionId, buildId],
       ),
       this.database.query(
@@ -140,7 +140,19 @@ export class SqlRecipeCatalogReader implements RecipeCatalogReader {
         "SELECT item_id, stat_index, stat_id, stat_value, display_text, display_tone FROM item_stat WHERE recipe_build_id = $1 ORDER BY item_id, stat_index",
         [buildId],
       ),
+      this.database.query(
+        "SELECT rsk.recipe_version_id, rsk.source_kind FROM recipe_source_kind rsk JOIN recipe_version rv ON rv.recipe_version_id = rsk.recipe_version_id JOIN recipe r ON r.recipe_id = rv.recipe_id WHERE r.profession_id = $1 AND rv.build_id = $2 ORDER BY rsk.recipe_version_id, rsk.source_kind",
+        [professionId, buildId],
+      ),
     ]);
+
+    const sourceKindsByVersion = new Map<string, string[]>();
+    for (const row of sourceKindResult.rows) {
+      const versionId = requiredString(row, "recipe_version_id");
+      const sourceKinds = sourceKindsByVersion.get(versionId) ?? [];
+      sourceKinds.push(requiredString(row, "source_kind"));
+      sourceKindsByVersion.set(versionId, sourceKinds);
+    }
 
     const statsByItemId = new Map<string, unknown[]>();
     for (const row of itemStatResult.rows) {
@@ -219,6 +231,13 @@ export class SqlRecipeCatalogReader implements RecipeCatalogReader {
       const verificationNotes = optionalString(row, "verification_notes");
       const provenanceNotes = optionalString(row, "provenance_notes");
       const learnSkill = optionalNumber(row, "learn_skill");
+      const acquisitionDetailVersionId = optionalString(
+        row,
+        "acquisition_detail_recipe_version_id",
+      );
+      const teachingItemId = optionalNumber(row, "teaching_item_id");
+      const sourceDataOrigin = optionalString(row, "source_data_origin");
+      const sourceKinds = sourceKindsByVersion.get(versionId);
       const specializationSpellId = optionalNumber(row, "specialization_spell_id");
       const cooldownSeconds = optionalNumber(row, "cooldown_seconds");
       return recipeSchema.parse({
@@ -229,6 +248,13 @@ export class SqlRecipeCatalogReader implements RecipeCatalogReader {
         buildId,
         learnSkill: learnSkill ?? null,
         acquisition: requiredString(row, "acquisition"),
+        ...(acquisitionDetailVersionId === undefined
+          ? sourceKinds === undefined ? {} : { sourceKinds }
+          : {
+              teachingItemId: teachingItemId ?? null,
+              sourceKinds: sourceKinds ?? [],
+              ...(sourceDataOrigin === undefined ? {} : { sourceDataOrigin }),
+            }),
         faction: requiredString(row, "faction"),
         specializationSpellId: specializationSpellId ?? null,
         cooldownSeconds: cooldownSeconds ?? null,

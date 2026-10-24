@@ -37,6 +37,9 @@ const server = createServer(async (request, response) => {
       ...(localCatalog === undefined ? {} : { catalog: localCatalog }),
       ...(localCatalog === undefined ? {} : { changes: localCatalog }),
       pricing: localPricingReader,
+      productEventSink(event) {
+        console.info(JSON.stringify({ event, type: "anonymous-product-event" }));
+      },
       readiness:
         localCatalog === undefined
           ? async () => undefined

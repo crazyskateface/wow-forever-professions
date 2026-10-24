@@ -8,6 +8,7 @@ import type {
 import { RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
 import { getItemRarityNameClass } from "./item-tooltip.js";
+import { recipeKnowledgeHref } from "./leatherworking-knowledge.js";
 import {
   activeRouteSegmentKey,
   routeSegmentKey,
@@ -59,14 +60,11 @@ function reasonLabel(reason: RouteRecipeEvidence["reasons"][number]): string {
   return "Not Forever-verified";
 }
 
-function blockedReason(result: Extract<RouteOptimizationResult, { status: "blocked" }>): string {
-  if (result.reason === "missing-price-data") {
-    return "required market prices are unavailable.";
-  }
-  if (result.reason === "unsupported-recipe-evidence") {
-    return "finishing would require a recipe with unsupported acquisition or availability.";
-  }
-  return "no eligible recipe covers this skill.";
+function presetLabel(result: RouteOptimizationResult): string {
+  if (result.preset === "trainer-friendly") return "Trainer friendly";
+  if (result.preset === "fewest-crafts") return "Fewest crafts";
+  if (result.preset === "fewest-materials") return "Fewest materials";
+  return result.preset[0]!.toUpperCase() + result.preset.slice(1);
 }
 
 function primaryMaterials(recipe: Recipe | undefined, segment: RouteSegment) {
@@ -113,6 +111,9 @@ export function RouteChecklist({
             Check off completed ranges. Progress is saved only for this exact build,
             route, market, and recipe selection.
           </p>
+          <span className={`route-preset-badge preset-${result.preset}`}>
+            {presetLabel(result)} preset
+          </span>
         </div>
         <div className="route-progress-copy" aria-live="polite">
           <strong>{completedCount} / {result.segments.length}</strong>
@@ -142,9 +143,7 @@ export function RouteChecklist({
         </p>
       ) : null}
       {result.status === "blocked" ? (
-        <p className="route-warning">
-          Route stops at skill {result.blockedAtSkill}: {blockedReason(result)}
-        </p>
+        <p className="route-warning">{result.explanation}</p>
       ) : null}
 
       <ol className="route-segments">
@@ -157,6 +156,10 @@ export function RouteChecklist({
             ? undefined
             : getRecipeChangeType(recipe);
           const materials = primaryMaterials(recipe, segment);
+          const sourceGuideHref = recipeKnowledgeHref(
+            segment.evidence.acquisition,
+            segment.recipeId,
+          );
           return (
             <li
               aria-current={active ? "step" : undefined}
@@ -201,6 +204,11 @@ export function RouteChecklist({
                   {changeType === undefined ? null : (
                     <RecipeChangeBadge changeType={changeType} />
                   )}
+                  {sourceGuideHref === undefined ? null : (
+                    <a className="route-source-guide" href={sourceGuideHref}>
+                      Acquisition guide
+                    </a>
+                  )}
                 </div>
 
                 <dl className="route-step-metrics">
@@ -211,6 +219,11 @@ export function RouteChecklist({
                     <dd>{segment.expectedCostCopper === undefined ? "Price unavailable" : formatCopper(segment.expectedCostCopper)}</dd>
                   </div>
                 </dl>
+
+                <div className="route-recommendation">
+                  <strong>Why this recipe</strong>
+                  <p>{segment.recommendation.summary}</p>
+                </div>
 
                 <div className="route-materials">
                   <strong>Primary materials</strong>
@@ -243,6 +256,33 @@ export function RouteChecklist({
                     </ul>
                   ) : null}
                 </details>
+
+                {segment.alternatives.length > 0 ? (
+                  <details className="route-alternative-details">
+                    <summary>
+                      Compare {segment.alternatives.length} {segment.alternatives.length === 1 ? "alternative" : "alternatives"}
+                    </summary>
+                    <ul>
+                      {segment.alternatives.map((alternative) => (
+                        <li key={`${alternative.recipeId}:${alternative.startSkill}:${alternative.endSkill}`}>
+                          <div>
+                            <strong>{alternative.recipeName}</strong>
+                            <span>{alternative.startSkill} → {alternative.endSkill}</span>
+                          </div>
+                          <p>{alternative.lossSummary}</p>
+                          <dl>
+                            <div><dt>Crafts</dt><dd>{formatNumber(alternative.expectedCrafts)}</dd></div>
+                            <div><dt>Materials</dt><dd>{formatNumber(alternative.expectedMaterials)}</dd></div>
+                            <div><dt>Cost</dt><dd>{alternative.expectedCostCopper === undefined ? "Unavailable" : formatCopper(alternative.expectedCostCopper)}</dd></div>
+                          </dl>
+                          <button onClick={() => onOpenRecipe(alternative.recipeId)} type="button">
+                            Open alternative
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
               </div>
 
               <button
