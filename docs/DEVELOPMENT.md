@@ -187,6 +187,13 @@ back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID`
 
 ## Static site pages
 
+The shared `--content-max-width` token in `apps/web/src/styles.css` caps the combined
+planner sidebar and main content, knowledge pages, legal pages, and footer content
+at 1000px. The masthead and navigation remain outside that centered content area.
+Keep the outer margins available for future rails or background art. Planner and
+knowledge panels use named CSS containers to reflow within their available width;
+viewport breakpoints still control the full-width navigation and sidebar stacking.
+
 `apps/web/src/main.tsx` resolves `/privacy`, `/terms`, `/contact`, and the focused
 `/leatherworking/*` knowledge pages before mounting the planner. Legal/support content
 and metadata live in `StaticPage.tsx`; build-scoped profession content lives in

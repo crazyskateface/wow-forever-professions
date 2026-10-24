@@ -1,4 +1,5 @@
 :root {
+  --content-max-width: 1000px;
   color: #f5f6f7;
   background: #15171d;
   font-family: var(--font-sans);
@@ -833,7 +834,7 @@ h1, h2, h3, p { margin-top: 0; }
 
 .site-footer { border-top: 1px solid #30333a; background: #111319; }
 .site-footer-inner {
-  width: min(1280px, 100%);
+  width: min(var(--content-max-width), 100%);
   margin: 0 auto;
   padding: 30px clamp(22px, 4vw, 58px) 24px;
   display: grid;
@@ -871,7 +872,7 @@ h1, h2, h3, p { margin-top: 0; }
 .site-footer nav a { color: #c8cbd1; text-decoration: none; font-size: 12px; font-weight: 750; }
 .site-footer nav a:hover, .site-footer nav a[aria-current="page"] { color: var(--lime); }
 .site-footer-disclaimer {
-  width: min(1280px, 100%);
+  width: min(var(--content-max-width), 100%);
   margin: 0 auto;
   padding: 15px clamp(22px, 4vw, 58px) 24px;
   color: var(--muted-2);
@@ -902,7 +903,7 @@ h1, h2, h3, p { margin-top: 0; }
   font-weight: 800;
 }
 .back-to-planner:hover { color: var(--lime); border-color: #596332; background: #2d302b; }
-.legal-main { width: min(1040px, 100%); margin: 0 auto; padding: 0 clamp(22px, 5vw, 72px) 80px; flex: 1; }
+.legal-main { width: min(var(--content-max-width), 100%); margin: 0 auto; padding: 0 clamp(22px, 5vw, 48px) 80px; flex: 1; }
 .legal-hero { padding: clamp(54px, 8vw, 92px) 0 44px; border-bottom: 1px solid #393d45; }
 .legal-hero h1 { max-width: 760px; margin: 10px 0 14px; font-size: clamp(38px, 6vw, 68px); line-height: .98; letter-spacing: -.055em; }
 .legal-hero p { max-width: 680px; margin: 0; color: #b9bdc5; font-size: 17px; line-height: 1.65; }
@@ -932,7 +933,6 @@ h1, h2, h3, p { margin-top: 0; }
 
 @media (max-width: 1180px) {
   .topbar { grid-template-columns: 330px minmax(230px, 1fr) 250px; }
-  .workspace { grid-template-columns: 355px minmax(0, 1fr); }
   .main-workspace { padding-inline: 28px; }
   .calculator-grid { grid-template-columns: minmax(0, 1.2fr) minmax(235px, .8fr); }
   .materials-header, .material-row { grid-template-columns: minmax(200px, 1.2fr) .5fr .7fr .8fr; }
@@ -1210,8 +1210,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: #102033;
 }
 
-.workspace { min-height: calc(100vh - 74px); grid-template-columns: 340px minmax(0, 1fr); }
-.workspace.workspace-changes { grid-template-columns: 292px minmax(0, 1fr); }
+.workspace {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin-inline: auto;
+  min-height: calc(100vh - 74px);
+  grid-template-columns: 280px minmax(0, 1fr);
+  border-inline: 1px solid var(--line-soft);
+  background: var(--bg);
+}
+.workspace.workspace-changes { grid-template-columns: 280px minmax(0, 1fr); }
 .profession-rail {
   top: 74px;
   height: calc(100vh - 74px);
@@ -1258,7 +1266,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .recipe-level { border-radius: 4px; background: #112033; }
 .change-badge { border-radius: 3px; background: #152438; }
 
-.main-workspace { width: 100%; max-width: 1760px; padding-inline: clamp(24px, 4vw, 68px); }
+.main-workspace { width: 100%; min-width: 0; padding-inline: 24px; container: planner / inline-size; }
 .main-workspace:focus, .knowledge-main:focus, .legal-main:focus { outline: 2px solid #ffd071; outline-offset: -2px; }
 .workspace-nav { height: 62px; border-bottom-color: #30465a; }
 .workspace-nav button { min-height: 48px; color: #9fabb9; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
@@ -1520,15 +1528,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .legal-section { border-top-color: #34495d; }
 .legal-section h2 { color: #f4e5c8; font-family: var(--font-secondary); }
 
-.knowledge-main { width: min(1320px, 100%); margin: 0 auto; padding: 0 clamp(22px, 4vw, 58px) 84px; flex: 1; }
+.knowledge-main { width: min(var(--content-max-width), 100%); margin: 0 auto; padding: 0 24px 84px; flex: 1; }
 .knowledge-hero { padding-bottom: 38px; }
-.knowledge-layout { padding-top: 28px; display: grid; grid-template-columns: 220px minmax(0, 1fr); align-items: start; gap: clamp(34px, 5vw, 72px); }
+.knowledge-layout { padding-top: 28px; display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; gap: 28px; }
 .knowledge-nav { position: sticky; top: 22px; padding: 15px; display: grid; gap: 3px; border: 1px solid #34495d; border-radius: 4px; background: #112033; }
 .knowledge-nav strong { margin: 10px 9px 5px; color: #88a2bb; font-family: var(--font-secondary); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; }
 .knowledge-nav strong:first-child { margin-top: 3px; }
 .knowledge-nav a { padding: 8px 9px; color: #cbd5de; border-left: 2px solid transparent; text-decoration: none; font-size: 11px; font-weight: 800; }
 .knowledge-nav a:hover, .knowledge-nav a[aria-current="page"] { color: #ffd071; border-left-color: #d99531; background: #172b40; }
-.knowledge-copy { min-width: 0; color: #cbd4dc; }
+.knowledge-copy { min-width: 0; color: #cbd4dc; container: knowledge / inline-size; }
 .knowledge-build-status { margin-bottom: 24px; padding: 16px 18px; display: grid; grid-template-columns: minmax(220px, 1fr) minmax(300px, 1.2fr); align-items: center; gap: 18px; border: 1px solid #496077; border-left: 4px solid #d99531; border-radius: 4px; background: #13263a; }
 .knowledge-build-status span { display: block; color: #8fa5b9; font-size: 9px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
 .knowledge-build-status strong { display: block; margin-top: 5px; color: #f4e5c8; font-size: 14px; }
@@ -1585,14 +1593,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .contact-actions .contact-primary { color: #231808; border-color: #eaa438; background: #eaa438; }
 .contact-actions .contact-primary:hover { color: #231808; border-color: #ffd071; background: #ffd071; }
 
-@media (min-width: 1800px) {
-  .workspace { grid-template-columns: 400px minmax(0, 1fr); }
-  .workspace.workspace-changes { grid-template-columns: 340px minmax(0, 1fr); }
-}
-
 @media (max-width: 1180px) {
   .topbar { grid-template-columns: 260px minmax(230px, 1fr) 250px; }
-  .workspace { grid-template-columns: 320px minmax(0, 1fr); }
   .materials-heading, .materials-header, .material-row { padding-inline: 28px; }
   .route-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .shopping-workspace-controls { grid-template-columns: minmax(0, 1fr) 180px; }
@@ -1630,6 +1632,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .known-recipes-search input { font-size: 16px; }
   .main-workspace { padding-inline: 15px; }
   .knowledge-main { padding-inline: 18px; padding-bottom: 58px; }
+  .knowledge-hero h1 { font-size: clamp(28px, 8vw, 40px); overflow-wrap: anywhere; }
   .knowledge-layout { padding-top: 20px; }
   .knowledge-build-status { grid-template-columns: 1fr; }
   .knowledge-section { grid-template-columns: 1fr; gap: 13px; }
@@ -1693,6 +1696,63 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .materials-heading, .material-row { padding-inline: 20px; }
 }
 
+/* Panels respond to their available content width, including beside the sidebar. */
+@container planner (max-width: 900px) {
+  .data-quality { grid-template-columns: 1fr; }
+  .route-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shopping-workspace-controls { grid-template-columns: minmax(0, 1fr) 180px; }
+  .shopping-workspace-controls .secondary-action { grid-column: 1 / -1; width: max-content; }
+  .shopping-paths { grid-template-columns: minmax(0, 1fr); }
+}
+
+@container planner (max-width: 700px) {
+  .recipe-hero { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .recipe-hero h1, .route-intro h1 { font-size: 30px; }
+  .hero-actions { align-self: flex-end; }
+  .calculator-grid { grid-template-columns: 1fr; gap: 18px; }
+  .chart-wrap { padding: 94px 22px 26px; }
+  .chart-heading strong { top: -20px; left: -11px; width: min(360px, calc(100% - 8px)); height: 70px; font-size: 17px; }
+  .chart-heading .chart-live { top: 44px; right: 14px; width: 150px; height: 47px; font-size: 12px; }
+  .outcome-feature { min-height: 190px; }
+  .cost-strip article { padding: 16px 12px; gap: 8px; }
+  .materials-card { border-width: 30px; border-image-width: 30px; }
+  .materials-heading { padding: 22px 18px 16px; flex-wrap: wrap; gap: 10px; }
+  .materials-header { display: none; }
+  .material-row { min-height: 0; padding: 16px 18px; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 12px; }
+  .material-row > strong:nth-child(2)::before { content: "Qty "; font-size: 10px; font-weight: 600; }
+  .source-pill { grid-column: 1; }
+  .material-cost { grid-column: 2; text-align: right; }
+  .route-checklist-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .route-progress-copy { text-align: left; }
+  .route-segments .route-segment-card { grid-template-columns: 42px minmax(0, 1fr); gap: 12px; }
+  .route-open-recipe { grid-column: 2; }
+  .route-step-check { min-width: 0; }
+  .route-alternative-details dl { grid-template-columns: 1fr; }
+  .shopping-checklist .shopping-heading { align-items: stretch; flex-direction: column; }
+  .shopping-checklist .shopping-total { min-width: 0; padding: 13px 0 0; text-align: left; border-left: 0; border-top: 1px solid #40566b; }
+  .change-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .change-summary .summary-changed { grid-column: 1 / -1; }
+  .changes-toolbar { align-items: stretch; flex-direction: column; }
+  .profession-filter { width: 100%; }
+  .change-card-details { padding-left: 18px; }
+  .snapshot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container planner (max-width: 500px) {
+  .route-field-grid, .route-summary, .shopping-workspace-controls { grid-template-columns: 1fr; }
+  .route-preset-field, .shopping-workspace-controls .secondary-action { grid-column: auto; }
+  .shopping-workspace-controls .secondary-action { width: 100%; }
+  .route-segments .route-segment-card { grid-template-columns: 1fr; }
+  .route-open-recipe { grid-column: auto; }
+  .cost-strip { grid-template-columns: 1fr; }
+  .shopping-section-heading { flex-wrap: wrap; gap: 10px; }
+  .snapshot-grid { grid-template-columns: 1fr; }
+}
+
+@container knowledge (max-width: 750px) {
+  .knowledge-build-status, .knowledge-section { grid-template-columns: 1fr; gap: 16px; }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .skip-link, .guide-step, .recipe, .workspace-nav button, .rail-tabs button { transition: color .15s ease, border-color .15s ease, background .15s ease, transform .15s ease; }
 }
@@ -1719,7 +1779,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .shopping-workspace-controls, .shopping-tools, .site-footer { display: none !important; }
   body, .app-shell, .workspace, .main-workspace, .route-result, .shopping-checklist,
   .shopping-section, .shopping-step-breakdown { color: #111; background: #fff !important; }
-  .workspace { display: block; }
+  .workspace { display: block; max-width: none; border: 0; }
   .main-workspace, .route-result { max-width: none; margin: 0; padding: 0; }
   .shopping-checklist { margin: 0; }
   .shopping-context, .shopping-paths { grid-template-columns: 1fr; }

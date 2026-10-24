@@ -158,6 +158,9 @@ data.
 
 ### Site information and support
 
+- Centers the sidebar and main workspace together in a fluid container capped at
+  1000px, leaving room on both sides on wide displays. The masthead and navigation
+  remain full width; guide and information pages share the same content limit.
 - Includes a shared site footer with direct links to privacy, terms, contact, and the
   public source repository.
 - Serves readable, responsive Privacy Policy, Terms of Use, and Contact pages at
