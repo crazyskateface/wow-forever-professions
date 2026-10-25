@@ -18,44 +18,54 @@ afterEach(() => {
 });
 
 describe("current skill control", () => {
-  it("keeps the guide slider on the full profession range", () => {
-    const personalization = {
-      ...DEFAULT_PERSONALIZATION,
-      currentSkill: 120,
-    };
-    const storage = {
-      getItem(key: string) {
-        return key === PERSONALIZATION_STORAGE_KEY
-          ? JSON.stringify(personalization)
-          : null;
-      },
-    };
-
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: {
-        localStorage: storage,
-        location: {
-          href: "http://127.0.0.1:5173/",
-          pathname: "/",
+  it.each([
+    { view: "guide", label: "Current leveling skill" },
+    { view: "recipes", label: "Current profession skill" },
+    { view: "changes", label: "Current skill for changed recipes" },
+  ].flatMap((view) => [1, 120, 300].map((skill) => ({ ...view, skill }))))(
+    "keeps the $view slider usable at skill $skill, including while data loads",
+    ({ view, label, skill }) => {
+      const personalization = {
+        ...DEFAULT_PERSONALIZATION,
+        currentSkill: skill,
+      };
+      const storage = {
+        getItem(key: string) {
+          return key === PERSONALIZATION_STORAGE_KEY
+            ? JSON.stringify(personalization)
+            : null;
         },
-      },
-    });
+      };
 
-    const markup = renderToStaticMarkup(
-      <ItemTooltipProvider>
-        <App />
-      </ItemTooltipProvider>,
-    );
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: {
+          localStorage: storage,
+          location: {
+            href: `http://127.0.0.1:5173/?view=${view}`,
+            pathname: "/",
+          },
+        },
+      });
 
-    expect(markup).toContain("Current skill");
-    expect(markup).toContain("120 / 300");
-    expect(markup).toContain(
-      'aria-label="Current leveling skill" max="300" min="1" step="1" type="range" value="120"',
-    );
-    expect(markup).toContain('aria-label="Decrease skill"');
-    expect(markup).toContain('aria-label="Increase skill"');
-  });
+      const markup = renderToStaticMarkup(
+        <ItemTooltipProvider>
+          <App />
+        </ItemTooltipProvider>,
+      );
+
+      const slider = markup.match(/<input\b[^>]*type="range"[^>]*>/g);
+      expect(slider).toHaveLength(1);
+      expect(slider![0]).toContain(`aria-label="${label}"`);
+      expect(slider![0]).toContain('draggable="false"');
+      expect(slider![0]).toContain('max="300" min="1"');
+      expect(slider![0]).toContain(`value="${skill}"`);
+      expect(slider![0]).not.toContain("disabled");
+      expect(markup).toContain(`${skill} / 300`);
+      expect(markup).toContain('aria-label="Decrease skill"');
+      expect(markup).toContain('aria-label="Increase skill"');
+    },
+  );
 
   it("uses current skill for guide position without exposing route bounds", () => {
     const storage = {

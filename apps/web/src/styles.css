@@ -190,17 +190,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-weight: 900;
   box-shadow: inset 0 0 14px rgba(255, 197, 87, .18);
 }
-.rail-skill, .guide-skill-control { padding: 2px 18px 18px; border-bottom: 1px solid var(--line-soft); }
+.rail-skill, .guide-skill-control { padding: 2px 18px 18px; border-bottom: 1px solid var(--line-soft); user-select: none; }
 .rail-label-row { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; font-weight: 700; }
 .rail-label-row span:last-child { color: #d7d9de; }
 .guide-skill-control { background: linear-gradient(135deg, rgba(200, 240, 0, .06), transparent 62%); }
 input[type="range"] {
   width: 100%;
-  height: 4px;
+  /* Keep the native thumb inside a generous hit area, including off-center grabs. */
+  height: 32px;
   accent-color: var(--lime);
   cursor: pointer;
+  touch-action: none;
 }
-.rail-skill > input, .guide-skill-control > input { margin: 16px 0 18px; }
+.rail-skill > input, .guide-skill-control > input { margin: 2px 0 4px; }
 .skill-stepper { height: 44px; display: grid; grid-template-columns: 46px 1fr 46px; overflow: hidden; border: 1px solid #393d46; border-radius: 8px; background: #292c34; }
 .skill-stepper button { border: 0; background: #25282f; color: var(--muted); font-size: 22px; cursor: pointer; }
 .skill-stepper button:hover:not(:disabled) { color: var(--lime); background: #2f3239; }

@@ -1754,9 +1754,11 @@ export function App() {
               </div>
               <input
                 aria-label={recipeListView === "guide" ? "Current leveling skill" : "Current skill for changed recipes"}
+                draggable={false}
                 max={maxBaseSkill}
                 min={MIN_CURRENT_SKILL}
                 onChange={(event) => updateCurrentSkill(Number(event.target.value))}
+                onDragStart={(event) => event.preventDefault()}
                 step={1}
                 type="range"
                 value={skill}
@@ -1786,9 +1788,11 @@ export function App() {
               <div className="rail-label-row"><span>Calculator skill</span><span>{skill} / {maxBaseSkill}</span></div>
               <input
                 aria-label="Current profession skill"
+                draggable={false}
                 max={maxBaseSkill}
                 min={MIN_CURRENT_SKILL}
                 onChange={(event) => updateCurrentSkill(Number(event.target.value))}
+                onDragStart={(event) => event.preventDefault()}
                 step={1}
                 type="range"
                 value={skill}

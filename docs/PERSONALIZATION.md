@@ -22,6 +22,11 @@ The browser restores the saved route preset when it generates the initial guide.
 guide always covers skill 1 through the configured base profession cap of 300. Current
 skill highlights and scrolls to the relevant guide segment; it does not change or
 truncate the generated route.
+The guide, catalog, and changes views use native range inputs with a 32px-high grab
+area. Dragging updates current skill continuously; arrow keys, Home/End, and the
+stepper buttons remain available. Text selection and HTML drag-and-drop are suppressed
+on the control so grabbing near the track does not start a text drag. Touch gestures
+started on the slider adjust skill without panning the page.
 Changing region or faction cancels in-flight planning requests and clears
 route and shopping results that were calculated with the previous profile. The
 session's known-recipe selection is preserved so the next route rebuild uses the
@@ -69,3 +74,16 @@ route fingerprint so completion cannot leak onto a different selection, but the
 selection itself is not restored after the session. Persisting known recipes or
 multiple character profiles is intentionally deferred until the product has a
 trustworthy source for character-specific recipe knowledge.
+
+## Skill-slider browser regression checks
+
+In Chrome, check all three sidebar views on desktop and a narrow viewport:
+
+1. Focus the slider and press Home. Grab 10px below the center of the thumb and drag
+   to the right end. Skill should update during the gesture and reach 300.
+2. Drag back to 1, allowing the pointer to drift vertically outside the track after
+   grabbing it. It should keep updating without selecting text or showing a drag ghost.
+3. Check Home, End, arrow keys, and both stepper buttons. Only the stepper button at
+   its corresponding limit is disabled; the slider always permits dragging back.
+4. Switch views and reload. The selected skill should be shared and restored, and
+   changing it must not rebuild or truncate the leveling route.

@@ -27,6 +27,8 @@ data.
 
 - Generates a complete 1–300 route from the loaded catalog. Current skill highlights
   and scrolls to the player's place without removing earlier or later guide ranges.
+- Shares a native current-skill slider across guide, catalog, and changes views,
+  with a larger grab area, live updates, and keyboard/stepper controls.
 - Limits the full guide to the current Forever base profession cap of 300, configured
   once in the shared domain package.
 - Offers Practical, Trainer friendly, Cheapest, Fewest crafts, Fewest materials, and
