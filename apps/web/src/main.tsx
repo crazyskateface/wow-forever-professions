@@ -6,6 +6,7 @@ import { LeatherworkingKnowledgePage } from "./LeatherworkingKnowledgePage.js";
 import { leatherworkingKnowledgePageFromPath } from "./leatherworking-knowledge.js";
 import { StaticPage, staticPageFromPath } from "./StaticPage.js";
 import "./styles.css";
+import "./best-crafts.css";
 
 const staticPage = staticPageFromPath(window.location.pathname);
 const knowledgePage = leatherworkingKnowledgePageFromPath(window.location.pathname);

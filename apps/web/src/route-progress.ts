@@ -9,7 +9,6 @@ interface BrowserStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }
-
 export interface RouteProgressFingerprintInput {
   readonly build: string;
   readonly professionId: string;
@@ -141,36 +140,4 @@ export function writeRouteProgress(
   } catch {
     return false;
   }
-}
-
-export function completedThroughSkill(
-  segments: readonly Pick<RouteSegment, "recipeId" | "startSkill" | "endSkill">[],
-  completedSegmentKeys: ReadonlySet<string>,
-  skill: number,
-): readonly string[] {
-  const completed = new Set(completedSegmentKeys);
-  for (const segment of segments) {
-    if (segment.endSkill <= skill) completed.add(routeSegmentKey(segment));
-  }
-  return [...completed];
-}
-
-export function activeRouteSegmentKey(
-  segments: readonly Pick<RouteSegment, "recipeId" | "startSkill" | "endSkill">[],
-  completedSegmentKeys: ReadonlySet<string>,
-  currentSkill: number,
-): string | undefined {
-  const containing = segments.find(
-    (segment) =>
-      !completedSegmentKeys.has(routeSegmentKey(segment)) &&
-      currentSkill >= segment.startSkill &&
-      currentSkill < segment.endSkill,
-  );
-  if (containing !== undefined) return routeSegmentKey(containing);
-  const next = segments.find(
-    (segment) =>
-      !completedSegmentKeys.has(routeSegmentKey(segment)) &&
-      segment.startSkill >= currentSkill,
-  );
-  return next === undefined ? undefined : routeSegmentKey(next);
 }

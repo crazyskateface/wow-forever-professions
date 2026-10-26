@@ -1,7 +1,3 @@
-import type {
-  RoutePreset,
-  ShoppingStrategy,
-} from "@forever-professions/contracts";
 import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 
 export type PlayerFaction = "alliance" | "horde";
@@ -28,10 +24,8 @@ export interface ForeverChangeFilters {
 }
 
 export interface PersonalizationPreferences {
-  readonly version: 2;
+  readonly version: 3;
   readonly currentSkill: number;
-  readonly routePreset: RoutePreset;
-  readonly shoppingStrategy: ShoppingStrategy;
   readonly region: string;
   readonly marketId: string;
   readonly faction: PlayerFaction;
@@ -46,6 +40,8 @@ interface BrowserStorage {
 }
 
 export const PERSONALIZATION_STORAGE_KEY =
+  "forever-professions.personalization.v3";
+const PREVIOUS_PERSONALIZATION_STORAGE_KEY =
   "forever-professions.personalization.v2";
 const LEGACY_PERSONALIZATION_STORAGE_KEY =
   "forever-professions.personalization.v1";
@@ -59,10 +55,8 @@ export const DEFAULT_CHANGE_FILTERS: ForeverChangeFilters = {
 };
 
 export const DEFAULT_PERSONALIZATION: PersonalizationPreferences = {
-  version: 2,
+  version: 3,
   currentSkill: 1,
-  routePreset: "practical",
-  shoppingStrategy: "cheapest",
   region: "us",
   marketId: "forever.pvp.horde.us",
   faction: "horde",
@@ -70,15 +64,6 @@ export const DEFAULT_PERSONALIZATION: PersonalizationPreferences = {
   changeFilters: DEFAULT_CHANGE_FILTERS,
 };
 
-const ROUTE_PRESETS = [
-  "practical",
-  "trainer-friendly",
-  "cheapest",
-  "fewest-crafts",
-  "fewest-materials",
-  "experimental",
-] as const;
-const SHOPPING_STRATEGIES = ["cheapest", "buy-only", "craft-first"] as const;
 const PLAYER_FACTIONS = ["alliance", "horde"] as const;
 const CHANGE_FILTERS = [
   "CHANGED",
@@ -131,22 +116,8 @@ function booleanValue(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
-function savedRoutePreset(value: Record<string, unknown>): RoutePreset {
-  if (
-    typeof value.routePreset === "string" &&
-    ROUTE_PRESETS.includes(value.routePreset as RoutePreset)
-  ) {
-    return value.routePreset as RoutePreset;
-  }
-  if (value.trainerOnly === true) return "trainer-friendly";
-  if (value.routeObjective === "cost") return "cheapest";
-  if (value.routeObjective === "materials") return "fewest-materials";
-  if (value.routeConfidencePolicy === "supported-only") return "fewest-crafts";
-  return DEFAULT_PERSONALIZATION.routePreset;
-}
-
 export function parsePersonalization(value: unknown): PersonalizationPreferences {
-  if (!isRecord(value) || (value.version !== 1 && value.version !== 2)) {
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2 && value.version !== 3)) {
     return DEFAULT_PERSONALIZATION;
   }
   const currentSkill = boundedInteger(
@@ -158,14 +129,8 @@ export function parsePersonalization(value: unknown): PersonalizationPreferences
   const changeFilters = isRecord(value.changeFilters) ? value.changeFilters : {};
 
   return {
-    version: 2,
+    version: 3,
     currentSkill,
-    routePreset: savedRoutePreset(value),
-    shoppingStrategy: oneOf(
-      value.shoppingStrategy,
-      SHOPPING_STRATEGIES,
-      DEFAULT_PERSONALIZATION.shoppingStrategy,
-    ),
     region: nonEmptyString(value.region, DEFAULT_PERSONALIZATION.region),
     marketId: nonEmptyString(value.marketId, DEFAULT_PERSONALIZATION.marketId),
     faction: oneOf(
@@ -214,6 +179,7 @@ export function readPersonalization(
     );
     if (resolvedStorage === undefined) return DEFAULT_PERSONALIZATION;
     const stored = resolvedStorage.getItem(PERSONALIZATION_STORAGE_KEY) ??
+      resolvedStorage.getItem(PREVIOUS_PERSONALIZATION_STORAGE_KEY) ??
       resolvedStorage.getItem(LEGACY_PERSONALIZATION_STORAGE_KEY);
     return stored === null
       ? DEFAULT_PERSONALIZATION
@@ -246,6 +212,7 @@ export function clearPersonalization(storage?: BrowserStorage): boolean {
     );
     if (resolvedStorage === undefined) return false;
     resolvedStorage.removeItem(PERSONALIZATION_STORAGE_KEY);
+    resolvedStorage.removeItem(PREVIOUS_PERSONALIZATION_STORAGE_KEY);
     resolvedStorage.removeItem(LEGACY_PERSONALIZATION_STORAGE_KEY);
     return true;
   } catch {

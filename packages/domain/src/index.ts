@@ -1,6 +1,7 @@
 export * from "./leveling-cost.js";
 export * from "./profession-cap.js";
 export * from "./skill-up.js";
+export * from "./best-crafts.js";
 
 export type ProvenanceSource =
   | "client-data"

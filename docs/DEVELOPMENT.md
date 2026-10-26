@@ -57,8 +57,30 @@ recipes.
 | AWS resources | `ops` | CDK v2, stable construct IDs, explicit retention/removal behavior. |
 
 Applications may depend on shared packages. Shared packages must not depend on an
-application. In particular, the UI never decides which recipe is optimal and the API
+application. In particular, React components never implement route optimization and the API
 never calls AH Ledger in a user request.
+
+### Best crafts and automatic guide
+
+The main workspace contains Recipe calculator and Best crafts. The left panel owns
+the automatic Practical leveling guide and individual completion checkboxes.
+Guide settings, known-recipe selection, sharing, shopping, bulk completion and
+expandable step metrics have been removed from the web client. Their request
+handlers, dialogs and browser persistence are also removed. Old shared-route query
+parameters no longer activate settings or select a preset. The shopping and route
+optimizer APIs remain available as package/API capabilities.
+
+`packages/domain/src/best-crafts.ts` owns fixed character-level targets, class/role
+profiles, armor eligibility, and deterministic equipment comparisons. `BestCrafts.tsx`
+only presents the loaded catalog results. No new API calls or dataset regeneration
+are required. Rankings are editorial weighted stat comparisons, not profession
+skill-up optimization or all-source BiS. Keep those boundaries visible. Class, role
+and target state lives in App so opening a recipe does not reset the shortlist.
+
+See [`CRAFTING_MILESTONES.md`](CRAFTING_MILESTONES.md) for the one-time bracket
+research, source restrictions and ranking limitations. Only the current Forever
+1.60 client metadata is supported. Unknown learning skill does not prevent gear
+comparison, but still prevents entry into a leveling route under existing policies.
 
 ### Profession progression cap
 
@@ -256,7 +278,7 @@ LibItemDB class/subclass metadata and uses name heuristics only as a display fal
 ## Browser-local personalization
 
 The web client owns a versioned local profile in `apps/web/src/personalization.ts`.
-It persists current skill, route and shopping preferences, region, market, faction,
+It persists current skill, region, market, faction,
 the Legacy profession-bonus input, and Forever Changes filters. The guide range is
 always 1–300 and is not browser state. The profile contains no
 credentials or imported game data. Keep its parser defensive and migrate by adding a
@@ -264,7 +286,9 @@ new storage version rather than changing the meaning of an existing version.
 
 Market and faction selections are functional request inputs. The Legacy profession
 bonus is storage-only until its Forever behavior is verified and explicitly modeled;
-do not silently add it to thresholds. Known recipes remain session-only. See
+do not silently add it to thresholds. Version 3 migrates the supported fields from
+versions 1 and 2 while dropping removed route/shopping settings. Automatic guide
+requests include the full catalog's recipe IDs as their known-recipe constraint. See
 `docs/PERSONALIZATION.md` for the field and failure-behavior contract.
 
 ## Verification expectations

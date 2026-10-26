@@ -3,7 +3,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type FormEvent,
   type ReactNode,
 } from "react";
 import {
@@ -13,7 +12,6 @@ import {
   recipeChangesResponseSchema,
   recipeChangesSummaryResponseSchema,
   routeOptimizationResponseSchema,
-  shoppingListResponseSchema,
   type AuctionMarket,
   type AuctionPriceObservation,
   type ProfessionFixture,
@@ -23,8 +21,6 @@ import {
   type RecipeChangeType,
   type RouteOptimizationResponse,
   type RoutePreset,
-  type ShoppingListResponse,
-  type ShoppingStrategy,
 } from "@forever-professions/contracts";
 import {
   FOREVER_BUILD_CONFIG,
@@ -39,8 +35,7 @@ import { leatherworkingFixture } from "@forever-professions/fixtures";
 import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
-import { RouteChecklist } from "./RouteChecklist.js";
-import { ShoppingChecklist } from "./ShoppingChecklist.js";
+import { BestCrafts, type CraftSelection } from "./BestCrafts.js";
 import { SiteFooter } from "./SiteFooter.js";
 import { ChevronDownIcon, SearchIcon } from "./UiIcons.js";
 import {
@@ -68,18 +63,12 @@ import {
 import { buildSkillChartData } from "./skill-chart.js";
 import { GUIDE_START_SKILL, getFullGuideRange } from "./guide-range.js";
 import {
-  completedThroughSkill,
   createRouteProgressFingerprint,
   readRouteProgress,
   routeSegmentKey,
   writeRouteProgress,
   type RouteProgressState,
 } from "./route-progress.js";
-import {
-  readShoppingProgress,
-  writeShoppingProgress,
-  type ShoppingProgressState,
-} from "./shopping-progress.js";
 import {
   DEFAULT_CATALOG_FILTERS,
   countActiveCatalogFilters,
@@ -95,53 +84,13 @@ import {
 } from "./catalog-discovery.js";
 import { recipeKnowledgeHref } from "./leatherworking-knowledge.js";
 import { recordProductEvent } from "./product-analytics.js";
-import { sharedRouteStateFromUrl, sharedRouteUrl } from "./route-share.js";
 
-type WorkspaceView = "calculator" | "planner";
-type PlannerResultView = "route" | "shopping";
+type WorkspaceView = "calculator" | "crafts";
 
 const MIN_PROFESSION_SKILL = 0;
 const MIN_CURRENT_SKILL = GUIDE_START_SKILL;
 const RECIPE_ROW_HEIGHT = 116;
-const KNOWN_RECIPE_ROW_HEIGHT = 48;
 const VIRTUAL_OVERSCAN = 5;
-
-const ROUTE_PRESETS: readonly {
-  readonly value: RoutePreset;
-  readonly label: string;
-  readonly description: string;
-}[] = [
-  {
-    value: "practical",
-    label: "Practical — recommended",
-    description: "Balances expected crafts, recipe switches, acquisition friction, Scarce avoidance, and evidence confidence.",
-  },
-  {
-    value: "trainer-friendly",
-    label: "Trainer friendly",
-    description: "Strongly prefers supported trainer recipes and labels any fallback to another acquisition path.",
-  },
-  {
-    value: "cheapest",
-    label: "Cheapest",
-    description: "Minimizes supported expected market cost and stops where required prices are missing.",
-  },
-  {
-    value: "fewest-crafts",
-    label: "Fewest crafts",
-    description: "Prioritizes expected skill-up efficiency using supported recipe evidence.",
-  },
-  {
-    value: "fewest-materials",
-    label: "Fewest materials",
-    description: "Minimizes total expected material units using supported recipe evidence.",
-  },
-  {
-    value: "experimental",
-    label: "Experimental — evidence risks",
-    description: "Allows clearly labeled acquisition or availability gaps and may produce a less trustworthy route.",
-  },
-];
 
 interface VirtualListProps<Item> {
   readonly ariaLabel: string;
@@ -369,8 +318,7 @@ function outputQuantityIsProvisional(recipe: Recipe): boolean {
   ]);
 }
 
-function outputTooltipItem(recipe: Recipe, professionName: string): ItemTooltipData {
-  const output = recipe.outputs[0]!;
+function outputTooltipItem(recipe: Recipe, professionName: string, output = recipe.outputs[0]!): ItemTooltipData {
   const provisionalQuantity = outputQuantityIsProvisional(recipe);
   return {
     ...tooltipItemData(output),
@@ -608,11 +556,6 @@ export function App() {
   const maxBaseSkill = FOREVER_BUILD_CONFIG.maxBaseSkill;
   const fullGuideRange = getFullGuideRange(maxBaseSkill);
   const [initialPreferences] = useState(readPersonalization);
-  const [initialSharedRoute] = useState(() =>
-    typeof window === "undefined"
-      ? undefined
-      : sharedRouteStateFromUrl(window.location.href),
-  );
   const [profession, setProfession] = useState<ProfessionFixture>(leatherworkingFixture);
   const [catalogState, setCatalogState] = useState<CatalogState>("loading");
   const [recipeId, setRecipeId] = useState(leatherworkingFixture.recipes[0]!.id);
@@ -627,19 +570,11 @@ export function App() {
     ),
     [maxBaseSkill, profession.recipes],
   );
-  const nonAuthoritativeRecipeCount = profession.recipes.filter(
-    (candidate) =>
-      !assessDataQuality(
-        candidate.provenance.source,
-        candidate.provenance.verification.status,
-      ).authoritative,
-  ).length;
   const [skill, setSkill] = useState(initialPreferences.currentSkill);
   const [prices, setPrices] = useState<readonly AuctionPriceObservation[]>([]);
   const [priceError, setPriceError] = useState<string>();
-  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>(
-    initialSharedRoute === undefined ? "calculator" : "planner",
-  );
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("calculator");
+  const [craftSelection, setCraftSelection] = useState<CraftSelection>({ classId: "rogue", roleId: "melee", level: 20 });
   const [recipeListView, setRecipeListView] = useState<RecipeListView>(() =>
     typeof window === "undefined"
       ? "guide"
@@ -664,32 +599,12 @@ export function App() {
   const [changeFilters, setChangeFilters] = useState<ForeverChangeFilters>(
     initialPreferences.changeFilters,
   );
-  const [knownRecipeSearch, setKnownRecipeSearch] = useState("");
-  const [routePreset, setRoutePreset] = useState<RoutePreset>(
-    initialSharedRoute?.preset ?? initialPreferences.routePreset,
-  );
-  const [routeShareLink, setRouteShareLink] = useState<string>();
-  const [routeShareStatus, setRouteShareStatus] = useState<string>();
-  const [knownRecipeIds, setKnownRecipeIds] = useState<readonly string[]>(
-    leatherworkingFixture.recipes.map(({ id }) => id),
-  );
   const [routeResponse, setRouteResponse] = useState<RouteOptimizationResponse>();
   const [routeProgress, setRouteProgress] = useState<RouteProgressState>();
   const [routeProgressStorageAvailable, setRouteProgressStorageAvailable] =
     useState(true);
   const [routeError, setRouteError] = useState<string>();
   const [routeLoading, setRouteLoading] = useState(false);
-  const [shoppingStrategy, setShoppingStrategy] = useState<ShoppingStrategy>(
-    initialPreferences.shoppingStrategy,
-  );
-  const [shoppingResponse, setShoppingResponse] = useState<ShoppingListResponse>();
-  const [shoppingProgress, setShoppingProgress] = useState<ShoppingProgressState>();
-  const [shoppingProgressStorageAvailable, setShoppingProgressStorageAvailable] =
-    useState(true);
-  const [plannerResultView, setPlannerResultView] =
-    useState<PlannerResultView>("route");
-  const [shoppingError, setShoppingError] = useState<string>();
-  const [shoppingLoading, setShoppingLoading] = useState(false);
   const [markets, setMarkets] = useState<readonly AuctionMarket[]>([]);
   const [marketsLoading, setMarketsLoading] = useState(true);
   const [marketsError, setMarketsError] = useState<string>();
@@ -702,17 +617,13 @@ export function App() {
   const [preferencesStorageAvailable, setPreferencesStorageAvailable] = useState(true);
   const routeAbortControllerRef = useRef<AbortController | null>(null);
   const routeRequestGuardRef = useRef(createRequestGuard());
-  const shoppingAbortControllerRef = useRef<AbortController | null>(null);
-  const shoppingRequestGuardRef = useRef(createRequestGuard());
   const firstStepEngagementRecordedRef = useRef(false);
   const missingDataEventsRecordedRef = useRef(new Set<string>());
 
   useEffect(() => {
     setPreferencesStorageAvailable(writePersonalization({
-      version: 2,
+      version: 3,
       currentSkill: skill,
-      routePreset,
-      shoppingStrategy,
       region,
       marketId,
       faction,
@@ -725,8 +636,6 @@ export function App() {
     legacyProfessionSkillBonus,
     marketId,
     region,
-    routePreset,
-    shoppingStrategy,
     skill,
   ]);
 
@@ -784,7 +693,6 @@ export function App() {
         );
         setProfession(loadedProfession);
         setRecipeId(selectedRecipe.id);
-        setKnownRecipeIds(loadedProfession.recipes.map(({ id }) => id));
         setCatalogState(usesFixtureCatalog ? "fixture" : "ready");
         writeRecipeUrl(selectedRecipe.id, "replace");
         if (requestedRecipeId === selectedRecipe.id) scrollToWorkspaceOnMobile();
@@ -797,7 +705,6 @@ export function App() {
         ) ?? leatherworkingFixture.recipes[0]!;
         setProfession(leatherworkingFixture);
         setRecipeId(fallbackRecipe.id);
-        setKnownRecipeIds(leatherworkingFixture.recipes.map(({ id }) => id));
         setCatalogState("fallback");
         writeRecipeUrl(fallbackRecipe.id, "replace");
       });
@@ -818,7 +725,7 @@ export function App() {
       professionId: profession.id,
       startSkill: fullGuideRange.startSkill,
       targetSkill: fullGuideRange.targetSkill,
-      preset: routePreset,
+      preset: "practical",
       knownRecipeIds: profession.recipes.map(({ id }) => id),
       signal: controller.signal,
     } satisfies RouteRequestOptions;
@@ -838,7 +745,7 @@ export function App() {
         ) return;
         setRouteResponse(undefined);
         setRouteError(
-          "The leveling guide could not be generated. Check the API connection and try again.",
+          "The leveling guide could not be generated. Refresh the page to try again.",
         );
       })
       .finally(() => {
@@ -856,13 +763,11 @@ export function App() {
         routeAbortControllerRef.current = null;
       }
     };
-  }, [catalogState, marketsLoading, profession]);
+  }, [catalogState, faction, marketId, marketsLoading, profession]);
 
   useEffect(() => () => {
     routeRequestGuardRef.current.invalidate();
     routeAbortControllerRef.current?.abort();
-    shoppingRequestGuardRef.current.invalidate();
-    shoppingAbortControllerRef.current?.abort();
   }, []);
 
   useEffect(() => {
@@ -939,10 +844,10 @@ export function App() {
   useEffect(() => {
     document.title = recipeListView === "changes"
       ? "Forever Changes · Forever Professions"
-      : workspaceView === "planner"
-        ? "Leatherworking leveling route · Forever Professions"
+      : workspaceView === "crafts"
+        ? `${profession.name} best crafts · Forever Professions`
       : `${recipe.name} · Forever Professions`;
-  }, [recipe.name, recipeListView, workspaceView]);
+  }, [profession.name, recipe.name, recipeListView, workspaceView]);
 
   useEffect(() => {
     if (catalogState === "loading") return;
@@ -1289,19 +1194,6 @@ export function App() {
     });
   }, [guideRows, recipeListView, search, skill]);
 
-  const knownRecipeSet = useMemo(() => new Set(knownRecipeIds), [knownRecipeIds]);
-  const filteredKnownRecipes = useMemo(() => {
-    const query = knownRecipeSearch.trim().toLowerCase();
-    return profession.recipes.filter(
-      ({ id, name }) =>
-        query.length === 0 ||
-        name.toLowerCase().includes(query) ||
-        id.toLowerCase().includes(query),
-    );
-  }, [knownRecipeSearch, profession.recipes]);
-  const selectedKnownResults = filteredKnownRecipes.filter(({ id }) =>
-    knownRecipeSet.has(id),
-  ).length;
   const availableRegions = useMemo(
     () => [
       ...new Set([region, ...markets.map((market) => market.region.toLowerCase())]),
@@ -1309,10 +1201,6 @@ export function App() {
     [markets, region],
   );
   const profileLabel = `${region.toUpperCase()} - ${faction === "horde" ? "Horde" : "Alliance"}`;
-  const routePresetDescription = ROUTE_PRESETS.find(
-    ({ value }) => value === routePreset,
-  )?.description ?? ROUTE_PRESETS[0]!.description;
-
   function activateRouteResponse(
     response: RouteOptimizationResponse,
     request: RouteRequestOptions,
@@ -1332,7 +1220,6 @@ export function App() {
     });
     setRouteResponse(response);
     setRouteProgress(readRouteProgress(fingerprint));
-    setPlannerResultView("route");
     firstStepEngagementRecordedRef.current = false;
     void recordProductEvent({
       name: "route-generated",
@@ -1385,64 +1272,16 @@ export function App() {
     persistRouteProgress([...next]);
   }
 
-  function markRouteThroughCurrentSkill(): void {
-    if (routeResponse === undefined) return;
-    persistRouteProgress(completedThroughSkill(
-      routeResponse.result.segments,
-      completedRouteSegmentKeys,
-      skill,
-    ));
-  }
-
   function resumeRouteAt(segmentKey: string | undefined): void {
     if (segmentKey === undefined) return;
-    setWorkspaceView("planner");
+    selectRecipeListView("guide");
+    setSearch("");
     window.requestAnimationFrame(() => {
       const entry = [...document.querySelectorAll<HTMLElement>(
         "[data-route-segment-key]",
       )].find((candidate) => candidate.dataset.routeSegmentKey === segmentKey);
       entry?.scrollIntoView({ behavior: "auto", block: "center" });
       entry?.focus({ preventScroll: true });
-    });
-  }
-
-  function invalidateShoppingResults(): void {
-    shoppingRequestGuardRef.current.invalidate();
-    shoppingAbortControllerRef.current?.abort();
-    shoppingAbortControllerRef.current = null;
-    setShoppingResponse(undefined);
-    setShoppingProgress(undefined);
-    setShoppingError(undefined);
-    setShoppingLoading(false);
-  }
-
-  function persistShoppingProgress(next: ShoppingProgressState): void {
-    setShoppingProgress(next);
-    setShoppingProgressStorageAvailable(writeShoppingProgress(next));
-  }
-
-  function updateOwnedQuantity(itemId: string, quantity: number): void {
-    if (shoppingProgress === undefined) return;
-    const normalized = Number.isFinite(quantity)
-      ? Math.min(1_000_000, Math.max(0, quantity))
-      : 0;
-    persistShoppingProgress({
-      ...shoppingProgress,
-      ownedQuantities: {
-        ...shoppingProgress.ownedQuantities,
-        [itemId]: normalized,
-      },
-    });
-  }
-
-  function toggleShoppingItem(itemKey: string, checked: boolean): void {
-    if (shoppingProgress === undefined) return;
-    const next = new Set(shoppingProgress.checkedItemIds);
-    if (checked) next.add(itemKey);
-    else next.delete(itemKey);
-    persistShoppingProgress({
-      ...shoppingProgress,
-      checkedItemIds: [...next],
     });
   }
 
@@ -1454,7 +1293,6 @@ export function App() {
     setRouteProgress(undefined);
     setRouteError(undefined);
     setRouteLoading(false);
-    invalidateShoppingResults();
   }
 
   function selectRegion(nextRegion: string): void {
@@ -1481,8 +1319,6 @@ export function App() {
     invalidatePlanningResults();
     clearPersonalization();
     setSkill(DEFAULT_PERSONALIZATION.currentSkill);
-    setRoutePreset(DEFAULT_PERSONALIZATION.routePreset);
-    setShoppingStrategy(DEFAULT_PERSONALIZATION.shoppingStrategy);
     setRegion(DEFAULT_PERSONALIZATION.region);
     setMarketId(DEFAULT_PERSONALIZATION.marketId);
     setFaction(DEFAULT_PERSONALIZATION.faction);
@@ -1491,14 +1327,21 @@ export function App() {
     );
     setChangeFilters(DEFAULT_PERSONALIZATION.changeFilters);
     setRouteProgressStorageAvailable(true);
-    setShoppingProgressStorageAvailable(true);
   }
 
   function selectRecipe(nextRecipe: Recipe, historyMode: "push" | "replace" = "push"): void {
     setRecipeId(nextRecipe.id);
     setWorkspaceView("calculator");
     writeRecipeUrl(nextRecipe.id, historyMode);
-    scrollToWorkspaceOnMobile();
+    if (workspaceView === "crafts") {
+      window.requestAnimationFrame(() => {
+        const workspace = document.getElementById("main-workspace");
+        workspace?.scrollIntoView({ block: "start" });
+        workspace?.focus({ preventScroll: true });
+      });
+    } else {
+      scrollToWorkspaceOnMobile();
+    }
   }
 
   function selectRecipeListView(
@@ -1519,126 +1362,6 @@ export function App() {
 
   function nudgeSkill(amount: number): void {
     updateCurrentSkill(skill + amount);
-  }
-
-  async function copyRouteLink(): Promise<void> {
-    const url = sharedRouteUrl(window.location.href, {
-      preset: routePreset,
-    });
-    setRouteShareLink(url);
-    try {
-      await navigator.clipboard.writeText(url);
-      setRouteShareStatus("Guide link copied. Only the route style is included.");
-    } catch {
-      setRouteShareStatus("The route link is ready below. Select it to copy manually.");
-    }
-  }
-
-  function toggleKnownRecipe(nextRecipeId: string): void {
-    setKnownRecipeIds((current) => {
-      const next = new Set(current);
-      if (next.has(nextRecipeId)) next.delete(nextRecipeId);
-      else next.add(nextRecipeId);
-      return [...next];
-    });
-  }
-
-  function setKnownResults(selected: boolean): void {
-    setKnownRecipeIds((current) => {
-      const next = new Set(current);
-      for (const candidate of filteredKnownRecipes) {
-        if (selected) next.add(candidate.id);
-        else next.delete(candidate.id);
-      }
-      return [...next];
-    });
-  }
-
-  async function submitRoute(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    invalidateShoppingResults();
-    routeAbortControllerRef.current?.abort();
-    const controller = new AbortController();
-    const requestId = routeRequestGuardRef.current.begin();
-    routeAbortControllerRef.current = controller;
-    setRouteLoading(true);
-    setRouteError(undefined);
-    try {
-      const request = {
-        faction,
-        marketId,
-        professionId: profession.id,
-        startSkill: fullGuideRange.startSkill,
-        targetSkill: fullGuideRange.targetSkill,
-        preset: routePreset,
-        knownRecipeIds,
-        signal: controller.signal,
-      } satisfies RouteRequestOptions;
-      const response = await requestOptimizedRoute(request);
-      if (!routeRequestGuardRef.current.isCurrent(requestId)) return;
-      activateRouteResponse(response, request);
-      selectRecipeListView("guide", "replace");
-    } catch {
-      if (!routeRequestGuardRef.current.isCurrent(requestId)) return;
-      setRouteResponse(undefined);
-      setRouteError("A route could not be calculated right now. Check the API connection and try again.");
-    } finally {
-      if (routeRequestGuardRef.current.isCurrent(requestId)) {
-        routeAbortControllerRef.current = null;
-        setRouteLoading(false);
-      }
-    }
-  }
-
-  async function buildShoppingList(): Promise<void> {
-    if (routeResponse === undefined || routeResponse.result.segments.length === 0) return;
-    shoppingAbortControllerRef.current?.abort();
-    const controller = new AbortController();
-    const requestId = shoppingRequestGuardRef.current.begin();
-    shoppingAbortControllerRef.current = controller;
-    setShoppingLoading(true);
-    setShoppingError(undefined);
-    setShoppingResponse(undefined);
-    try {
-      const response = await fetch("/api/shopping-list", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          professionId: profession.id,
-          marketId,
-          route: routeResponse.result.segments.map(
-            ({ recipeId: id, expectedCrafts }) => ({ recipeId: id, expectedCrafts }),
-          ),
-          strategy: shoppingStrategy,
-          knownRecipeIds,
-        }),
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const parsed = shoppingListResponseSchema.parse(await response.json());
-      if (!shoppingRequestGuardRef.current.isCurrent(requestId)) return;
-      setShoppingResponse(parsed);
-      void recordProductEvent({
-        name: "shopping-used",
-        buildId: profession.build,
-        preset: routeResponse.result.preset,
-        strategy: parsed.plan.strategy,
-        status: parsed.plan.status,
-      });
-      if (routeProgress !== undefined) {
-        setShoppingProgress(readShoppingProgress(routeProgress.fingerprint));
-      }
-      setPlannerResultView("shopping");
-    } catch {
-      if (!shoppingRequestGuardRef.current.isCurrent(requestId)) return;
-      setShoppingResponse(undefined);
-      setShoppingError("A shopping list could not be built right now.");
-    } finally {
-      if (shoppingRequestGuardRef.current.isCurrent(requestId)) {
-        shoppingAbortControllerRef.current = null;
-        setShoppingLoading(false);
-      }
-    }
   }
 
   function openRouteRecipe(nextRecipeId: string): void {
@@ -1732,7 +1455,7 @@ export function App() {
               <p className="personalization-warning">Browser storage is unavailable, so changes will last only for this tab.</p>
             ) : null}
             <div className="personalization-footer">
-              <span>Skill, route, shopping, and change filters are saved automatically.</span>
+              <span>Skill, profile preferences, and change filters are saved automatically.</span>
               <button onClick={resetPersonalization} type="button">Reset preferences</button>
             </div>
           </div>
@@ -2026,6 +1749,13 @@ export function App() {
             </div>
           ) : null}
 
+          {recipeListView === "guide" && routeResponse ? (
+            <div className="guide-completion-count">
+              <span aria-live="polite">{completedRouteSegmentKeys.size} / {routeResponse.result.segments.length} complete</span>
+              {!routeProgressStorageAvailable ? <small>Progress lasts only for this tab; browser storage is unavailable.</small> : null}
+            </div>
+          ) : null}
+
           {recipeListView === "guide" ? (
             <nav
               aria-label="Optimized leveling guide"
@@ -2043,13 +1773,12 @@ export function App() {
                 <div className="guide-message guide-message-error">
                   <strong>Guide unavailable</strong>
                   <small>{routeError}</small>
-                  <button onClick={() => setWorkspaceView("planner")} type="button">Open planner</button>
                 </div>
               ) : null}
               {!routeLoading && routeError === undefined && guideRows.length === 0 ? (
                 <div className="guide-message">
                   <strong>{search ? "No guide steps match" : "No route steps yet"}</strong>
-                  <small>{search ? `Clear “${search}” to see the complete route.` : "Open the planner to generate a leveling route."}</small>
+                  <small>{search ? `Clear “${search}” to see the complete route.` : "The guide appears automatically when recipe data is ready."}</small>
                 </div>
               ) : null}
               {routeResponse?.result.status === "blocked" && search.length === 0 ? (
@@ -2068,10 +1797,12 @@ export function App() {
                   <div
                     className="guide-entry"
                     data-guide-index={index}
+                    data-route-segment-key={segmentProgressKey}
+                    tabIndex={-1}
                     key={`${segment.recipeId}-${segment.startSkill}`}
                   >
                     <div className="guide-range-divider">
-                      <span>{segment.startSkill} – {segment.endSkill}</span>
+                      <label className="guide-step-checkbox"><input aria-label={"Complete " + guideRecipe.name + ", skill " + segment.startSkill + "–" + segment.endSkill} checked={complete} onChange={(event) => toggleRouteSegment(segmentProgressKey, event.target.checked)} type="checkbox" /><span>{segment.startSkill} – {segment.endSkill}</span></label>
                     </div>
                     <ItemTooltipButton
                       aria-current={active ? "step" : undefined}
@@ -2198,7 +1929,7 @@ export function App() {
           {recipeListView === "changes" ? null : (
             <nav className="workspace-nav" aria-label="Workspace views">
               <button aria-pressed={workspaceView === "calculator"} className={workspaceView === "calculator" ? "active" : ""} onClick={() => setWorkspaceView("calculator")} type="button">Recipe calculator</button>
-              <button aria-pressed={workspaceView === "planner"} className={workspaceView === "planner" ? "active" : ""} onClick={() => setWorkspaceView("planner")} type="button">Leveling route</button>
+              <button aria-pressed={workspaceView === "crafts"} className={workspaceView === "crafts" ? "active" : ""} onClick={() => setWorkspaceView("crafts")} type="button">Best crafts</button>
             </nav>
           )}
 
@@ -2232,7 +1963,7 @@ export function App() {
                     <button
                       onClick={() => {
                         selectRecipeListView("guide");
-                        setWorkspaceView("planner");
+                        resumeRouteAt(routeSegmentKey(activeRouteSegment));
                       }}
                       type="button"
                     >
@@ -2296,9 +2027,6 @@ export function App() {
                       />
                     </div>
                   </div>
-                </div>
-                <div className="hero-actions">
-                  <button onClick={() => setWorkspaceView("planner")} type="button">Use in route</button>
                 </div>
               </section>
 
@@ -2369,169 +2097,17 @@ export function App() {
               <DataQualityNotice build={profession.build} recipe={recipe} />
             </>
           ) : (
-            <section className="route-planner" aria-labelledby="route-title">
-              <div className="route-intro">
-                <div><span className="section-kicker">Leveling planner</span><h1 id="route-title">Build the 1–300 guide</h1><p>Choose how you want to level. The complete guide always stays visible; current skill highlights and scrolls to your place.</p></div>
-                <span className="planner-badge">{knownRecipeIds.length} known recipes</span>
-              </div>
-              {nonAuthoritativeRecipeCount > 0 ? (
-                <section className="planner-quality-note" aria-label="Route data quality warning">
-                  <span className="quality-icon" aria-hidden="true">!</span>
-                  <div>
-                    <strong>Route inputs are not yet authoritative</strong>
-                    <p>{nonAuthoritativeRecipeCount} of {profession.recipes.length} available recipes use unverified or fallback data. Route math is deterministic, but its result is only as reliable as those inputs.</p>
-                  </div>
-                </section>
-              ) : null}
-              <form className="route-form" onSubmit={submitRoute}>
-                {initialSharedRoute === undefined ? null : (
-                  <p className="route-share-loaded" role="status">
-                    Shared route style loaded. Your current skill, market, faction, known recipes,
-                    shopping quantities, and checklist progress remain local.
-                  </p>
-                )}
-                <div className="route-field-grid">
-                  <label className="route-preset-field"><span>Route style</span><select aria-describedby="route-preset-help" onChange={(event) => setRoutePreset(event.target.value as RoutePreset)} value={routePreset}>{ROUTE_PRESETS.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}</select><small id="route-preset-help">{routePresetDescription}</small></label>
-                </div>
-                <fieldset className="known-recipes">
-                  <legend>Recipes you know</legend>
-                  <div className="known-recipes-toolbar">
-                    <label className="known-recipes-search">
-                      <SearchIcon className="search-icon" />
-                      <input
-                        aria-label="Filter known recipes"
-                        onChange={(event) => setKnownRecipeSearch(event.target.value)}
-                        placeholder="Filter by recipe name or spell ID…"
-                        type="search"
-                        value={knownRecipeSearch}
-                      />
-                    </label>
-                    <div className="known-recipes-count" aria-live="polite">
-                      <strong>{knownRecipeIds.length}</strong>
-                      <span>of {profession.recipes.length} selected</span>
-                    </div>
-                  </div>
-                  <div className="known-recipes-actions">
-                    <span>{filteredKnownRecipes.length} matching recipes</span>
-                    <button
-                      disabled={selectedKnownResults === filteredKnownRecipes.length}
-                      onClick={() => setKnownResults(true)}
-                      type="button"
-                    >
-                      Select results
-                    </button>
-                    <button
-                      disabled={selectedKnownResults === 0}
-                      onClick={() => setKnownResults(false)}
-                      type="button"
-                    >
-                      Clear results
-                    </button>
-                  </div>
-                  <VirtualList
-                    ariaLabel="Known recipe selection"
-                    className="known-recipes-list"
-                    empty={<p className="empty-recipes">No recipes match “{knownRecipeSearch}”.</p>}
-                    getKey={({ id }) => id}
-                    items={filteredKnownRecipes}
-                    renderItem={(candidate) => (
-                      <label className="known-recipe-row">
-                        <input
-                          checked={knownRecipeSet.has(candidate.id)}
-                          onChange={() => toggleKnownRecipe(candidate.id)}
-                          type="checkbox"
-                        />
-                        <span>
-                          <strong className={getItemRarityNameClass(recipeOutputQualityId(candidate))}>{candidate.name}</strong>
-                          <small>{candidate.id} · skill {candidate.thresholds.orange}–{candidate.thresholds.gray}</small>
-                        </span>
-                      </label>
-                    )}
-                    resetKey={knownRecipeSearch}
-                    rowHeight={KNOWN_RECIPE_ROW_HEIGHT}
-                  />
-                  <small className="known-recipes-note">Acquisition sources with incomplete Forever evidence remain labeled in route results.</small>
-                </fieldset>
-                <div className="route-form-actions">
-                  <button className="primary-action" disabled={routeLoading} type="submit">{routeLoading ? "Calculating…" : "Build 1–300 guide"}</button>
-                  <button className="secondary-action" onClick={copyRouteLink} type="button">Copy guide link</button>
-                </div>
-                <p className="route-share-note">
-                  Shared links include only route style. Current skill, market, faction,
-                  known recipes, owned materials, and progress are excluded.
-                </p>
-                {routeShareStatus === undefined ? null : (
-                  <p className="route-share-status" role="status">{routeShareStatus}</p>
-                )}
-                {routeShareLink === undefined ? null : (
-                  <label className="route-share-field">
-                    <span>Shareable route link</span>
-                    <input
-                      onFocus={(event) => event.currentTarget.select()}
-                      readOnly
-                      type="text"
-                      value={routeShareLink}
-                    />
-                  </label>
-                )}
-              </form>
-
-              {routeError ? <p className="route-error">{routeError}</p> : null}
-              {routeResponse ? (
-                <div className="route-result">
-                  <div className="route-summary"><article><span>Expected crafts</span><strong>{formatNumber(routeResponse.result.totals.expectedCrafts)}</strong></article><article><span>Material units</span><strong>{formatNumber(routeResponse.result.totals.expectedMaterials)}</strong></article><article><span>Expected cost</span><strong>{routeResponse.result.totals.expectedCostCopper === undefined ? "—" : formatCopper(routeResponse.result.totals.expectedCostCopper)}</strong></article></div>
-                  <nav className="planner-result-nav" aria-label="Route workspace">
-                    <button aria-pressed={plannerResultView === "route"} className={plannerResultView === "route" ? "active" : ""} onClick={() => setPlannerResultView("route")} type="button">Route checklist</button>
-                    <button aria-pressed={plannerResultView === "shopping"} className={plannerResultView === "shopping" ? "active" : ""} onClick={() => setPlannerResultView("shopping")} type="button">Shopping checklist</button>
-                  </nav>
-
-                  {plannerResultView === "route" ? (
-                    <>
-                      <RouteChecklist
-                        completedSegmentKeys={completedRouteSegmentKeys}
-                        currentSkill={skill}
-                        getRecipeChangeType={getRecipeChangeType}
-                        onMarkThroughSkill={markRouteThroughCurrentSkill}
-                        onOpenRecipe={openRouteRecipe}
-                        onResume={resumeRouteAt}
-                        onToggleSegment={toggleRouteSegment}
-                        recipes={profession.recipes}
-                        result={routeResponse.result}
-                      />
-                      {!routeProgressStorageAvailable ? (
-                        <p className="route-warning">Browser storage is unavailable, so checklist progress will last only for this tab.</p>
-                      ) : null}
-                      {routeResponse.attribution ? <a className="attribution" href={routeResponse.attribution.url} rel="noreferrer" target="_blank">{routeResponse.attribution.text}</a> : null}
-                    </>
-                  ) : (
-                    <section className="shopping-workspace" aria-labelledby="shopping-workspace-title">
-                      <div className="shopping-workspace-controls">
-                        <div><span className="section-kicker">Shopping mode</span><h2 id="shopping-workspace-title">Plan route supplies</h2><p>Choose how intermediates should be sourced, then build the checklist from this exact route.</p></div>
-                        <label><span>Strategy</span><select onChange={(event) => { setShoppingStrategy(event.target.value as ShoppingStrategy); setShoppingResponse(undefined); setShoppingProgress(undefined); }} value={shoppingStrategy}><option value="cheapest">Cheapest</option><option value="buy-only">Buy only</option><option value="craft-first">Craft first</option></select></label>
-                        <button className="secondary-action" disabled={shoppingLoading || routeResponse.result.segments.length === 0} onClick={buildShoppingList} type="button">{shoppingLoading ? "Building…" : shoppingResponse === undefined ? "Build shopping checklist" : "Rebuild shopping checklist"}</button>
-                      </div>
-                      {shoppingError ? <p className="route-error">{shoppingError}</p> : null}
-                      {shoppingResponse !== undefined && shoppingProgress !== undefined ? (
-                        <ShoppingChecklist
-                          itemQualityById={itemQualityById}
-                          onOwnedQuantityChange={updateOwnedQuantity}
-                          onToggleItem={toggleShoppingItem}
-                          progress={shoppingProgress}
-                          recipes={profession.recipes}
-                          response={shoppingResponse}
-                          route={routeResponse.result}
-                          storageAvailable={shoppingProgressStorageAvailable}
-                        />
-                      ) : !shoppingLoading ? (
-                        <div className="shopping-empty"><strong>Build this route's supply plan</strong><p>Expected quantities, purchase paths, craft choices, missing prices, and cycles will stay explicit.</p></div>
-                      ) : null}
-                    </section>
-                  )}
-                </div>
-              ) : (
-                <div className="planner-empty"><span aria-hidden="true">⌁</span><h2>Your route will appear here</h2><p>Choose your range and goal, then build a route to compare the best recipes skill by skill.</p></div>
-              )}
-            </section>
+            <BestCrafts
+              catalogState={catalogState}
+              currentSkill={skill}
+              faction={faction}
+              getTooltip={outputTooltipItem}
+              onOpenRecipe={selectRecipe}
+              onSelectionChange={setCraftSelection}
+              professionName={profession.name}
+              recipes={profession.recipes}
+              selection={craftSelection}
+            />
           )}
         </main>
       </div>

@@ -67,7 +67,7 @@ describe("current skill control", () => {
     },
   );
 
-  it("uses current skill for guide position without exposing route bounds", () => {
+  it("keeps removed controls unavailable even through an old shared-route URL", () => {
     const storage = {
       getItem() {
         return JSON.stringify({
@@ -94,8 +94,14 @@ describe("current skill control", () => {
       </ItemTooltipProvider>,
     );
 
-    expect(markup).toContain("Build the 1–300 guide");
-    expect(markup).toContain("Route style");
+    expect(markup).toContain("Best crafts");
+    expect(markup).not.toContain(">Leveling route</button>");
+    expect(markup).not.toContain("Guide settings");
+    expect(markup).not.toContain("Shopping list");
+    expect(markup).not.toContain("Route style");
+    expect(markup).not.toContain("Copy guide link");
+    expect(markup).not.toContain("Complete through");
+    expect(markup).not.toContain("<dialog");
     expect(markup).not.toContain("Starting skill");
     expect(markup).not.toContain("Target skill");
     expect(markup).not.toContain("Use current skill as the route start");

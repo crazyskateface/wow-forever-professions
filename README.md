@@ -2,7 +2,7 @@
 
 Forever Professions is a TypeScript monorepo for a data-driven World of Warcraft:
 Forever profession leveling planner. The current vertical slice covers Leatherworking
-and combines an optimized leveling guide, recipe calculator, shopping planner, and a
+and combines an optimized leveling guide, recipe calculator, best-crafts shortlist, and a
 build-generated Classic Era → Forever change browser.
 
 The product is guide-first:
@@ -14,7 +14,7 @@ skill-up and eligibility math
         ↓
 stateful route optimization
         ↓
-leveling guide + calculator + shopping plan
+leveling guide + calculator + best crafts
 ```
 
 Recipe and comparison data retain their build, source, and verification state. A
@@ -31,8 +31,8 @@ data.
   with a larger grab area, live updates, and keyboard/stepper controls.
 - Limits the full guide to the current Forever base profession cap of 300, configured
   once in the shared domain package.
-- Offers Practical, Trainer friendly, Cheapest, Fewest crafts, Fewest materials, and
-  visibly risk-labeled Experimental presets instead of exposing raw optimizer weights.
+- Automatically generates the web guide with the Practical preset. The optimizer API
+  also supports Trainer friendly, Cheapest, Fewest crafts, Fewest materials, and Experimental.
 - Uses dynamic programming with preset-owned recipe-switch, acquisition-friction,
   evidence, and cost policies. Practical uses complete stored price coverage as a
   deterministic tie-breaker when the stronger safeguards and craft score are equal.
@@ -51,11 +51,28 @@ data.
   a complete non-Scarce route wins even when its ordinary objective score is higher.
 - Opens each guide step in the calculator at the relevant skill and shows New/Updated
   Forever badges when comparison data exists.
-- Presents generated segments as an execution checklist with the active skill range,
-  expected crafts, primary and total materials, market estimate, acquisition, and
-  expandable confidence details. Completion is saved only for the exact matching
+- Presents generated segments as a checklist in the left panel with the active skill range
+  and acquisition. The calculator shows materials and recipe evidence. Completion is saved only for the exact matching
   build, range, preset, resolved objective and confidence policy, constraints,
   market, and route.
+
+### Best crafts
+
+- Replaces the duplicate main Leveling Route tab with a class/role equipment shortlist
+  for the selected profession (currently Leatherworking).
+- Uses fixed character-level targets of **20, 30, 40, 50, 55, and 60**, researched once
+  from the pinned catalog. Exact equip levels remain visible, and strong earlier crafts
+  can remain recommended at later targets.
+- Compares known Forever equipment stats by role, showing a leading craft and up to
+  two alternatives per slot. Recommendations use transparent editorial priorities,
+  not simulated combat output or all-source best-in-slot claims.
+- Preserves unknown learning skills, pattern availability, faction and specialization
+  restrictions. Unsupported item data, rejected/unavailable recipes, samples, and
+  Classic fallbacks never become ranked Forever recommendations.
+- Opens each craft in the existing URL-addressable calculator. Class, role and level
+  choices survive switching between workspace tabs for the current page session.
+- Documents the bracket evidence and comparison policy in
+  [`docs/CRAFTING_MILESTONES.md`](docs/CRAFTING_MILESTONES.md).
 
 ### Recipe catalog and calculator
 
@@ -74,9 +91,6 @@ data.
   build, stored Forever changes, trainer evidence, specializations, Merchant's Favor,
   Camping, and supported vendor, quest, reputation, and drop acquisition records.
   Unsupported names, locations, rates, and unlock rules remain visibly unknown.
-- Generates privacy-safe guide links containing only the route preset. Current skill,
-  local market, faction, known recipes, owned materials, and checklist progress are
-  deliberately excluded.
 - Records a strict set of first-party anonymous product events for the route-to-
   shopping funnel. The accepted fields and retention boundary are documented in
   [`docs/PRODUCT_ANALYTICS.md`](docs/PRODUCT_ANALYTICS.md).
@@ -116,18 +130,17 @@ data.
 - The bundled comparison currently contains 289 New, 227 Updated, 0 Removed, and 87
   Unchanged Leatherworking recipes (603 total).
 
-### Shopping and pricing
+### Shopping API and pricing
 
-- Promotes a generated route into a first-class shopping checklist with aggregate
-  and per-step material views.
-- Saves owned quantities and checked materials under the exact route fingerprint;
-  remaining quantities never change the route's canonical expected totals.
+- Provides shopping plans through `POST /api/shopping-list`. The web client's shopping
+  controls, checklist, owned-quantity persistence, copy/print actions, guide settings,
+  route sharing, bulk completion and expandable step metrics have been removed.
 - Supports cheapest, buy-only, and craft-first strategies with guarded recursive
   intermediate crafting.
 - Keeps buy and craft paths separate, preserves missing prices and unresolved
   crafting sources, and detects cycles.
-- Labels complete totals versus partial known subtotals, shows the oldest price
-  observation used, and provides copy and print-friendly summaries.
+- Distinguishes complete totals from partial known subtotals and retains the oldest
+  price observation used in the API response.
 - Normalizes AH Ledger observations to integer copper and preserves attribution.
 - Reads prices refreshed ahead of time; API requests never call an auction provider
   directly.
@@ -144,15 +157,12 @@ data.
 
 ### Personalization without accounts
 
-- Saves current skill, route preset, shopping strategy, region, market, faction, and
+- Saves current skill, region, market, faction, and
   Forever Changes filters in the browser. Route bounds are fixed at 1–300 and are not
   persisted.
-- Saves route-step completion under a separate route fingerprint and exposes
-  mark-through-current-skill and resume-at-current-skill actions.
-- Saves shopping owned quantities and checked materials separately under that same
-  exact-route fingerprint.
+- Saves individually checked route steps under a separate route fingerprint.
 - Restores the saved profile when generating the initial guide and uses its market and
-  faction in price, route, and shopping-list requests.
+  faction in price and automatic route requests.
 - Validates and versions stored preferences, falls back safely when storage is corrupt
   or unavailable, and provides a one-click reset.
 - Saves a Legacy profession bonus for future modeling but does not apply it until the
