@@ -189,7 +189,7 @@ back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID`
 
 The shared `--content-max-width` token in `apps/web/src/styles.css` caps the combined
 planner sidebar and main content, knowledge pages, legal pages, and footer content
-at 1000px. The masthead and navigation remain outside that centered content area.
+at 1400px. The masthead and navigation remain outside that centered content area.
 Keep the outer margins available for future rails or background art. Planner and
 knowledge panels use named CSS containers to reflow within their available width;
 viewport breakpoints still control the full-width navigation and sidebar stacking.
