@@ -283,6 +283,11 @@ shows the stored Classic Era → Forever comparison. API and persistence support
 The shared current-skill slider powers change availability tags and the filters for
 recipes above current skill or with unknown requirements. Item-type filtering prefers
 LibItemDB class/subclass metadata and uses name heuristics only as a display fallback.
+The image-only gear-slot toggles use imported output `inventoryType` metadata only,
+combine selected slots with OR, and intersect with the other filters. Removed
+recipes use the base snapshot; current recipes never borrow a missing target slot
+from Classic. With no slot selected, unknown and non-equipment outputs remain visible. Reset filters
+clears the saved slot selection along with the other optional filters.
 
 ## Browser-local personalization
 

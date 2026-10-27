@@ -153,6 +153,9 @@ data.
 - Displays summary counts, search, profession and change-type filters, item-type
   filters, current-skill availability filters, provenance, icons, and expandable
   before/after values.
+- Offers image-only multi-select gear-slot filters beside Filters. Selected slots
+  show matching recipe outputs; clearing them restores all slots. Hover labels,
+  keyboard controls, saved selection, and Reset filters are supported.
 - Loads comparison records on demand when the Forever Changes tab is first opened,
   keeping the initial guide request burst below the API's concurrency boundary.
 - Hides unchanged recipes by default; badges are reused in the guide and All Recipes.

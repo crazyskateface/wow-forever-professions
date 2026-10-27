@@ -8,6 +8,8 @@ import type {
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltipSummary } from "./ItemTooltip.js";
 import { ChevronDownIcon } from "./UiIcons.js";
+import { GearSlotIcon } from "./GearSlotIcon.js";
+import { GEAR_SLOTS, changeMatchesGearSlots, toggleGearSlot } from "./gear-slots.js";
 import { getItemRarityNameClass, type ItemTooltipData } from "./item-tooltip.js";
 import {
   DEFAULT_CHANGE_FILTERS,
@@ -383,6 +385,7 @@ export function ForeverChanges({
   const {
     changeFilter,
     itemType,
+    gearSlots = DEFAULT_CHANGE_FILTERS.gearSlots,
     professionId,
     showAboveSkill,
     showUnknownSkill,
@@ -425,17 +428,19 @@ export function ForeverChanges({
           ? change.changeType !== "UNCHANGED"
           : change.changeType === changeFilter) &&
         (itemType === "ALL" || itemTypeFor(change) === itemType) &&
+        changeMatchesGearSlots(change, gearSlots) &&
         matchesSkill &&
         changeMatchesSearch(change, query)
       );
     });
-  }, [changeFilter, currentSkill, itemType, professionChanges, search, showAboveSkill, showUnknownSkill]);
-  const activeFilterCount = Number(normalizedProfessionId.length > 0) + Number(itemType !== "ALL") + Number(!showAboveSkill) + Number(!showUnknownSkill);
+  }, [changeFilter, currentSkill, itemType, gearSlots, professionChanges, search, showAboveSkill, showUnknownSkill]);
+  const activeFilterCount = Number(normalizedProfessionId.length > 0) + Number(itemType !== "ALL") + Number(!showAboveSkill) + Number(!showUnknownSkill) + gearSlots.length;
   const resultDescription = [
     changeFilter === "CHANGED"
       ? "Unchanged recipes are hidden by default"
       : `${CHANGE_LABELS[changeFilter as RecipeChangeType]} recipes`,
     itemType === "ALL" ? undefined : ITEM_TYPE_LABELS[itemType],
+    gearSlots.length === 0 ? undefined : GEAR_SLOTS.filter(slot => gearSlots.includes(slot.id)).map(slot => slot.label).join(", "),
     showAboveSkill ? undefined : `At or below skill ${currentSkill}`,
     showUnknownSkill ? undefined : "Known requirements only",
   ].filter((value): value is string => value !== undefined).join(" · ");
@@ -535,6 +540,7 @@ export function ForeverChanges({
                   ...filters,
                   professionId: DEFAULT_CHANGE_FILTERS.professionId,
                   itemType: DEFAULT_CHANGE_FILTERS.itemType,
+                  gearSlots: DEFAULT_CHANGE_FILTERS.gearSlots,
                   showAboveSkill: DEFAULT_CHANGE_FILTERS.showAboveSkill,
                   showUnknownSkill: DEFAULT_CHANGE_FILTERS.showUnknownSkill,
                 })}
@@ -545,6 +551,17 @@ export function ForeverChanges({
             ) : null}
           </div>
         </details>
+        <div className="changes-gear-slots" role="group" aria-label="Filter changed recipes by gear slot">
+          {GEAR_SLOTS.map(slot => <button
+            aria-label={slot.label}
+            aria-pressed={gearSlots.includes(slot.id)}
+            className="changes-gear-slot"
+            key={slot.id}
+            onClick={() => onFiltersChange({ ...filters, gearSlots: toggleGearSlot(gearSlots, slot.id) })}
+            title={slot.label}
+            type="button"
+          ><GearSlotIcon slot={slot.id} /></button>)}
+        </div>
         {professions.length > 1 ? (
           <label className="profession-filter">
             <span>Profession</span>

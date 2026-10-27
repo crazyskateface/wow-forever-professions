@@ -73,10 +73,22 @@ describe("browser personalization", () => {
         professionId: "leatherworking",
         changeFilter: "UPDATED",
         itemType: "GEAR",
+        gearSlots: [],
         showAboveSkill: false,
         showUnknownSkill: false,
       },
     });
+  });
+
+  it("sanitizes saved gear slots and retains them across storage round-trips", () => {
+    const profile = parsePersonalization({ ...DEFAULT_PERSONALIZATION, changeFilters: {
+      ...DEFAULT_PERSONALIZATION.changeFilters, gearSlots: ["head", "bogus", "head", "off-hand", 42],
+    } });
+    expect(profile.changeFilters.gearSlots).toEqual(["head", "off-hand"]);
+    const storage = memoryStorage();
+    writePersonalization(profile, storage);
+    expect(readPersonalization(storage)).toEqual(profile);
+    expect(parsePersonalization({ ...profile, changeFilters: { gearSlots: "head" } }).changeFilters.gearSlots).toEqual([]);
   });
 
   it("migrates version-1 profiles without retaining removed guide settings", () => {

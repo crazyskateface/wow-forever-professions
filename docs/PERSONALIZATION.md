@@ -9,7 +9,7 @@ web client stores one versioned JSON profile under the local-storage key
 - current calculator and guide-progress skill;
 - region, auction market, and character faction;
 - the Legacy profession skill-bonus input;
-- Forever Changes profession, change-type, item-type, and skill-availability filters.
+- Forever Changes profession, change-type, item-type, gear-slot, and skill-availability filters.
 
 The internal market is selected from the active region and faction and is used for
 recipe prices and automatic guide requests. The market remains in
@@ -32,6 +32,9 @@ IDs as their known-recipe constraint.
 Version-1 and version-2 profiles are migrated when read. Current skill and supported
 profile/filter preferences are retained. Removed route presets, shopping strategies,
 route bounds and linkage fields are dropped. Reset clears all three profile versions.
+
+The additive gear-slot selection defaults to no slot restriction for older profiles;
+unknown slot IDs and duplicates are discarded when reading preferences.
 
 Checklist completion is stored separately under a route fingerprint containing the
 recipe build, profession, skill range, preset, resolved objective and confidence
