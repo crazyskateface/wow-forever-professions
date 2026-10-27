@@ -1308,7 +1308,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   align-items: stretch;
   gap: 12px;
 }
-.chart-wrap, .outcome-panel {
+.chart-wrap, .outcome-panel, .profession-group {
   position: relative;
   isolation: isolate;
   min-width: 0;
@@ -1316,7 +1316,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border: 0;
   box-shadow: 0 14px 34px rgba(4, 10, 17, .24);
 }
-.chart-wrap::before, .outcome-panel::before {
+.chart-wrap::before, .outcome-panel::before, .profession-group::before {
   position: absolute;
   z-index: -1;
   inset: 4px;
@@ -1324,7 +1324,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: var(--panel-surface);
   clip-path: polygon(20px 0, calc(100% - 20px) 0, 100% 20px, 100% calc(100% - 20px), calc(100% - 20px) 100%, 20px 100%, 0 calc(100% - 20px), 0 20px);
 }
-.chart-wrap::after, .outcome-panel::after {
+.chart-wrap::after, .outcome-panel::after, .profession-group::after {
   position: absolute;
   z-index: 3;
   inset: 0;
@@ -1350,7 +1350,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   display: block;
   pointer-events: none;
 }
-.chart-heading strong, .chart-heading .chart-live {
+.chart-heading strong, .chart-heading .chart-live, .profession-group-heading h2 {
   position: absolute;
   isolation: isolate;
   display: flex;
@@ -1360,7 +1360,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: transparent;
   text-shadow: 0 2px 2px rgba(0, 0, 0, .88);
 }
-.chart-heading strong::before, .chart-heading .chart-live::before {
+.chart-heading strong::before, .chart-heading .chart-live::before, .profession-group-heading h2::before {
   position: absolute;
   z-index: -1;
   inset: 0;
@@ -1370,7 +1370,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background-size: 100% 100%;
   filter: brightness(.72) saturate(.72);
 }
-.chart-heading strong {
+.chart-heading strong, .profession-group-heading h2 {
   --chart-title-width: clamp(320px, 58%, 520px);
   top: -25px;
   left: -19px;
@@ -1383,7 +1383,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: clamp(17px, 1.45vw, 23px);
   white-space: nowrap;
 }
-.chart-heading strong::before { background-image: url("/ui/chart-title-plate.png"); }
+.chart-heading strong::before, .profession-group-heading h2::before { background-image: url("/ui/chart-title-plate.png"); }
 .chart-heading .chart-live {
   top: 15px;
   right: 28px;
@@ -1771,9 +1771,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .materials-card { border: 1px solid CanvasText; border-image: none; background: Canvas; }
   .brand-masthead::after, .legal-hero::after { background: CanvasText; }
   .profession-icon, .brand-mark { border: 1px solid CanvasText; }
-  .chart-wrap, .outcome-panel { border: 1px solid CanvasText; }
-  .chart-wrap::after, .outcome-panel::after,
-  .chart-heading strong::before, .chart-heading .chart-live::before,
+  .chart-wrap, .outcome-panel, .profession-group { border: 1px solid CanvasText; }
+  .chart-wrap::after, .outcome-panel::after, .profession-group::after,
+  .chart-heading strong::before, .chart-heading .chart-live::before, .profession-group-heading h2::before,
   .outcome-feature::before, .outcome-feature::after { display: none; }
 }
 

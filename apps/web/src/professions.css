@@ -10,9 +10,22 @@
 .profession-landing { width: min(100%, var(--content-max-width)); margin: 0 auto; padding: 64px 40px; flex: 1; }
 .profession-introduction { max-width: 750px; margin-bottom: 32px; }
 .profession-introduction > p:last-child { color: var(--muted); font-size: 17px; line-height: 1.8; max-width: 620px; }
-.profession-group { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 32px; padding: 32px 0; border-top: 1px solid var(--line); }
-.profession-group-heading h2 { margin: 4px 0 10px; font-size: 20px; }
-.profession-group-heading p { color: var(--muted); line-height: 1.7; font-size: 13px; }
+.profession-group {
+  --panel-surface: radial-gradient(circle at 55% 50%, rgba(74, 112, 147, .18), transparent 64%), #18283a;
+  padding: 70px 32px 28px;
+  margin-top: 44px;
+}
+.profession-group-heading h2 {
+  --chart-title-width: min(380px, calc(100% - 8px));
+  z-index: 4;
+  top: -22px;
+  left: -12px;
+  height: 76px;
+  margin: 0;
+  font-size: 20px;
+  pointer-events: none;
+}
+.profession-group-heading p { margin: 0 0 14px; color: var(--muted); line-height: 1.7; font-size: 13px; }
 .profession-directory { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 24px; }
 .profession-entry { display: flex; align-items: center; gap: 16px; color: var(--text); text-decoration: none; padding: 18px 8px; border-bottom: 1px solid var(--line-soft); min-width: 0; }
 .profession-entry:hover { background: var(--surface); }
@@ -29,12 +42,13 @@
 .profession-entry .profession-unavailable { color: var(--orange); }
 .profession-activity-note { max-width: var(--content-max-width); margin: 0 auto; padding: 18px 24px; color: var(--muted); line-height: 1.6; }
 .profession-status-bar { display: flex; }
-@media (max-width: 900px) {
-  .profession-group { grid-template-columns: 1fr; gap: 12px; }
-}
 @media (max-width: 600px) {
   .profession-landing { padding: 40px 20px; }
+  .profession-group { padding: 60px 22px 24px; }
+  .profession-group-heading h2 { height: 70px; font-size: 17px; }
   .profession-directory { grid-template-columns: 1fr; }
+  .profession-entry { gap: 12px; }
+  .profession-entry-arrow { display: none; }
   .profession-switcher select { font-size: 16px; padding-right: 24px !important; background-position: right 3px center !important; }
   .profession-switcher { grid-template-columns: 28px minmax(0, 1fr); column-gap: 6px; }
   .profession-switcher-icon { width: 28px; height: 28px; }
