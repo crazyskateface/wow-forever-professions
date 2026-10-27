@@ -22,7 +22,7 @@ export function ProfessionLanding() {
     <ProfessionMasthead />
     <main className="profession-landing" id="profession-directory">
       <div className="profession-introduction">
-        <h1 className="sr-only">Choose a profession</h1><p>Choose your profession to explore its recipes, plan your leveling, and see what changed in Forever.</p>
+        <h1 className="sr-only">Choose a profession</h1><p>Choose your profession</p>
       </div>
       {error ? <p role="status">Catalog availability could not be checked. Select a profession to try loading its catalog.</p> : null}
       {["Crafting", "Secondary", "Gathering"].map((group) => <section className="profession-group" key={group} aria-label={`${group} professions`}>
