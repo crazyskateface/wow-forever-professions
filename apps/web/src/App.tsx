@@ -1327,6 +1327,20 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
     writeRecipeListViewUrl(nextView, historyMode);
   }
 
+  function openChangedRecipe(nextRecipe: Recipe): void {
+    setRecipeId(nextRecipe.id);
+    setRecipeListView("recipes");
+    setWorkspaceView("calculator");
+    setSearch("");
+    const url = urlWithRecipeListView(urlWithRecipeId(window.location.href, nextRecipe.id), "recipes");
+    window.history.pushState({}, "", url);
+    window.requestAnimationFrame(() => {
+      const workspace = document.getElementById("main-workspace");
+      workspace?.scrollIntoView({ block: "start" });
+      workspace?.focus({ preventScroll: true });
+    });
+  }
+
   function updateCurrentSkill(value: number): void {
     const nextSkill = Math.min(
       maxBaseSkill,
@@ -1911,6 +1925,8 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
               loading={changesLoading}
               onFiltersChange={setChangeFilters}
               onRetry={() => setChangesReload((value) => value + 1)}
+              onSelectRecipe={openChangedRecipe}
+              recipes={profession.recipes}
               recipeTooltipBySpellId={recipeTooltipBySpellId}
               search={search}
               summary={changeSummary}

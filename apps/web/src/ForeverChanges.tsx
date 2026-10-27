@@ -1,13 +1,12 @@
-import { Fragment, useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo } from "react";
 import type {
   RecipeChange,
   RecipeChangeCounts,
   RecipeChangeType,
-  RecipeComparisonSnapshot,
+  Recipe,
 } from "@forever-professions/contracts";
 import { ItemIcon } from "./ItemIcon.js";
-import { ItemTooltipSummary } from "./ItemTooltip.js";
-import { ChevronDownIcon } from "./UiIcons.js";
+import { ItemTooltipButton } from "./ItemTooltip.js";
 import { GearSlotIcon } from "./GearSlotIcon.js";
 import { GEAR_SLOTS, changeMatchesGearSlots, toggleGearSlot } from "./gear-slots.js";
 import { nextChangeSort, sortRecipeChanges } from "./change-sort.js";
@@ -35,6 +34,8 @@ interface ForeverChangesProps {
   readonly loading: boolean;
   readonly onFiltersChange: (filters: ForeverChangeFilters) => void;
   readonly onRetry: () => void;
+  readonly onSelectRecipe: (recipe: Recipe) => void;
+  readonly recipes: readonly Recipe[];
   readonly recipeTooltipBySpellId: ReadonlyMap<number, ItemTooltipData>;
   readonly search: string;
   readonly summary: RecipeChangeCounts | undefined;
@@ -85,22 +86,6 @@ const GEAR_NAME_PATTERN = /\b(apron|armor|belt|boots?|bracers?|breastplate|chest
 const CONTAINER_NAME_PATTERN = /\b(bag|pack|pouch|quiver|satchel)\b/i;
 const MATERIAL_NAME_PATTERN = /\b(cured\s+\w+\s+hide|deeprock salt|hide|leather|scale)\b/i;
 
-const FIELD_LABELS: Record<string, string> = {
-  name: "Name",
-  reagents: "Reagents",
-  outputs: "Outputs",
-  orangeSkill: "Orange skill",
-  yellowSkill: "Yellow skill",
-  greenSkill: "Green skill",
-  graySkill: "Gray skill",
-  learnSkill: "Learned at",
-  acquisition: "Acquisition",
-  faction: "Faction",
-  specializationSpellId: "Specialization",
-  cooldownSeconds: "Cooldown",
-  availability: "Availability",
-};
-
 function countChanges(changes: readonly RecipeChange[]): RecipeChangeCounts {
   const counts = { ...EMPTY_COUNTS };
   for (const change of changes) {
@@ -148,68 +133,6 @@ function skillAvailabilityFor(
     return { kind: "ABOVE_SKILL", label: `Requires skill ${snapshot.learnSkill}` };
   }
   return { kind: "AVAILABLE" };
-}
-
-function formatFieldValue(
-  field: string,
-  value: unknown,
-  snapshot: RecipeComparisonSnapshot | undefined,
-  itemQualityById: ReadonlyMap<string, number>,
-): ReactNode {
-  if (field === "orangeSkill" && snapshot?.orangeSkillKnown === false) {
-    return "Unknown (source value is unanchored)";
-  }
-  if (field === "learnSkill" && (value === null || value === undefined)) {
-    return snapshot?.borrowedLearnSkill === null || snapshot?.borrowedLearnSkill === undefined
-      ? "Unknown"
-      : `Unknown (Classic fallback: ${snapshot.borrowedLearnSkill})`;
-  }
-  if (field === "acquisition" && value === "unknown" && snapshot?.sourceKinds?.length) {
-    const kinds = snapshot.sourceKinds.map((kind) =>
-      kind === "container" ? "Container" : `${kind[0]!.toUpperCase()}${kind.slice(1)}`,
-    );
-    const suffix = snapshot.sourceDataOrigin === "classic-borrowed"
-      ? " (Classic fallback)"
-      : "";
-    return `${kinds.join(" / ")}${suffix}`;
-  }
-  if (value === null || value === undefined) return "None";
-  if (typeof value === "string" || typeof value === "number") return String(value);
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (Array.isArray(value)) {
-    if (value.length === 0) return "None";
-    return value.map((entry, index) => {
-      if (typeof entry !== "object" || entry === null) {
-        return <Fragment key={index}>{index > 0 ? ", " : ""}{String(entry)}</Fragment>;
-      }
-      const item = entry as Record<string, unknown>;
-      const name = typeof item.name === "string" ? item.name : "Item";
-      const itemId = typeof item.itemId === "string" ? item.itemId : undefined;
-      let quantity = "";
-      if (typeof item.quantity === "number") quantity = `${item.quantity}× `;
-      if (
-        typeof item.minimumQuantity === "number" &&
-        typeof item.maximumQuantity === "number"
-      ) {
-        const outputQuantity = item.minimumQuantity === item.maximumQuantity
-          ? item.minimumQuantity
-          : `${item.minimumQuantity}–${item.maximumQuantity}`;
-        quantity = `${outputQuantity}× `;
-      }
-      return (
-        <Fragment key={itemId ?? index}>
-          {index > 0 ? ", " : ""}
-          {quantity}
-          <span className={getItemRarityNameClass(
-            itemId === undefined ? undefined : itemQualityById.get(itemId)
-          )}>
-            {name}
-          </span>
-        </Fragment>
-      );
-    });
-  }
-  return JSON.stringify(value);
 }
 
 function changeMatchesSearch(change: RecipeChange, query: string): boolean {
@@ -276,11 +199,15 @@ function ChangeCard({
   currentSkill,
   itemQualityById,
   recipeTooltipBySpellId,
+  recipe,
+  onSelectRecipe,
 }: {
   readonly change: RecipeChange;
   readonly currentSkill: number;
   readonly itemQualityById: ReadonlyMap<string, number>;
   readonly recipeTooltipBySpellId: ReadonlyMap<number, ItemTooltipData>;
+  readonly recipe: Recipe | undefined;
+  readonly onSelectRecipe: (recipe: Recipe) => void;
 }) {
   const changedFields = Object.entries(change.changedFields);
   const snapshot = change.target ?? change.base;
@@ -292,8 +219,15 @@ function ChangeCard({
   );
 
   return (
-    <details className={`change-card change-card-${change.changeType.toLowerCase()}`}>
-      <ItemTooltipSummary item={tooltipItem}>
+    <article className={`change-card change-card-${change.changeType.toLowerCase()}`}>
+      <ItemTooltipButton
+        aria-label={recipe ? `Open ${change.name} in recipe calculator` : `${change.name}: calculator unavailable in current catalog`}
+        disabled={recipe === undefined}
+        item={tooltipItem}
+        onClick={() => { if (recipe) onSelectRecipe(recipe); }}
+        title={recipe ? "Open recipe calculator" : "This recipe has no current catalog record"}
+        type="button"
+      >
         <ItemIcon
           className="change-card-icon"
           gameItemId={snapshot?.outputs[0]?.gameItemId}
@@ -321,52 +255,10 @@ function ChangeCard({
                   : `${changedFields.length} ${changedFields.length === 1 ? "field" : "fields"} changed`}
           </small>
         </span>
-        <ChevronDownIcon className="change-card-expand" />
-      </ItemTooltipSummary>
+        {recipe ? <span aria-hidden="true">→</span> : null}
+      </ItemTooltipButton>
 
-      <div className="change-card-details">
-        {change.changeType === "UPDATED" && changedFields.length > 0 ? (
-          <div className="field-comparison" role="table" aria-label={`${change.name} field changes`}>
-            <div className="field-comparison-head" role="row">
-              <span role="columnheader">Field</span>
-              <span role="columnheader">Classic / previous</span>
-              <span role="columnheader">Forever / current</span>
-            </div>
-            {changedFields.map(([field, values]) => values === undefined ? null : (
-              <div className="field-comparison-row" key={field} role="row">
-                <strong role="cell">{FIELD_LABELS[field] ?? field}</strong>
-                <span role="cell">{formatFieldValue(field, values.before, change.base, itemQualityById)}</span>
-                <span role="cell">{formatFieldValue(field, values.after, change.target, itemQualityById)}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="snapshot-grid">
-            <div>
-              <span>Learned at</span>
-              <strong>{formatFieldValue("learnSkill", snapshot?.learnSkill, snapshot, itemQualityById)}</strong>
-            </div>
-            <div>
-              <span>Orange from</span>
-              <strong>{formatFieldValue("orangeSkill", snapshot?.orangeSkill, snapshot, itemQualityById)}</strong>
-            </div>
-            <div>
-              <span>Source</span>
-              <strong>{formatFieldValue("acquisition", snapshot?.acquisition, snapshot, itemQualityById)}</strong>
-            </div>
-            <div>
-              <span>Availability</span>
-              <strong>{snapshot?.availability ?? "Unknown"}</strong>
-            </div>
-          </div>
-        )}
-
-        <div className="change-provenance">
-          {change.base ? <span>Before: {change.base.provenance.sourceLabel}</span> : null}
-          {change.target ? <span>After: {change.target.provenance.sourceLabel}</span> : null}
-        </div>
-      </div>
-    </details>
+    </article>
   );
 }
 
@@ -379,6 +271,8 @@ export function ForeverChanges({
   loading,
   onFiltersChange,
   onRetry,
+  onSelectRecipe,
+  recipes,
   recipeTooltipBySpellId,
   search,
   summary,
@@ -454,7 +348,7 @@ export function ForeverChanges({
         <div>
           <span className="section-kicker">Build comparison · Classic Era → Forever</span>
           <h1 id="changes-title">Forever Changes</h1>
-          <p>See exactly what changed from Classic Era to Forever, with field-level evidence from the imported recipe builds.</p>
+          <p>Browse Classic Era → Forever recipe changes and open current recipes in the calculator.</p>
         </div>
       </div>
 
@@ -624,6 +518,8 @@ export function ForeverChanges({
               itemQualityById={itemQualityById}
               key={`${change.identity.professionId}-${change.identity.spellId}`}
               recipeTooltipBySpellId={recipeTooltipBySpellId}
+              recipe={recipes.find(recipe => recipe.professionId === change.identity.professionId && recipe.spellId === change.identity.spellId)}
+              onSelectRecipe={onSelectRecipe}
             />
           ))}
         </div>

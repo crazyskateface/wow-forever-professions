@@ -178,7 +178,7 @@ native lazy loading for non-hero images.
 
 Every recipe, change-card, output, and reagent icon uses the shared item-tooltip
 surface. Pointer hover opens a preview after one second and leaving the owning
-control closes that preview immediately. Focusing a recipe button or change summary
+control closes that preview immediately. Focusing a recipe button or change row
 opens the same preview for keyboard users, and Escape dismisses either mode.
 Forever Changes resolves current recipes through the calculator's catalog tooltip
 payload so the same item exposes the same fields in both views; removed recipes fall
@@ -279,6 +279,12 @@ updates.
 The UI currently has no comparison chooser. The Forever Changes tab intentionally
 shows the stored Classic Era → Forever comparison. API and persistence support
 `forever-build` comparisons for future use.
+Change rows open the current recipe calculator instead of expanding comparison
+details. Selection resolves by `(professionId, spellId)`, updates `?recipe=...&view=recipes`
+in one history entry, and supports reloads and Back navigation. Removed recipes
+without a matching current catalog row remain visible with calculator navigation
+unavailable; Classic data never becomes an invented current recipe. Field-level
+comparison evidence remains available through the comparison API.
 
 The shared current-skill slider powers change availability tags and the filters for
 recipes above current skill or with unknown requirements. Item-type filtering prefers

@@ -151,8 +151,9 @@ data.
 - Supports Classic Era → Forever now and the same pipeline supports Forever build →
   build comparisons.
 - Displays summary counts, search, profession and change-type filters, item-type
-  filters, current-skill availability filters, provenance, icons, and expandable
-  before/after values.
+  filters, current-skill availability filters, badges, and item tooltips. Clicking
+  a recipe opens its calculator with a URL-addressable selection. Removed recipes
+  without a current catalog record remain visible with navigation unavailable.
 - Offers image-only multi-select gear-slot filters beside Filters. Selected slots
   show matching recipe outputs; clearing them restores all slots. Hover labels,
   keyboard controls, saved selection, and Reset filters are supported.

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { RecipeChange } from "@forever-professions/contracts";
+import { leatherworkingFixture } from "@forever-professions/fixtures";
+import { ItemTooltipProvider } from "./ItemTooltip.js";
 import { ForeverChanges, changeTooltipItem, normalizeProfessionId } from "./ForeverChanges.js";
 import { DEFAULT_CHANGE_FILTERS } from "./personalization.js";
 import { GEAR_SLOTS } from "./gear-slots.js";
@@ -28,6 +30,7 @@ describe("Forever Changes gear controls", () => {
       filters: { ...DEFAULT_CHANGE_FILTERS, gearSlots: ["head", "hands"] },
       itemQualityById: new Map(), loading: false, onFiltersChange: () => {},
       onRetry: () => {}, recipeTooltipBySpellId: new Map(), search: "", summary: undefined,
+      onSelectRecipe: () => {}, recipes: [],
     }));
     expect(html.match(/class="changes-gear-slot"/g)).toHaveLength(14);
     for (const slot of GEAR_SLOTS) {
@@ -39,6 +42,40 @@ describe("Forever Changes gear controls", () => {
     expect(html).toContain('aria-label="Alphabetical" aria-pressed="true"');
     expect(html).toContain('aria-label="Skill level" aria-pressed="false"');
     expect(html).toContain("No matching recipe changes");
+  });
+});
+
+describe("Forever Changes calculator navigation", () => {
+  const recipe = { ...leatherworkingFixture.recipes[0]!, id: "tailoring:local-shoes", name: "Azure Stormsewn Shoes", professionId: "tailoring", spellId: 1301469 };
+  const change = { name: recipe.name, professionName: "Tailoring", identity: { professionId: "tailoring", spellId: 1301469 }, changedFields: {}, changeType: "NEW" } as RecipeChange;
+
+  function render(record: RecipeChange, recipes = [recipe]) {
+    const content = createElement(ForeverChanges, {
+      changes: [record], currentSkill: 1, error: undefined, filters: { ...DEFAULT_CHANGE_FILTERS, changeFilter: record.changeType },
+      itemQualityById: new Map(), loading: false, onFiltersChange: () => {}, onRetry: () => {}, onSelectRecipe: () => {},
+      recipes, recipeTooltipBySpellId: new Map(), search: "", summary: undefined,
+    });
+    return renderToStaticMarkup(createElement(ItemTooltipProvider, { children: content }));
+  }
+
+  it.each(["NEW", "UPDATED", "UNCHANGED"] as const)("renders %s recipes as calculator buttons without expandable details", changeType => {
+    const html = render({ ...change, changeType });
+    expect(html).toContain('aria-label="Open Azure Stormsewn Shoes in recipe calculator"');
+    expect(html).toContain('<article class="change-card');
+    expect(html).not.toContain('<details class="change-card');
+    expect(html).not.toContain('class="change-card-details"');
+    expect(html).not.toContain('disabled=""');
+  });
+
+  it("keeps missing and removed recipes visible without opening a different recipe", () => {
+    for (const candidates of [[], [{ ...recipe, spellId: 42 }], [{ ...recipe, professionId: "leatherworking" }]]) {
+      const html = render(change, candidates);
+      expect(html).toContain('Azure Stormsewn Shoes: calculator unavailable in current catalog');
+      expect(html).toContain('disabled=""');
+    }
+    const html = render({ ...change, changeType: "REMOVED" }, []);
+    expect(html).toContain("No longer present in the target build");
+    expect(html).toContain('disabled=""');
   });
 });
 
