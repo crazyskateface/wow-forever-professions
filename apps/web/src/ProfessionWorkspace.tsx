@@ -3,31 +3,12 @@ import { getProfessionDefinition, professionFixtureSchema, type ProfessionFixtur
 import { App } from "./App.js";
 import { ProfessionMasthead, ProfessionSwitcher } from "./ProfessionNavigation.js";
 import { SiteFooter } from "./SiteFooter.js";
-import { ProfessionIcon } from "./ProfessionIcon.js";
+import { GatheringProfession } from "./GatheringProfession.js";
 
 export function ProfessionWorkspace({ professionId }: { readonly professionId: string }) {
-  return getProfessionDefinition(professionId)?.sourceName === null
-    ? <GatheringProfessionWorkspace professionId={professionId} />
+  return getProfessionDefinition(professionId)?.sourceName === null || (professionId === "mining" && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "gathering")
+    ? <GatheringProfession professionId={professionId} />
     : <RecipeProfessionWorkspace professionId={professionId} />;
-}
-
-function GatheringProfessionWorkspace({ professionId }: { readonly professionId: string }) {
-  const definition = getProfessionDefinition(professionId)!;
-  useEffect(() => { document.title = `${definition.name} · Forever Professions`; }, [definition.name]);
-  return <div className="app-shell landing-shell">
-    <a className="skip-link" href="#gathering-workspace">Skip to profession</a>
-    <ProfessionMasthead />
-    <div className="topbar profession-status-bar"><ProfessionSwitcher professionId={professionId} /></div>
-    <main className="profession-landing" id="gathering-workspace">
-      <div className="profession-overview-heading"><ProfessionIcon className="profession-art profession-overview-icon" professionId={professionId} eager /><h1>{definition.name}</h1></div>
-      <section className="profession-group" aria-labelledby="gathering-data-title">
-        <div className="profession-group-heading"><h2 id="gathering-data-title">Gathering data</h2></div>
-        <p>Gathering progression data is not available for {definition.name} yet.</p>
-        <p>Gathering sources, locations, and skill requirements have not been imported. A leveling guide cannot be generated from the available data.</p>
-        <p><a href="/">Choose another profession</a></p>
-      </section>
-    </main><SiteFooter />
-  </div>;
 }
 
 function RecipeProfessionWorkspace({ professionId }: { readonly professionId: string }) {

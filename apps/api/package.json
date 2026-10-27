@@ -15,6 +15,7 @@
     "shopping": "tsx scripts/shopping.ts",
     "smoke": "tsx scripts/smoke.ts",
     "smoke:professions": "tsx scripts/smoke-professions.ts",
+    "smoke:gathering": "tsx scripts/smoke-gathering.ts",
     "smoke:cloud": "tsx scripts/smoke-cloud.ts",
     "start": "tsx src/local.ts",
     "test": "vitest run",

@@ -42,17 +42,47 @@
 .profession-entry .profession-unavailable { color: var(--orange); }
 .profession-activity-note { max-width: var(--content-max-width); margin: 0 auto; padding: 18px 24px; color: var(--muted); line-height: 1.6; }
 .profession-status-bar { display: flex; }
-.profession-overview-heading { display: flex; align-items: center; gap: 16px; }
-.profession-overview-heading h1 { margin: 0; }
-.profession-overview-icon { width: 56px; height: 56px; flex: 0 0 56px; }
-#gathering-workspace .profession-group p { color: var(--muted); line-height: 1.7; }
+.gathering-content p { color: var(--muted); line-height: 1.7; }
+.gathering-workspace .outcome-value { font-size: clamp(24px, 4vw, 48px); }
+.gathering-curve-empty { min-height: 200px; display: grid; place-content: center; color: var(--muted); text-align: center; line-height: 1.7; }
+.profession-gathering-link { color: var(--gold); font-size: 12px; }
+.gathering-build { color: var(--muted); font-size: 13px; }
+.gathering-content a { color: var(--gold); }
+.gathering-content button { background: var(--surface); color: var(--text); border: 1px solid var(--line); padding: 9px 12px; cursor: pointer; }
+.gathering-content button:hover { border-color: var(--gold); }
+.gathering-content button:disabled { opacity: .45; cursor: default; }
+.gathering-content details { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.gathering-content summary { cursor: pointer; font-weight: 700; line-height: 1.6; }
+.gathering-content summary small { display: block; color: var(--muted); font-weight: 400; }
+.gathering-abilities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; align-items: start; }
+.gathering-abilities h3 { font-size: 15px; }
+.gathering-abilities ul { list-style: none; padding: 0; }
+.gathering-abilities li { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+.gathering-abilities li strong { margin-left: auto; font-size: 13px; }
+.gathering-item-icon { width: 32px; height: 32px; flex: 0 0 32px; }
+.gathering-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 24px 0; }
+.gathering-filters label { display: grid; gap: 8px; color: var(--muted); font-size: 13px; }
+.gathering-filters input, .gathering-filters select { width: 100%; min-width: 0; padding: 12px; background: var(--rail); color: var(--text); border: 1px solid var(--line); font-size: 16px; }
+.gathering-source-list, .gathering-locations ul { list-style: none; padding: 0; }
+.gathering-source-list > li { padding: 20px 0; border-top: 1px solid var(--line); }
+.gathering-source-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.gathering-source-heading h3 { margin: 0 0 8px; text-transform: capitalize; }
+.gathering-source-heading small, .gathering-source-heading p, .gathering-yield-note { color: var(--muted); font-size: 12px; }
+.gathering-source-heading button { flex-shrink: 0; }
+.gathering-locations li { display: flex; flex-wrap: wrap; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+.gathering-locations small { color: var(--muted); }
+.gathering-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; font-size: 12px; }
+.gathering-hash { overflow-wrap: anywhere; font-size: 12px; }
 @media (max-width: 600px) {
+  .gathering-workspace > .topbar > .price-mode { display: none; }
   .profession-landing { padding: 40px 20px; }
   .profession-group { padding: 60px 22px 24px; }
   .profession-group-heading h2 { height: 70px; font-size: 17px; }
   .profession-directory { grid-template-columns: 1fr; }
   .profession-entry { gap: 12px; }
   .profession-entry-arrow { display: none; }
+  .gathering-abilities, .gathering-filters { grid-template-columns: 1fr; }
+  .gathering-source-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
   .profession-switcher select { font-size: 16px; padding-right: 24px !important; background-position: right 3px center !important; }
   .profession-switcher { grid-template-columns: 28px minmax(0, 1fr); column-gap: 6px; }
   .profession-switcher-icon { width: 28px; height: 28px; }

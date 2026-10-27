@@ -31,7 +31,7 @@ export function ProfessionLanding() {
         <div className="profession-directory">
           {PROFESSIONS.filter((profession) => profession.group === group).map(({ id, name, description, sourceName }) => <a className="profession-entry" href={professionHref(id)} key={id}>
             <ProfessionIcon className="profession-art profession-directory-icon" professionId={id} /><span><strong>{name}</strong><small>{description}</small>
-              {sourceName === null ? <small className="profession-unavailable">Gathering data unavailable</small> : available !== undefined && !available.has(id) ? <small className="profession-unavailable">Catalog unavailable</small> : null}
+              {sourceName !== null && available !== undefined && !available.has(id) ? <small className="profession-unavailable">Catalog unavailable</small> : null}
             </span><span className="profession-entry-arrow" aria-hidden="true">↗</span>
           </a>)}
         </div>

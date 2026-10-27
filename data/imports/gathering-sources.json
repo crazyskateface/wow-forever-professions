@@ -1,0 +1,18 @@
+{
+  "gatherLite": {
+    "files": {
+      "plugins/database/data/forever.lua": "2aadc6a6530c0c5242a071e6a2e429bfc19a892753e071bc804f1309eb09c753",
+      "LICENSE": "443684f83619c9e6ad445848cdb7a469e945b58d39c08c38039241dd95cb6aca",
+      "scripts/nodes.lua": "e6757bd56bbf3f79dfdae6bd88aa383909559cfa9c9d125b6448030e48221734",
+      "tools/maps/forever-1.60.1.70009/manifest.json": "90777854d2078b716a1c2d46a99da4abc1ebccd6ea0bc5b99caf678386eda47f"
+    },
+    "license": "MIT",
+    "revision": "934c920705a5fca852bbde8669f2b0bc52f56779"
+  },
+  "schemaVersion": 1,
+  "foreverDb": {
+    "decision": "excluded",
+    "reason": "No license file or published reuse permission at the reviewed revision.",
+    "revision": "2940324bf4a96549f3c2cbff4948e0297b14e525"
+  }
+}

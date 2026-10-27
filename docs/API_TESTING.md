@@ -209,3 +209,15 @@ empty item outputs, scoped comparisons, route recipe eligibility, and shopping p
 The controlled pricing reader returns no observations so missing prices stay explicit.
 Full routes currently complete for the six crafting professions and Cooking; First
 Aid, Fishing, and Mining report blockers from missing supported progression evidence.
+
+## Gathering evidence
+
+After `pnpm data:import:gathering:local data/imports/forever-1.60.1.70630-gathering.json`,
+read `GET /api/professions/herbalism/gathering` (also Mining and Skinning). Its
+`datasetId` and a source ID pin location reads:
+`GET /api/professions/herbalism/gathering/locations?datasetId=<hash>&sourceId=object-1617&offset=0&limit=25`.
+An optional `mapId` restricts location results to a zone. Limits above 100, invalid
+offsets, and missing required IDs return 400. Cross-profession source requests
+return 404. Missing gathering dependencies return 503, with no fixture fallback.
+Run `pnpm data:test:gathering:local` for the isolated full-import and persistence
+gate described in [GATHERING_DATA.md](GATHERING_DATA.md).

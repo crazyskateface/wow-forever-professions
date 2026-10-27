@@ -14,6 +14,7 @@ export function ProfessionSwitcher({ professionId }: { readonly professionId: st
         </optgroup>)}
       </select>
     </label>
+    {professionId === "mining" ? <a className="profession-gathering-link" href="/professions/mining?view=gathering">Gathering</a> : null}
   </div>;
 }
 

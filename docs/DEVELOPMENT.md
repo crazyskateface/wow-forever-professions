@@ -30,7 +30,7 @@ LibProfessionDB + LibItemDB + reviewed overrides + pinned client DB2
 ```
 
 The current recipe data covers ten professions. The directory additionally includes
-Herbalism and Skinning with explicit gathering-data gaps:
+Herbalism and Skinning. Separate gathering evidence covers all three gathering professions:
 
 | Purpose | Build | File |
 | --- | --- | --- |
@@ -367,8 +367,10 @@ treating them as current truth.
 
 The shared `PROFESSIONS` registry defines twelve directory identities, including
 Herbalism and Skinning. These two have null `sourceName` values because the pinned
-recipe archive has no tables for them. Their dedicated web pages expose the missing
-gathering progression data without requesting a recipe catalog or offering retries.
+recipe archive has no tables for them. Their dedicated web pages request the separate
+gathering API, with explicit loading, retryable errors, provenance, and missing-data
+states. Mining's gathering page is available through its Gathering link while its
+normal route remains the smelting calculator.
 `RECIPE_PROFESSIONS` selects the ten source-backed recipe identities, including the
 `first-aid` slug and upstream `Firstaid.lua` filename. The converter
 requires every selected core and English-name table and validates a single build
@@ -400,6 +402,15 @@ selected profession icon eagerly. Profession artwork comes from the pinned clien
 `apps/web/public/icons/professions/manifest.json` records the source product, build,
 region, locale, skill-line identity, FileDataID, output path, and SHA-256 for each asset.
 Regenerate it with `pnpm data:icons:professions "C:\World of Warcraft" 1.60.1.70630`.
+
+### Gathering evidence
+
+[GATHERING_DATA.md](GATHERING_DATA.md) documents the client extractor, pinned external
+source review, observation interchange, migrations 029–037, local/live import paths,
+and API boundaries. Gathering datasets use independent content hashes and publication
+headers; they never change recipe-build hashes. Page requests read stored facts only,
+and location pagination pins the dataset hash. Client ranks and community skill
+claims do not become verified harvest requirements or optimizer inputs.
 
 ### Recipe material quantities
 

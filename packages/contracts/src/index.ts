@@ -3,6 +3,7 @@ import { z } from "zod";
 export * from "./recipe-changes.js";
 export * from "./guide-validation.js";
 export * from "./professions.js";
+export * from "./gathering.js";
 
 export const healthResponseSchema = z.object({
   service: z.literal("forever-professions-api"),

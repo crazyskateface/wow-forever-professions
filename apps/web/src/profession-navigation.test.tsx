@@ -16,13 +16,13 @@ afterEach(() => {
 });
 
 describe("profession entry and navigation", () => {
-  it("includes all three gathering professions and opens missing-data pages for Herbalism and Skinning", () => {
+  it("includes all three gathering professions and opens gathering pages for Herbalism and Skinning", () => {
     expect(PROFESSIONS.filter(({ group }) => group === "Gathering").map(({ id }) => id)).toEqual(["herbalism", "mining", "skinning"]);
     const landing = renderToStaticMarkup(<ProfessionLanding />);
-    expect(landing.match(/Gathering data unavailable/g)).toHaveLength(2);
+    expect(landing).not.toContain("Gathering data unavailable");
     for (const professionId of ["herbalism", "skinning"]) {
       const workspace = renderToStaticMarkup(<ProfessionWorkspace professionId={professionId} />);
-      expect(workspace).toContain("Gathering progression data is not available");
+      expect(workspace).toContain("Loading gathering data");
       expect(workspace).toContain(`src="/icons/professions/${professionId}.webp"`);
       expect(workspace).toContain(`value="${professionId}" selected`);
       expect(workspace).not.toContain("Loading profession catalog");

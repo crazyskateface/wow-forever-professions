@@ -2,9 +2,10 @@ import { Pool, type PoolClient } from "pg";
 import { SqlRecipeCatalogReader, type RecipeCatalogReader } from "./catalog.js";
 import type { SqlMigrationRunner } from "./migrations.js";
 import { SqlRecipeChangeReader, type RecipeChangeReader } from "./recipe-change-store.js";
+import { SqlGatheringReader, type GatheringReader } from "./gathering-store.js";
 import type { SqlExecutor, SqlQueryResult } from "./writer.js";
 
-export interface ClosableRecipeCatalogReader extends RecipeCatalogReader, RecipeChangeReader {
+export interface ClosableRecipeCatalogReader extends RecipeCatalogReader, RecipeChangeReader, GatheringReader {
   end(): Promise<void>;
 }
 
@@ -78,6 +79,7 @@ export function createPostgresRecipeCatalogReader(
   const database = queryExecutor(pool);
   const catalog = new SqlRecipeCatalogReader(database);
   const changes = new SqlRecipeChangeReader(database);
+  const gathering = new SqlGatheringReader(database);
 
   return {
     listProfessions: () => catalog.listProfessions(),
@@ -85,6 +87,8 @@ export function createPostgresRecipeCatalogReader(
     getRecipe: (recipeId) => catalog.getRecipe(recipeId),
     listChanges: (filter) => changes.listChanges(filter),
     getSummary: (filter) => changes.getSummary(filter),
+    getGathering: (professionId) => gathering.getGathering(professionId),
+    getLocations: (professionId, query) => gathering.getLocations(professionId, query),
     end: () => pool.end(),
   };
 }

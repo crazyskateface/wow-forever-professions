@@ -32,8 +32,11 @@ data.
 - Groups home-page profession choices inside the calculator's decorative frames,
   with a named title plate for Crafting, Secondary, and Gathering professions.
 - Includes all three gathering professions: Herbalism, Mining, and Skinning.
-  Herbalism and Skinning have dedicated pages and client-derived icons; gathering
-  progression data is explicitly unavailable until supported sources are imported.
+  Gathering pages show 62 client abilities, exact per-craft reagents, supported
+  create-item links, 99 herb/ore sources, and 24,390 unverified community location
+  reports with search, zone selection, and pagination. Skinning creature loot and
+  locations remain unknown. See [Gathering data](docs/GATHERING_DATA.md) for source
+  review, provenance limits, extraction, and import commands.
 - Switch professions with the native dropdown in the top-left navigation. Each
   workspace loads its own catalog, route, prices, and Classic-to-Forever comparison.
 - Current skill is saved independently per profession. Existing root recipe links

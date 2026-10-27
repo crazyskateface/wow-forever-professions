@@ -8,8 +8,9 @@ are retained in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Herbalism and Skinning appear in the site directory with client-derived icons, but
 the pinned LibProfessionDB archive has no recipe tables for either. They are not
-part of these ten recipe catalogs. Gathering sources, locations, and progression
-remain unavailable; no recipe data is inferred to fill the gap.
+part of these ten recipe catalogs. Their client abilities and community location
+evidence are imported separately in `forever-1.60.1.70630-gathering.json`; see
+[Gathering data](../../docs/GATHERING_DATA.md). No recipe data is inferred to fill the gap.
 
 | Profession | Forever records | Classic records |
 | --- | ---: | ---: |

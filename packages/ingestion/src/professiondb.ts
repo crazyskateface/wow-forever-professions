@@ -202,6 +202,12 @@ class LuaLiteralParser {
   }
 }
 
+export function parseLuaLiteralTable(source: string): LuaTable {
+  const start = source.indexOf("{");
+  if (start < 0) throw new Error("Missing Lua literal table.");
+  return new LuaLiteralParser(source).parseTableAt(start);
+}
+
 function parseCallTable(source: string, call: string): LuaTable {
   const callStart = source.indexOf(call);
   if (callStart === -1) throw new Error(`Could not find ${call} in Lua source.`);

@@ -1,2 +1,3 @@
 # Immutable build hashes must survive checkout on Windows and Unix unchanged.
 data/imports/*-professions.json text eol=lf
+data/imports/*-gathering.json text eol=lf
