@@ -395,23 +395,6 @@ button.item-tooltip-trigger-button { padding: 0; border: 0; background: transpar
 .workspace-nav button { position: relative; padding: 0 2px; color: var(--muted); border: 0; background: transparent; font-size: 13px; font-weight: 800; cursor: pointer; }
 .workspace-nav button:hover, .workspace-nav button.active { color: var(--text); }
 .workspace-nav button.active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 3px; content: ""; border-radius: 3px 3px 0 0; background: var(--lime); }
-.route-context-compare { margin-top: 24px; overflow: hidden; border: 1px solid #495238; border-radius: 11px; background: linear-gradient(145deg, rgba(200, 240, 0, .07), rgba(35, 39, 35, .95) 42%, #20232a); box-shadow: 0 14px 36px rgba(0, 0, 0, .18); }
-.route-context-heading { padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; border-bottom: 1px solid #3e4634; }
-.route-context-heading h2 { margin: 3px 0 0; font-size: 17px; letter-spacing: -.02em; }
-.route-context-heading button, .route-compare-grid article > button { min-height: 34px; padding: 7px 10px; flex: 0 0 auto; color: var(--lime); border: 1px solid #596632; border-radius: 7px; background: #272c25; font-size: 10px; font-weight: 850; cursor: pointer; }
-.route-context-heading button:hover, .route-compare-grid article > button:hover { background: #30372c; }
-.route-context-match { margin: 0; padding: 16px 18px; color: #c4c8c1; font-size: 12px; line-height: 1.55; }
-.route-compare-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.route-compare-grid article { min-width: 0; padding: 17px 18px 18px; }
-.route-compare-grid article + article { border-left: 1px solid #3d423d; }
-.route-compare-grid article.recommended { background: rgba(200, 240, 0, .025); }
-.route-compare-grid article > span { display: block; color: var(--muted-2); font-size: 9px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-.route-compare-grid article > strong { margin-top: 5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.route-compare-grid dl { margin: 13px 0 0; display: grid; gap: 7px; }
-.route-compare-grid dl div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
-.route-compare-grid dt { color: var(--muted-2); font-size: 10px; }
-.route-compare-grid dd { margin: 0; color: #e2e5e9; font-size: 10px; font-weight: 800; text-align: right; }
-.route-compare-grid article > button { margin-top: 14px; }
 .forever-changes { padding: 42px 0 10px; }
 .changes-hero > div { max-width: 720px; }
 .changes-hero h1 { margin: 6px 0 10px; font-size: clamp(34px, 4vw, 55px); line-height: 1; letter-spacing: -.05em; }
@@ -960,10 +943,6 @@ h1, h2, h3, p { margin-top: 0; }
   .skill-stepper { grid-column: 1; grid-row: auto; }
   .main-workspace { padding-inline: 14px; }
   .workspace-nav { height: 56px; gap: 20px; overflow-x: auto; }
-  .route-context-heading { align-items: flex-start; flex-direction: column; }
-  .route-context-heading button { width: 100%; }
-  .route-compare-grid { grid-template-columns: 1fr; }
-  .route-compare-grid article + article { border-top: 1px solid #3d423d; border-left: 0; }
   .recipe-hero { min-height: 0; padding: 27px 2px 23px; align-items: flex-start; flex-direction: column; }
   .hero-item-icon { width: 58px; height: 58px; }
   .hero-title-row { align-items: flex-start; gap: 13px; }

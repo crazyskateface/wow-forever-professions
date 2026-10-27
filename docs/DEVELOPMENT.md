@@ -69,6 +69,8 @@ The main workspace contains Recipe calculator, with Best crafts available only f
 Leatherworking, Tailoring, and Blacksmithing. Their initial class profiles are
 Rogue, Mage, and Warrior respectively. The left panel owns
 the automatic Practical leveling guide and individual completion checkboxes.
+The calculator starts with the selected recipe. It does not display an active-route
+comparison panel above the recipe; route progress remains in the left panel.
 Guide settings, known-recipe selection, sharing, shopping, bulk completion and
 expandable step metrics have been removed from the web client. Their request
 handlers, dialogs and browser persistence are also removed. Old shared-route query

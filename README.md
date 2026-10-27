@@ -111,9 +111,9 @@ data.
   Forever comparison state. Sorts cover learning rank, current-skill usefulness,
   expected market cost, and each difficulty threshold; incomplete price coverage
   remains explicit and sorts after supported totals.
-- Shows compact orange/yellow/green/grey thresholds without relying on color alone,
-  keeps unknown source facts visible, and compares a selected catalog recipe with
-  the active route segment without discarding route or checklist context.
+- Shows compact orange/yellow/green/grey thresholds without relying on color alone
+  and keeps unknown source facts visible. The calculator opens directly on the
+  selected recipe; route progress remains in the sidebar.
 - Provides directly addressable Leatherworking field-guide pages for the current
   build, stored Forever changes, trainer evidence, specializations, Merchant's Favor,
   Camping, and supported vendor, quest, reputation, and drop acquisition records.

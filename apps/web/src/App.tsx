@@ -264,26 +264,6 @@ function sourceDataOriginLabel(sourceDataOrigin: string | undefined): string {
   return sourceDataOrigin[0]!.toUpperCase() + sourceDataOrigin.slice(1);
 }
 
-function recipeComparisonMetrics(
-  recipe: Recipe,
-  skill: number,
-  pricesByItemId: ReadonlyMap<number, AuctionPriceObservation>,
-) {
-  const probability = getSkillUpProbability(skill, recipe.thresholds);
-  return {
-    probability,
-    expectedCrafts: probability <= 0 ? undefined : getExpectedCraftsForSkillUp(probability),
-    expectedMaterialUnits: probability <= 0
-      ? undefined
-      : recipe.reagents.reduce(
-          (total, reagent) =>
-            total + getExpectedReagentQuantity(reagent.quantity, probability),
-          0,
-        ),
-    expectedCost: getRecipeExpectedCost(recipe, skill, pricesByItemId),
-  };
-}
-
 type TooltipRecipeItem = Recipe["outputs"][number] | Recipe["reagents"][number];
 
 function recipeOutputQualityId(recipe: Recipe | undefined): number | undefined {
@@ -1109,22 +1089,6 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
       return matches ? [{ alternatives, segment, recipe: guideRecipe }] : [];
     });
   }, [profession.recipes, routeResponse, search]);
-  const activeRouteSegment = routeResponse?.result.segments.find(
-    (segment) => skill >= segment.startSkill && skill < segment.endSkill,
-  ) ?? routeResponse?.result.segments.find((segment) => segment.startSkill > skill);
-  const activeRouteRecipe = activeRouteSegment === undefined
-    ? undefined
-    : profession.recipes.find(({ id }) => id === activeRouteSegment.recipeId);
-  const selectedComparisonMetrics = useMemo(
-    () => recipeComparisonMetrics(recipe, skill, catalogPricesByItemId),
-    [catalogPricesByItemId, recipe, skill],
-  );
-  const activeRouteComparisonMetrics = useMemo(
-    () => activeRouteRecipe === undefined
-      ? undefined
-      : recipeComparisonMetrics(activeRouteRecipe, skill, catalogPricesByItemId),
-    [activeRouteRecipe, catalogPricesByItemId, skill],
-  );
   const recipeRequiredSkill = recipe.learnSkill ?? recipe.thresholds.orange;
   const recipeIsAboveCurrentSkill = skill < recipeRequiredSkill;
   const recipeCapStatus = getRecipeSkillCapStatus(
@@ -1245,19 +1209,6 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
     if (complete) next.add(segmentKey);
     else next.delete(segmentKey);
     persistRouteProgress([...next]);
-  }
-
-  function resumeRouteAt(segmentKey: string | undefined): void {
-    if (segmentKey === undefined) return;
-    selectRecipeListView("guide");
-    setSearch("");
-    window.requestAnimationFrame(() => {
-      const entry = [...document.querySelectorAll<HTMLElement>(
-        "[data-route-segment-key]",
-      )].find((candidate) => candidate.dataset.routeSegmentKey === segmentKey);
-      entry?.scrollIntoView({ behavior: "auto", block: "center" });
-      entry?.focus({ preventScroll: true });
-    });
   }
 
   function invalidatePlanningResults(): void {
@@ -1933,67 +1884,6 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
             />
           ) : workspaceView === "calculator" || !craftDefaults ? (
             <>
-              {recipeListView === "recipes" && activeRouteSegment && activeRouteRecipe && activeRouteComparisonMetrics ? (
-                <section className="route-context-compare" aria-labelledby="route-context-title">
-                  <div className="route-context-heading">
-                    <div>
-                      <span className="section-kicker">Active route · skill {activeRouteSegment.startSkill}–{activeRouteSegment.endSkill}</span>
-                      <h2 id="route-context-title">
-                        {recipe.id === activeRouteRecipe.id
-                          ? "This recipe matches your active route step"
-                          : `Compare with ${activeRouteRecipe.name}`}
-                      </h2>
-                    </div>
-                    <button
-                      onClick={() => {
-                        selectRecipeListView("guide");
-                        resumeRouteAt(routeSegmentKey(activeRouteSegment));
-                      }}
-                      type="button"
-                    >
-                      Back to route
-                    </button>
-                  </div>
-                  {recipe.id === activeRouteRecipe.id ? (
-                    <p className="route-context-match">
-                      The generated route recommends this recipe at your current skill.
-                      Browse alternatives here without losing route or checklist progress.
-                    </p>
-                  ) : (
-                    <div className="route-compare-grid">
-                      {[
-                        {
-                          label: "Selected recipe",
-                          candidate: recipe,
-                          metrics: selectedComparisonMetrics,
-                        },
-                        {
-                          label: "Route recommendation",
-                          candidate: activeRouteRecipe,
-                          metrics: activeRouteComparisonMetrics,
-                        },
-                      ].map(({ label, candidate, metrics }) => (
-                        <article className={candidate.id === activeRouteRecipe.id ? "recommended" : ""} key={candidate.id}>
-                          <span>{label}</span>
-                          <strong className={getItemRarityNameClass(recipeOutputQualityId(candidate))}>{candidate.name}</strong>
-                          <dl>
-                            <div><dt>Skill-up chance</dt><dd>{Math.round(metrics.probability * 100)}%</dd></div>
-                            <div><dt>Expected crafts</dt><dd>{metrics.expectedCrafts === undefined ? "No skill-up" : formatNumber(metrics.expectedCrafts)}</dd></div>
-                            <div><dt>Material units</dt><dd>{metrics.expectedMaterialUnits === undefined ? "No skill-up" : formatNumber(metrics.expectedMaterialUnits)}</dd></div>
-                            <div><dt>Expected cost</dt><dd>{metrics.expectedCost === undefined ? "Unknown" : formatCopper(metrics.expectedCost)}</dd></div>
-                            <div><dt>Acquisition</dt><dd>{acquisitionLabel(candidate)}</dd></div>
-                          </dl>
-                          {candidate.id === activeRouteRecipe.id ? (
-                            <button onClick={() => openRouteRecipe(candidate.id)} type="button">
-                              Open recommended recipe
-                            </button>
-                          ) : null}
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              ) : null}
               <section className="recipe-hero" aria-labelledby="recipe-title">
                 <div className="hero-title-row">
                   <ItemTooltip item={outputTooltipItem(recipe, profession.name)} pinnable>
