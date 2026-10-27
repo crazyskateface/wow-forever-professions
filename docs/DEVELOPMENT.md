@@ -288,6 +288,11 @@ combine selected slots with OR, and intersect with the other filters. Removed
 recipes use the base snapshot; current recipes never borrow a missing target slot
 from Classic. With no slot selected, unknown and non-equipment outputs remain visible. Reset filters
 clears the saved slot selection along with the other optional filters.
+The Sort popover sorts the filtered list by name or learning skill, toggling
+ascending/descending when the selected option is clicked again. Unknown skill
+requirements remain last in both directions; removed recipes use their base rank.
+Sorting is client-side and saved separately from filter restrictions, so Reset
+filters preserves the chosen order. Older profiles default to alphabetical ascending.
 
 ## Browser-local personalization
 

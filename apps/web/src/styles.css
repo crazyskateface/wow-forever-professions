@@ -441,7 +441,8 @@ button.item-tooltip-trigger-button { padding: 0; border: 0; background: transpar
 .changes-filter-menu > summary:hover, .changes-filter-menu > summary.active { color: #ffd071; border-color: #9a7538; background: #294259; }
 .changes-filter-menu > summary > span { font-size: 14px; line-height: .7; transform: rotate(90deg); }
 .changes-filter-menu > summary > strong { min-width: 17px; height: 17px; display: grid; place-items: center; color: #1d1508; border-radius: 50%; background: #f0b84d; font-size: 10px; }
-.changes-filter-popover { position: absolute; z-index: 20; top: calc(100% + 9px); left: 0; width: min(320px, calc(100vw - 40px)); padding: 16px; display: grid; gap: 14px; border: 1px solid #454a54; border-radius: 11px; background: #24272e; box-shadow: 0 18px 42px rgba(0, 0, 0, .38); }
+.changes-filter-popover { position: absolute; z-index: 20; top: calc(100% + 9px); left: 0; width: min(320px, calc(100vw - 40px)); padding: 16px; display: grid; gap: 14px; border: 1px solid #454a54; }
+.changes-sort-options button { width: 100%; min-height: 36px; text-align: start; }
 .changes-availability-toggle { display: flex; align-items: center; justify-content: space-between; gap: 18px; color: #e4e6ea; cursor: pointer; }
 .changes-availability-toggle span { min-width: 0; }
 .changes-availability-toggle strong { display: block; font-size: 11px; }

@@ -35,6 +35,9 @@ describe("Forever Changes gear controls", () => {
       expect(html).toContain(`title="${slot.label}"`);
     }
     expect(html).toContain("Reset filters");
+    expect(html).toContain('aria-label="Sort recipes"');
+    expect(html).toContain('aria-label="Alphabetical" aria-pressed="true"');
+    expect(html).toContain('aria-label="Skill level" aria-pressed="false"');
     expect(html).toContain("No matching recipe changes");
   });
 });

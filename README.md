@@ -156,6 +156,8 @@ data.
 - Offers image-only multi-select gear-slot filters beside Filters. Selected slots
   show matching recipe outputs; clearing them restores all slots. Hover labels,
   keyboard controls, saved selection, and Reset filters are supported.
+- Offers a Sort popover for alphabetical or learning-skill order. Clicking the
+  selected option reverses direction; unknown skill requirements stay last.
 - Loads comparison records on demand when the Forever Changes tab is first opened,
   keeping the initial guide request burst below the API's concurrency boundary.
 - Hides unchanged recipes by default; badges are reused in the guide and All Recipes.

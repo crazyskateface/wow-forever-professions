@@ -10,6 +10,7 @@ import { ItemTooltipSummary } from "./ItemTooltip.js";
 import { ChevronDownIcon } from "./UiIcons.js";
 import { GearSlotIcon } from "./GearSlotIcon.js";
 import { GEAR_SLOTS, changeMatchesGearSlots, toggleGearSlot } from "./gear-slots.js";
+import { nextChangeSort, sortRecipeChanges } from "./change-sort.js";
 import { getItemRarityNameClass, type ItemTooltipData } from "./item-tooltip.js";
 import {
   DEFAULT_CHANGE_FILTERS,
@@ -386,6 +387,8 @@ export function ForeverChanges({
     changeFilter,
     itemType,
     gearSlots = DEFAULT_CHANGE_FILTERS.gearSlots,
+    sortBy = DEFAULT_CHANGE_FILTERS.sortBy,
+    sortDirection = DEFAULT_CHANGE_FILTERS.sortDirection,
     professionId,
     showAboveSkill,
     showUnknownSkill,
@@ -419,7 +422,7 @@ export function ForeverChanges({
   }, [professionChanges]);
   const visibleChanges = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return professionChanges.filter((change) => {
+    return sortRecipeChanges(professionChanges.filter((change) => {
       const skillAvailability = skillAvailabilityFor(change, currentSkill);
       const matchesSkill = skillAvailability.kind === "AVAILABLE" ||
         (skillAvailability.kind === "UNKNOWN" ? showUnknownSkill : showAboveSkill);
@@ -432,8 +435,8 @@ export function ForeverChanges({
         matchesSkill &&
         changeMatchesSearch(change, query)
       );
-    });
-  }, [changeFilter, currentSkill, itemType, gearSlots, professionChanges, search, showAboveSkill, showUnknownSkill]);
+    }), { sortBy, sortDirection });
+  }, [changeFilter, currentSkill, itemType, gearSlots, professionChanges, search, showAboveSkill, showUnknownSkill, sortBy, sortDirection]);
   const activeFilterCount = Number(normalizedProfessionId.length > 0) + Number(itemType !== "ALL") + Number(!showAboveSkill) + Number(!showUnknownSkill) + gearSlots.length;
   const resultDescription = [
     changeFilter === "CHANGED"
@@ -477,7 +480,7 @@ export function ForeverChanges({
       </div>
 
       <div className="changes-toolbar">
-        <details className="changes-filter-menu">
+        <details className="changes-filter-menu" name="changes-controls">
           <summary className={activeFilterCount > 0 ? "active" : ""}>
             <span aria-hidden="true">≡</span>
             Filters
@@ -549,6 +552,28 @@ export function ForeverChanges({
                 Reset filters
               </button>
             ) : null}
+          </div>
+        </details>
+        <details className="changes-filter-menu" name="changes-controls" onKeyDown={event => {
+          if (event.key !== "Escape") return;
+          event.currentTarget.open = false;
+          event.currentTarget.querySelector("summary")?.focus();
+        }}>
+          <summary aria-label="Sort recipes" title={`${sortBy === "name" ? "Alphabetical" : "Skill level"}, ${sortDirection === "asc" ? "ascending" : "descending"}`}>Sort</summary>
+          <div className="changes-filter-popover changes-sort-options" role="group" aria-label="Sort recipes by">
+            {([["name", "Alphabetical"], ["skill", "Skill level"]] as const).map(([key, label]) => {
+              const selected = sortBy === key;
+              const ascending = !selected || sortDirection === "asc";
+              return <button
+                aria-label={label}
+                aria-pressed={selected}
+                className="changes-availability-toggle changes-filter-reset"
+                key={key}
+                onClick={() => onFiltersChange({ ...filters, ...nextChangeSort({ sortBy, sortDirection }, key) })}
+                title={selected ? `Click again for ${ascending ? "descending" : "ascending"} order` : "Sort ascending"}
+                type="button"
+              ><span><strong>{label} {selected ? ascending ? "↑" : "↓" : ""}</strong><small>{key === "name" ? ascending ? "A to Z" : "Z to A" : ascending ? "Lowest skill first" : "Highest skill first"}</small></span>{selected ? <span aria-hidden="true">✓</span> : null}</button>;
+            })}
           </div>
         </details>
         <div className="changes-gear-slots" role="group" aria-label="Filter changed recipes by gear slot">

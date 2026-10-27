@@ -35,6 +35,8 @@ route bounds and linkage fields are dropped. Reset clears all three profile vers
 
 The additive gear-slot selection defaults to no slot restriction for older profiles;
 unknown slot IDs and duplicates are discarded when reading preferences.
+The additive change-sort fields default to alphabetical ascending. Name/skill order
+and direction are retained across reloads; invalid values return to those defaults.
 
 Checklist completion is stored separately under a route fingerprint containing the
 recipe build, profession, skill range, preset, resolved objective and confidence
