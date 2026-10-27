@@ -8,12 +8,11 @@
 .profession-switcher option, .profession-switcher optgroup { background: var(--rail); }
 .landing-shell { display: flex; flex-direction: column; }
 .profession-landing { width: min(100%, var(--content-max-width)); margin: 0 auto; padding: 64px 40px; flex: 1; }
-.profession-introduction { max-width: 750px; margin-bottom: 60px; }
-.profession-introduction h1 { font-family: var(--font-title); font-size: clamp(32px, 4vw, 54px); line-height: 1.15; margin: 16px 0 20px; }
+.profession-introduction { max-width: 750px; margin-bottom: 32px; }
 .profession-introduction > p:last-child { color: var(--muted); font-size: 17px; line-height: 1.8; max-width: 620px; }
 .profession-group { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 32px; padding: 32px 0; border-top: 1px solid var(--line); }
 .profession-group-heading h2 { margin: 4px 0 10px; font-size: 20px; }
-.profession-group-heading p, .profession-evidence-note { color: var(--muted); line-height: 1.7; font-size: 13px; }
+.profession-group-heading p { color: var(--muted); line-height: 1.7; font-size: 13px; }
 .profession-directory { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 24px; }
 .profession-entry { display: flex; align-items: center; gap: 16px; color: var(--text); text-decoration: none; padding: 18px 8px; border-bottom: 1px solid var(--line-soft); min-width: 0; }
 .profession-entry:hover { background: var(--surface); }
@@ -25,12 +24,10 @@
 .profession-monogram { color: var(--gold); background: var(--surface); border: 1px solid var(--line); width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; font-family: var(--font-title); }
 .profession-entry-arrow { color: var(--muted); }
 .profession-entry .profession-unavailable { color: var(--orange); }
-.profession-evidence-note { max-width: 900px; margin-top: 36px; }
 .profession-activity-note { max-width: var(--content-max-width); margin: 0 auto; padding: 18px 24px; color: var(--muted); line-height: 1.6; }
 .profession-status-bar { display: flex; }
 @media (max-width: 900px) {
   .profession-group { grid-template-columns: 1fr; gap: 12px; }
-  .profession-introduction { margin-bottom: 36px; }
 }
 @media (max-width: 600px) {
   .profession-landing { padding: 40px 20px; }
