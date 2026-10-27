@@ -35,6 +35,7 @@ import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
 import { BestCrafts, type CraftSelection } from "./BestCrafts.js";
+import { bestCraftDefaults } from "./best-crafts-professions.js";
 import { SiteFooter } from "./SiteFooter.js";
 import { ChevronDownIcon, SearchIcon } from "./UiIcons.js";
 import {
@@ -563,6 +564,7 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
     return { ...profile, currentSkill: readProfessionSkill(initialProfession.id, profile.currentSkill) };
   });
   const profession = initialProfession;
+  const craftDefaults = bestCraftDefaults(profession.id);
   const catalogState = initialCatalogState;
   const [recipeId, setRecipeId] = useState(() => profession.recipes.find(({ id }) => id === recipeIdFromUrl())?.id ?? profession.recipes[0]!.id);
   const recipe =
@@ -580,7 +582,7 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
   const [prices, setPrices] = useState<readonly AuctionPriceObservation[]>([]);
   const [priceError, setPriceError] = useState<string>();
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("calculator");
-  const [craftSelection, setCraftSelection] = useState<CraftSelection>({ classId: "rogue", roleId: "melee", level: 20 });
+  const [craftSelection, setCraftSelection] = useState<CraftSelection>(() => craftDefaults ?? { classId: "rogue", roleId: "melee", level: 20 });
   const [recipeListView, setRecipeListView] = useState<RecipeListView>(() =>
     typeof window === "undefined"
       ? "guide"
@@ -1895,7 +1897,7 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
           {recipeListView === "changes" ? null : (
             <nav className="workspace-nav" aria-label="Workspace views">
               <button aria-pressed={workspaceView === "calculator"} className={workspaceView === "calculator" ? "active" : ""} onClick={() => setWorkspaceView("calculator")} type="button">Recipe calculator</button>
-              <button aria-pressed={workspaceView === "crafts"} className={workspaceView === "crafts" ? "active" : ""} onClick={() => setWorkspaceView("crafts")} type="button">Best crafts</button>
+              {craftDefaults ? <button aria-pressed={workspaceView === "crafts"} className={workspaceView === "crafts" ? "active" : ""} onClick={() => setWorkspaceView("crafts")} type="button">Best crafts</button> : null}
             </nav>
           )}
 
@@ -1913,7 +1915,7 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
               search={search}
               summary={changeSummary}
             />
-          ) : workspaceView === "calculator" ? (
+          ) : workspaceView === "calculator" || !craftDefaults ? (
             <>
               {recipeListView === "recipes" && activeRouteSegment && activeRouteRecipe && activeRouteComparisonMetrics ? (
                 <section className="route-context-compare" aria-labelledby="route-context-title">

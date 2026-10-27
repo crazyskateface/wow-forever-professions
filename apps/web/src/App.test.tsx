@@ -3,12 +3,21 @@ import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App.js";
 import { ItemTooltipProvider } from "./ItemTooltip.js";
 import { leatherworkingFixture } from "@forever-professions/fixtures";
+import { PROFESSIONS } from "@forever-professions/contracts";
 import {
   DEFAULT_PERSONALIZATION,
   PERSONALIZATION_STORAGE_KEY,
 } from "./personalization.js";
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+
+describe("Best crafts navigation", () => {
+  it.each(PROFESSIONS)("shows the tab only for supported equipment professions: $id", ({ id, name }) => {
+    const profession = { ...leatherworkingFixture, id, name, recipes: leatherworkingFixture.recipes.map(recipe => ({ ...recipe, professionId: id })) };
+    const html = renderToStaticMarkup(<ItemTooltipProvider><App initialProfession={profession} /></ItemTooltipProvider>);
+    expect(html.includes(">Best crafts</button>")).toBe(["leatherworking", "tailoring", "blacksmithing"].includes(id));
+  });
+});
 
 afterEach(() => {
   if (originalWindow === undefined) {

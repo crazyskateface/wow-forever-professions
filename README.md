@@ -84,8 +84,9 @@ data.
 
 ### Best crafts
 
-- Replaces the duplicate main Leveling Route tab with a class/role equipment shortlist
-  for the selected profession across loaded professions. Recommendations require supported item stats.
+- Provides a class/role equipment shortlist for Leatherworking, Tailoring, and
+  Blacksmithing. Other professions hide this tab. Initial profiles are Rogue,
+  Mage, and Warrior respectively; class and role remain selectable.
 - Uses fixed character-level targets of **20, 30, 40, 50, 55, and 60**, researched once
   from the pinned catalog. Exact equip levels remain visible, and strong earlier crafts
   can remain recommended at later targets.

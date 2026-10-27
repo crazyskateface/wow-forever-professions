@@ -12,6 +12,15 @@ function recipe(id: string, output = gear(id), extra: Partial<CraftRecipe> = {})
 const winners = (result: ReturnType<typeof recommendCrafts>) => result.slots.map(({ best }) => best.recipe.id);
 
 describe("best crafts", () => {
+  it("accepts both Forever client products while rejecting unrelated products and Classic builds", () => {
+    const current = { ...gear("current"), clientData: { ...gear("current").clientData!, source: { ...source, product: "wowf", build: "1.60.1.70630" } } };
+    expect(winners(recommendCrafts([recipe("current", current)], rogue))).toEqual(["current"]);
+    expect(winners(recommendCrafts([recipe("beta")], rogue))).toEqual(["beta"]);
+    for (const unsupported of [{ product: "wow", build: "1.60.1.70630" }, { product: "wowf", build: "1.15.9.69722" }]) {
+      expect(recommendCrafts([recipe("unsupported", { ...current, clientData: { ...current.clientData!, source: { ...source, ...unsupported } } })], rogue).slots).toEqual([]);
+    }
+  });
+
   it("includes level 19 by 20, retains earlier stronger crafts, and excludes later unlocks", () => {
     const recipes = [recipe("early"), recipe("newer", gear("newer", 20, [{ statId: 3, value: 5 }])), recipe("later", gear("later", 21, [{ statId: 3, value: 100 }]))];
     const result = recommendCrafts(recipes, rogue);

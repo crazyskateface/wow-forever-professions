@@ -22,7 +22,7 @@ describe("gathering content", () => {
     expect(workspace).toContain('class="profession-rail"');
     expect(workspace).toContain('class="main-workspace"');
     expect(workspace).toContain("Recipe calculator");
-    expect(workspace).toContain("Best crafts");
+    expect(workspace).not.toContain("Best crafts");
     expect(workspace).toContain("For 1 craft");
     expect(workspace).toContain("Skill-up curve unavailable");
   });

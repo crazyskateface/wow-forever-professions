@@ -65,7 +65,9 @@ never calls AH Ledger in a user request.
 
 ### Best crafts and automatic guide
 
-The main workspace contains Recipe calculator and Best crafts. The left panel owns
+The main workspace contains Recipe calculator, with Best crafts available only for
+Leatherworking, Tailoring, and Blacksmithing. Their initial class profiles are
+Rogue, Mage, and Warrior respectively. The left panel owns
 the automatic Practical leveling guide and individual completion checkboxes.
 Guide settings, known-recipe selection, sharing, shopping, bulk completion and
 expandable step metrics have been removed from the web client. Their request
@@ -82,7 +84,8 @@ and target state lives in App so opening a recipe does not reset the shortlist.
 
 See [`CRAFTING_MILESTONES.md`](CRAFTING_MILESTONES.md) for the one-time bracket
 research, source restrictions and ranking limitations. Only the current Forever
-1.60 client metadata is supported. Unknown learning skill does not prevent gear
+1.60 client metadata from `wowf` or the earlier `wow_classic_beta` product is
+supported. Unknown learning skill does not prevent gear
 comparison, but still prevents entry into a leveling route under existing policies.
 
 ### Profession progression cap
