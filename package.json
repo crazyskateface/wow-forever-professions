@@ -18,6 +18,7 @@
     "data:audit": "pnpm --filter @forever-professions/ingestion audit:build",
     "data:convert:professiondb": "pnpm --filter @forever-professions/ingestion convert:professiondb",
     "data:enrich:client": "pnpm --filter @forever-professions/ingestion enrich:client-data",
+    "data:icons:professions": "pnpm --filter @forever-professions/ingestion extract:profession-icons",
     "data:import": "pnpm --filter @forever-professions/ingestion import:client-data",
     "data:import:local": "pnpm --filter @forever-professions/ingestion import:local",
     "data:status:local": "pnpm --filter @forever-professions/ingestion status:local",

@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json",
     "convert:professiondb": "tsx scripts/convert-professiondb.ts",
     "enrich:client-data": "tsx scripts/enrich-client-data.ts",
+    "extract:profession-icons": "tsx scripts/extract-profession-icons.ts",
     "import:client-data": "tsx scripts/import-client-data.ts",
     "import:local": "tsx scripts/import-local.ts",
     "migrate:dsql": "tsx scripts/migrate-dsql.ts",

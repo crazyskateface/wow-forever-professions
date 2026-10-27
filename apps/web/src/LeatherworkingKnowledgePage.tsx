@@ -10,6 +10,7 @@ import {
   type RecipeSourceKind,
 } from "@forever-professions/contracts";
 import { SiteFooter } from "./SiteFooter.js";
+import { ProfessionIcon } from "./ProfessionIcon.js";
 import {
   LEATHERWORKING_KNOWLEDGE_PAGES,
   isIllustrativeKnowledgeCatalog,
@@ -520,6 +521,7 @@ export function LeatherworkingKnowledgePage({
       </header>
       <main className="knowledge-main" id="knowledge-main" tabIndex={-1}>
         <header className="legal-hero knowledge-hero">
+          <ProfessionIcon className="profession-art profession-knowledge-icon" professionId="leatherworking" eager />
           <span className="section-kicker">{definition.eyebrow}</span>
           <h1>{definition.title}</h1>
           <p>{definition.description}</p>

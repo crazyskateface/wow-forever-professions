@@ -1,11 +1,13 @@
 import { PROFESSIONS } from "@forever-professions/contracts";
 import { professionHref } from "./profession-navigation.js";
+import { ProfessionIcon } from "./ProfessionIcon.js";
 
 export function ProfessionSwitcher({ professionId }: { readonly professionId: string }) {
   return <div className="profession-navigation">
     <a className="profession-home" href="/" aria-label="Choose a profession">←</a>
     <label className="profession-switcher">
-      <span>Profession</span>
+      <ProfessionIcon className="profession-art profession-switcher-icon" professionId={professionId} eager />
+      <span className="profession-switcher-label">Profession</span>
       <select aria-label="Switch profession" value={professionId} onChange={(event) => { window.location.assign(professionHref(event.target.value)); }}>
         {["Crafting", "Secondary", "Gathering"].map((group) => <optgroup key={group} label={group}>
           {PROFESSIONS.filter((profession) => profession.group === group).map(({ id, name }) => <option key={id} value={id}>{name}</option>)}

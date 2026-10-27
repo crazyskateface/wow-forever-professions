@@ -27,6 +27,8 @@ data.
 
 - Start at `/` and choose a profession before entering its workspace at
   `/professions/<profession-id>`.
+- Shows client-derived profession artwork on the home page and in each profession
+  header, with lazy-loaded directory icons and an initials fallback.
 - Switch professions with the native dropdown in the top-left navigation. Each
   workspace loads its own catalog, route, prices, and Classic-to-Forever comparison.
 - Current skill is saved independently per profession. Existing root recipe links

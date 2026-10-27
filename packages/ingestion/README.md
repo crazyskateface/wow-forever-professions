@@ -139,3 +139,13 @@ Icon manifests now serialize as compact schema v2 (`icons` maps item IDs to File
 paths are deterministically `/icons/items/<id>.webp`). The reader still accepts v1.
 This removes repeated URL strings so complete profession assets fit the existing
 80 KB manifest budget without increasing web performance thresholds.
+
+## Profession icon export
+
+Run `pnpm data:icons:professions "C:\World of Warcraft" 1.60.1.70630` from the root.
+The command resolves the supplied client build, reads `SkillLine.SpellIconFileID` for
+all registered professions, and exports WebP assets plus a source-stamped manifest
+to `apps/web/public/icons/professions/`. The optional third argument selects a different
+output directory. `WOW_CLIENT_PRODUCT` and `WOWDATA_PATH` have the same meaning as
+in client-item enrichment. Missing or invalid skill-line icons fail explicitly.
+This artwork export never modifies recipe snapshots or requires a database import.

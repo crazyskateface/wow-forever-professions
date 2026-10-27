@@ -83,8 +83,8 @@ import {
 } from "./catalog-discovery.js";
 import { recipeKnowledgeHref } from "./leatherworking-knowledge.js";
 import { ProfessionMasthead, ProfessionSwitcher } from "./ProfessionNavigation.js";
+import { ProfessionIcon } from "./ProfessionIcon.js";
 import { readProfessionSkill, writeProfessionSkill } from "./profession-navigation.js";
-import { getProfessionDefinition } from "@forever-professions/contracts";
 import { recordProductEvent } from "./product-analytics.js";
 
 type WorkspaceView = "calculator" | "crafts";
@@ -563,7 +563,6 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
     return { ...profile, currentSkill: readProfessionSkill(initialProfession.id, profile.currentSkill) };
   });
   const profession = initialProfession;
-  const professionDefinition = getProfessionDefinition(profession.id);
   const catalogState = initialCatalogState;
   const [recipeId, setRecipeId] = useState(() => profession.recipes.find(({ id }) => id === recipeIdFromUrl())?.id ?? profession.recipes[0]!.id);
   const recipe =
@@ -1432,7 +1431,7 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
       <div className={recipeListView === "changes" ? "workspace workspace-changes" : "workspace"} id="top">
         <aside className="profession-rail" aria-label="Profession and recipe selection">
           <div className="profession-select">
-            <span className="profession-icon" aria-hidden="true">{professionDefinition?.initials}</span>
+            <ProfessionIcon className="profession-icon profession-art" professionId={profession.id} eager />
             <strong>{profession.name}</strong>
           </div>
 

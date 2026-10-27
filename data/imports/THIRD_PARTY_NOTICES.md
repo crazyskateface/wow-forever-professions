@@ -50,3 +50,8 @@ metadata extracted from installed Forever product `wowf`, client build
 `1.60.1.70630`, locale `enUS`. These client facts retain Blizzard attribution;
 MIT licensing of the source libraries does not relicense Blizzard game data.
 The earlier Leatherworking-only snapshots retain their original client provenance.
+
+Profession icons under `apps/web/public/icons/professions/` are also Blizzard
+Entertainment artwork, extracted from `SkillLine.SpellIconFileID` in Forever
+product `wowf`, build `1.60.1.70630`, locale `enUS`. Their separate manifest records
+the exact FileDataIDs and asset checksums. They are not covered by the MIT license.

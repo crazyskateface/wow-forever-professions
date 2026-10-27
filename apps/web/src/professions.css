@@ -2,9 +2,9 @@
 .profession-navigation { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .profession-home { color: var(--muted); text-decoration: none; font-size: 24px; padding: 8px; }
 .profession-home:hover { color: var(--gold); }
-.profession-switcher { display: grid; gap: 3px; min-width: 0; width: 245px; }
-.profession-switcher > span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; }
-.profession-switcher select { background-color: transparent; color: var(--text); border: 0; border-radius: 0; padding: 4px 0; font-size: 18px; font-weight: 700; width: 100%; min-width: 0; cursor: pointer; }
+.profession-switcher { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 3px 10px; min-width: 0; flex: 1; }
+.profession-switcher-label { grid-column: 2; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; }
+.profession-switcher select { grid-column: 2; background-color: transparent; color: var(--text); border: 0; border-radius: 0; padding: 4px 0; font-size: 18px; font-weight: 700; width: 100%; min-width: 0; cursor: pointer; }
 .profession-switcher option, .profession-switcher optgroup { background: var(--rail); }
 .landing-shell { display: flex; flex-direction: column; }
 .profession-landing { width: min(100%, var(--content-max-width)); margin: 0 auto; padding: 64px 40px; flex: 1; }
@@ -21,7 +21,10 @@
 .profession-entry strong, .profession-entry small { display: block; overflow-wrap: anywhere; }
 .profession-entry strong { font-size: 17px; margin-bottom: 7px; }
 .profession-entry small { color: var(--muted); font-size: 12px; line-height: 1.7; }
-.profession-monogram { color: var(--gold); background: var(--surface); border: 1px solid var(--line); width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; font-family: var(--font-title); }
+.profession-art { color: var(--gold); background: var(--surface); border: 1px solid var(--line); border-radius: 3px; object-fit: cover; display: grid; place-items: center; font-family: var(--font-title); }
+.profession-directory-icon { width: 44px; height: 44px; flex: 0 0 44px; }
+.profession-switcher-icon { grid-column: 1; grid-row: 1 / span 2; align-self: center; width: 36px; height: 36px; }
+.profession-knowledge-icon { width: 48px; height: 48px; margin-bottom: 16px; }
 .profession-entry-arrow { color: var(--muted); }
 .profession-entry .profession-unavailable { color: var(--orange); }
 .profession-activity-note { max-width: var(--content-max-width); margin: 0 auto; padding: 18px 24px; color: var(--muted); line-height: 1.6; }
@@ -32,7 +35,9 @@
 @media (max-width: 600px) {
   .profession-landing { padding: 40px 20px; }
   .profession-directory { grid-template-columns: 1fr; }
-  .profession-switcher select { font-size: 16px; }
-  .profession-switcher { width: 205px; }
+  .profession-switcher select { font-size: 16px; padding-right: 24px !important; background-position: right 3px center !important; }
+  .profession-switcher { grid-template-columns: 28px minmax(0, 1fr); column-gap: 6px; }
+  .profession-switcher-icon { width: 28px; height: 28px; }
+  .profession-home { padding-inline: 2px; font-size: 20px; }
   .profession-navigation { gap: 6px; }
 }

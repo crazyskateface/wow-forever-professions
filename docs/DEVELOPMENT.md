@@ -385,3 +385,13 @@ reagents and indexes only actual outputs for nested crafting.
 Run `pnpm api:smoke:professions` after importing to exercise catalog reconstruction,
 profession-scoped comparisons, full-range route eligibility, and shopping for every
 profession against local PostgreSQL. Prices in this test are deliberately unavailable.
+
+### Profession artwork
+
+`ProfessionIcon` reuses the lazy-loading and error fallback in `ItemIcon`. Directory
+entries load lazily; profession switchers and the Leatherworking field guide load the
+selected profession icon eagerly. Profession artwork comes from the pinned client's
+`SkillLine.SpellIconFileID`, separate from item icons and gameplay snapshots.
+`apps/web/public/icons/professions/manifest.json` records the source product, build,
+region, locale, skill-line identity, FileDataID, output path, and SHA-256 for each asset.
+Regenerate it with `pnpm data:icons:professions "C:\World of Warcraft" 1.60.1.70630`.

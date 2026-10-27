@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { PROFESSIONS, professionsResponseSchema } from "@forever-professions/contracts";
 import { ProfessionMasthead } from "./ProfessionNavigation.js";
+import { ProfessionIcon } from "./ProfessionIcon.js";
 import { professionHref } from "./profession-navigation.js";
 import { SiteFooter } from "./SiteFooter.js";
 
@@ -28,8 +29,8 @@ export function ProfessionLanding() {
       {["Crafting", "Secondary", "Gathering"].map((group) => <section className="profession-group" key={group} aria-label={`${group} professions`}>
         <div className="profession-group-heading"><h2>{group} professions</h2>{group === "Crafting" ? null : <p>{group === "Secondary" ? "Cooking, First Aid, and Fishing in one place." : "Explore smelting and material processing."}</p>}</div>
         <div className="profession-directory">
-          {PROFESSIONS.filter((profession) => profession.group === group).map(({ id, name, initials, description }) => <a className="profession-entry" href={professionHref(id)} key={id}>
-            <span className="profession-monogram" aria-hidden="true">{initials}</span><span><strong>{name}</strong><small>{description}</small>
+          {PROFESSIONS.filter((profession) => profession.group === group).map(({ id, name, description }) => <a className="profession-entry" href={professionHref(id)} key={id}>
+            <ProfessionIcon className="profession-art profession-directory-icon" professionId={id} /><span><strong>{name}</strong><small>{description}</small>
               {available !== undefined && !available.has(id) ? <small className="profession-unavailable">Catalog unavailable</small> : null}
             </span><span className="profession-entry-arrow" aria-hidden="true">↗</span>
           </a>)}
