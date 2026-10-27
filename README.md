@@ -31,6 +31,9 @@ data.
   header, with lazy-loaded directory icons and an initials fallback.
 - Groups home-page profession choices inside the calculator's decorative frames,
   with a named title plate for Crafting, Secondary, and Gathering professions.
+- Includes all three gathering professions: Herbalism, Mining, and Skinning.
+  Herbalism and Skinning have dedicated pages and client-derived icons; gathering
+  progression data is explicitly unavailable until supported sources are imported.
 - Switch professions with the native dropdown in the top-left navigation. Each
   workspace loads its own catalog, route, prices, and Classic-to-Forever comparison.
 - Current skill is saved independently per profession. Existing root recipe links

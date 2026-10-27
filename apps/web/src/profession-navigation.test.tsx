@@ -4,6 +4,7 @@ import { PROFESSIONS } from "@forever-professions/contracts";
 import { professionHref, professionIdFromUrl, readProfessionSkill, writeProfessionSkill } from "./profession-navigation.js";
 import { ProfessionLanding } from "./ProfessionLanding.js";
 import { ProfessionSwitcher } from "./ProfessionNavigation.js";
+import { ProfessionWorkspace } from "./ProfessionWorkspace.js";
 import { App } from "./App.js";
 import { ItemTooltipProvider } from "./ItemTooltip.js";
 import { leatherworkingFixture } from "@forever-professions/fixtures";
@@ -15,6 +16,20 @@ afterEach(() => {
 });
 
 describe("profession entry and navigation", () => {
+  it("includes all three gathering professions and opens missing-data pages for Herbalism and Skinning", () => {
+    expect(PROFESSIONS.filter(({ group }) => group === "Gathering").map(({ id }) => id)).toEqual(["herbalism", "mining", "skinning"]);
+    const landing = renderToStaticMarkup(<ProfessionLanding />);
+    expect(landing.match(/Gathering data unavailable/g)).toHaveLength(2);
+    for (const professionId of ["herbalism", "skinning"]) {
+      const workspace = renderToStaticMarkup(<ProfessionWorkspace professionId={professionId} />);
+      expect(workspace).toContain("Gathering progression data is not available");
+      expect(workspace).toContain(`src="/icons/professions/${professionId}.webp"`);
+      expect(workspace).toContain(`value="${professionId}" selected`);
+      expect(workspace).not.toContain("Loading profession catalog");
+      expect(workspace).not.toContain("Try again");
+    }
+  });
+
   it("makes every profession reachable from the landing page and native switcher", () => {
     const landing = renderToStaticMarkup(<ProfessionLanding />);
     const switcher = renderToStaticMarkup(<ProfessionSwitcher professionId="first-aid" />);

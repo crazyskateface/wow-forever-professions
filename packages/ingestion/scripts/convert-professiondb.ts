@@ -12,7 +12,7 @@ import {
 } from "../src/index.js";
 import {
   importedRecipeOverridesSchema,
-  PROFESSIONS,
+  RECIPE_PROFESSIONS,
   type ImportedRecipeOverrides,
 } from "@forever-professions/contracts";
 
@@ -136,7 +136,7 @@ const [
 const itemCoreLua = itemCoreSources.filter((source) => source.includes("lib:LoadCore("));
 const resolvedCanonicalItemNames = await canonicalItemNames;
 
-const convertedProfessions = await Promise.all(PROFESSIONS.map(async (profession) => convertProfessionDbSnapshot({
+const convertedProfessions = await Promise.all(RECIPE_PROFESSIONS.map(async (profession) => convertProfessionDbSnapshot({
   coreLua: await readFile(join(professionCoreDirectory, `${profession.sourceName}.lua`), "utf8"),
   acquireMethodsLua,
   recipeItemsLua,

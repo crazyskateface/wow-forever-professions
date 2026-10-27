@@ -6,6 +6,11 @@ Cooking, First Aid, Fishing, and Mining's smelting records from the pinned
 LibProfessionDB v1.9.1 / LibItemDB v1.6.0 archives. Original archive hashes and licenses
 are retained in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
+Herbalism and Skinning appear in the site directory with client-derived icons, but
+the pinned LibProfessionDB archive has no recipe tables for either. They are not
+part of these ten recipe catalogs. Gathering sources, locations, and progression
+remain unavailable; no recipe data is inferred to fill the gap.
+
 | Profession | Forever records | Classic records |
 | --- | ---: | ---: |
 | Alchemy | 195 | 131 |

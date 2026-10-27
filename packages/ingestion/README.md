@@ -124,6 +124,14 @@ and Vanilla tables are required. The source lock, admin refresh/sync jobs, and i
 commands use `*-professions.json`. Previous `*-leatherworking.json` files remain
 historical references. Do not import both variants of the same build into one database.
 
+The shared profession directory also includes Herbalism and Skinning. Neither has a
+recipe table in the pinned source archive: their `sourceName` is explicitly null.
+The converter and recipe API smoke check use `RECIPE_PROFESSIONS`, the source-backed
+subset of `PROFESSIONS`. Their absence is not an import failure, and no synthetic
+recipes or build rows are generated for them. The web pages expose the gathering
+data gap; the database remains able to store those professions when supported data
+becomes available.
+
 Set `WOW_CLIENT_PRODUCT=wowf` for the installed Forever client. The default is `wowf`; set `wow_classic_beta` explicitly for the older beta client.
 Only these explicit Forever products are accepted.
 The extractor resolves a build once, pins all subsequent reads, and retains the actual

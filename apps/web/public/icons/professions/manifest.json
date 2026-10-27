@@ -72,12 +72,26 @@
       "path": "/icons/professions/fishing.webp",
       "sha256": "387a591a4a96e6ff207dd7dd1cec374bdfa16d8976c28bfbe09058be1487adec"
     },
+    "herbalism": {
+      "skillLineId": 182,
+      "displayName": "Herbalism",
+      "fileDataId": 136246,
+      "path": "/icons/professions/herbalism.webp",
+      "sha256": "a10444c57fa40fad503c7252ec6b55f6105284dc2059c18e47c0602519cd6a36"
+    },
     "mining": {
       "skillLineId": 186,
       "displayName": "Mining",
       "fileDataId": 136248,
       "path": "/icons/professions/mining.webp",
       "sha256": "48c211b5ba639a3e639cf47b5d47ef8b4fcbbfa6cbed679151a48072cae92f58"
+    },
+    "skinning": {
+      "skillLineId": 393,
+      "displayName": "Skinning",
+      "fileDataId": 134366,
+      "path": "/icons/professions/skinning.webp",
+      "sha256": "90f071ad25a950291bd7495c50c34610d698e95cb66ea2c56d5dee6f2686107e"
     }
   }
 }

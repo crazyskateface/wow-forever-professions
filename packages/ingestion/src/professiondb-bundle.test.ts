@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PROFESSIONS } from "@forever-professions/contracts";
+import { RECIPE_PROFESSIONS } from "@forever-professions/contracts";
 import { bundleProfessionDbSnapshots, normalizeBuildDataset, parseRawDatasetBytes, compareRecipeBuilds } from "./index.js";
 
 const target = parseRawDatasetBytes(readFileSync(new URL("../../../data/imports/forever-1.60.1.69977-professions.json", import.meta.url)));
@@ -9,7 +9,7 @@ const base = parseRawDatasetBytes(readFileSync(new URL("../../../data/imports/cl
 describe("complete profession snapshots", () => {
   it("normalizes every crafting, secondary, and smelting profession in one immutable build", () => {
     for (const dataset of [base, target]) {
-      expect(dataset.professions.map(({ id }) => id)).toEqual(PROFESSIONS.map(({ id }) => id));
+      expect(dataset.professions.map(({ id }) => id)).toEqual(RECIPE_PROFESSIONS.map(({ id }) => id));
       const normalized = normalizeBuildDataset(dataset);
       expect(normalized.professions).toHaveLength(10);
       expect(new Set(normalized.recipes.map(({ id }) => id)).size).toBe(normalized.recipes.length);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { PROFESSIONS, professionFixtureSchema, professionsResponseSchema, recipeChangesResponseSchema, recipeChangesSummaryResponseSchema, routeOptimizationResponseSchema, shoppingListResponseSchema } from "@forever-professions/contracts";
+import { RECIPE_PROFESSIONS, professionFixtureSchema, professionsResponseSchema, recipeChangesResponseSchema, recipeChangesSummaryResponseSchema, routeOptimizationResponseSchema, shoppingListResponseSchema } from "@forever-professions/contracts";
 import { createPostgresTransactionRunner, parseRawDatasetBytes, SqlRecipeCatalogReader, SqlRecipeChangeReader } from "@forever-professions/ingestion";
 import { routeRequest } from "../src/router.js";
 
@@ -17,8 +17,8 @@ try {
   };
   const list = await routeRequest("GET", "/api/professions", {}, dependencies);
   assert.equal(list.statusCode, 200);
-  assert.deepEqual(professionsResponseSchema.parse(JSON.parse(list.body)).map(({ id }) => id).sort(), PROFESSIONS.map(({ id }) => id).sort());
-  for (const definition of PROFESSIONS) {
+  assert.deepEqual(professionsResponseSchema.parse(JSON.parse(list.body)).map(({ id }) => id).sort(), RECIPE_PROFESSIONS.map(({ id }) => id).sort());
+  for (const definition of RECIPE_PROFESSIONS) {
     const expected = dataset.professions.find(({ id }) => id === definition.id)!;
     const response = await routeRequest("GET", `/api/professions/${definition.id}`, {}, dependencies);
     assert.equal(response.statusCode, 200, response.body);

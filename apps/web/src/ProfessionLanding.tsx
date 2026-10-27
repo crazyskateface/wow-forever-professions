@@ -27,11 +27,11 @@ export function ProfessionLanding() {
       </div>
       {error ? <p role="status">Catalog availability could not be checked. Select a profession to try loading its catalog.</p> : null}
       {["Crafting", "Secondary", "Gathering"].map((group) => <section className="profession-group" key={group} aria-label={`${group} professions`}>
-        <div className="profession-group-heading"><h2>{group}</h2>{group === "Crafting" ? null : <p>{group === "Secondary" ? "Cooking, First Aid, and Fishing in one place." : "Explore smelting and material processing."}</p>}</div>
+        <div className="profession-group-heading"><h2>{group}</h2>{group === "Crafting" ? null : <p>{group === "Secondary" ? "Cooking, First Aid, and Fishing in one place." : "Herbalism, Mining, and Skinning."}</p>}</div>
         <div className="profession-directory">
-          {PROFESSIONS.filter((profession) => profession.group === group).map(({ id, name, description }) => <a className="profession-entry" href={professionHref(id)} key={id}>
+          {PROFESSIONS.filter((profession) => profession.group === group).map(({ id, name, description, sourceName }) => <a className="profession-entry" href={professionHref(id)} key={id}>
             <ProfessionIcon className="profession-art profession-directory-icon" professionId={id} /><span><strong>{name}</strong><small>{description}</small>
-              {available !== undefined && !available.has(id) ? <small className="profession-unavailable">Catalog unavailable</small> : null}
+              {sourceName === null ? <small className="profession-unavailable">Gathering data unavailable</small> : available !== undefined && !available.has(id) ? <small className="profession-unavailable">Catalog unavailable</small> : null}
             </span><span className="profession-entry-arrow" aria-hidden="true">↗</span>
           </a>)}
         </div>

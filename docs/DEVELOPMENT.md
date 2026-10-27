@@ -29,7 +29,8 @@ LibProfessionDB + LibItemDB + reviewed overrides + pinned client DB2
                       React/Vite client
 ```
 
-The current product data covers ten professions:
+The current recipe data covers ten professions. The directory additionally includes
+Herbalism and Skinning with explicit gathering-data gaps:
 
 | Purpose | Build | File |
 | --- | --- | --- |
@@ -364,9 +365,13 @@ treating them as current truth.
 
 ## Full profession imports
 
-The shared `PROFESSIONS` registry defines the ten source-backed profession identities,
-including the `first-aid` slug and upstream `Firstaid.lua` filename. The converter
-requires every registered core and English-name table and validates a single build
+The shared `PROFESSIONS` registry defines twelve directory identities, including
+Herbalism and Skinning. These two have null `sourceName` values because the pinned
+recipe archive has no tables for them. Their dedicated web pages expose the missing
+gathering progression data without requesting a recipe catalog or offering retries.
+`RECIPE_PROFESSIONS` selects the ten source-backed recipe identities, including the
+`first-aid` slug and upstream `Firstaid.lua` filename. The converter
+requires every selected core and English-name table and validates a single build
 before bundling. Non-Leatherworking recipe IDs are namespaced by profession to avoid
 cross-profession spell collisions; Leatherworking IDs retain existing public links.
 Comparison identity remains `(professionId, spellId)`.
@@ -384,7 +389,7 @@ reagents and indexes only actual outputs for nested crafting.
 
 Run `pnpm api:smoke:professions` after importing to exercise catalog reconstruction,
 profession-scoped comparisons, full-range route eligibility, and shopping for every
-profession against local PostgreSQL. Prices in this test are deliberately unavailable.
+recipe-backed profession against local PostgreSQL. Prices in this test are deliberately unavailable.
 
 ### Profession artwork
 
