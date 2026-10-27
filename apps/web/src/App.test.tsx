@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App.js";
 import { ItemTooltipProvider } from "./ItemTooltip.js";
+import { leatherworkingFixture } from "@forever-professions/fixtures";
 import {
   DEFAULT_PERSONALIZATION,
   PERSONALIZATION_STORAGE_KEY,
@@ -15,6 +16,29 @@ afterEach(() => {
   } else {
     Object.defineProperty(globalThis, "window", originalWindow);
   }
+});
+
+describe("recipe materials", () => {
+  it.each([150, 175, 300])("shows integer quantities for one craft at skill %s", (skill) => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage: {
+          getItem: (key: string) => key === PERSONALIZATION_STORAGE_KEY
+            ? JSON.stringify({ ...DEFAULT_PERSONALIZATION, currentSkill: skill })
+            : null,
+        },
+        location: { href: "http://127.0.0.1:5173/?view=recipes", pathname: "/" },
+      },
+    });
+    const markup = renderToStaticMarkup(<ItemTooltipProvider><App initialProfession={leatherworkingFixture} /></ItemTooltipProvider>);
+    const materials = markup.match(/<section class="materials-card"[\s\S]*?<\/section>/)![0];
+    const quantities = [...materials.matchAll(/<strong role="cell">([^<]+)<\/strong>/g)].map((match) => match[1]);
+    expect(quantities).toEqual(leatherworkingFixture.recipes[0]!.reagents.map(({ quantity }) => String(quantity)));
+    expect(materials).toContain('role="columnheader">Quantity</span>');
+    expect(materials).toContain("For 1 craft");
+    expect(materials).not.toContain("attempts");
+  });
 });
 
 describe("current skill control", () => {

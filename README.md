@@ -112,6 +112,8 @@ data.
 - Records a strict set of first-party anonymous product events for the route-to-
   shopping funnel. The accepted fields and retention boundary are documented in
   [`docs/PRODUCT_ANALYTICS.md`](docs/PRODUCT_ANALYTICS.md).
+- Shows Materials required as integer quantities for one craft, with per-craft material
+  costs independent of skill-up chance.
 - Calculates difficulty, skill-up probability, expected crafts, expected reagents,
   and stored-price cost at the selected profession skill.
 - Shows the skill curve only through the configured base profession cap. Recipes

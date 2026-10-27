@@ -395,3 +395,10 @@ selected profession icon eagerly. Profession artwork comes from the pinned clien
 `apps/web/public/icons/professions/manifest.json` records the source product, build,
 region, locale, skill-line identity, FileDataID, output path, and SHA-256 for each asset.
 Regenerate it with `pnpm data:icons:professions "C:\World of Warcraft" 1.60.1.70630`.
+
+### Recipe material quantities
+
+The calculator's Materials required table displays the recipe's canonical integer
+reagent quantities for exactly one craft, independent of current skill or skill-up
+probability. Its material costs also cover one craft. Expected attempts and expected
+cost per skill-up remain explicitly labeled estimates in the calculator summary.

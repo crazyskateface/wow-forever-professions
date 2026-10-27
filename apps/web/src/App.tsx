@@ -2032,15 +2032,14 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
 
               <section className="materials-card" aria-labelledby="materials-title">
                 <div className="section-title-row materials-heading">
-                  <div><h2 id="materials-title">Materials required</h2><small className="section-subtitle">For {formatNumber(calculation.expectedCrafts)} attempts</small></div>
+                  <div><h2 id="materials-title">Materials required</h2><small className="section-subtitle">For 1 craft</small></div>
                   <span className="price-mode">Market prices</span>
                 </div>
                 <div className="materials-table" role="table" aria-label="Required materials">
-                  <div className="materials-header" role="row"><span role="columnheader">Name</span><span role="columnheader">Amount</span><span role="columnheader">Source</span><span role="columnheader">Estimated cost</span></div>
+                  <div className="materials-header" role="row"><span role="columnheader">Name</span><span role="columnheader">Quantity</span><span role="columnheader">Source</span><span role="columnheader">Estimated cost</span></div>
                   {recipe.reagents.map((reagent, index) => {
                     const observation = reagent.gameItemId === undefined ? undefined : pricing.byItem.get(reagent.gameItemId);
                     const price = unitPrice(observation);
-                    const expectedQuantity = getExpectedReagentQuantity(reagent.quantity, calculation.probability);
                     return (
                       <div className="material-row" key={reagent.itemId} role="row">
                         <span className="material-name" role="cell">
@@ -2049,9 +2048,9 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
                           </ItemTooltip>
                           <span><strong className={getItemRarityNameClass(reagent.clientData?.qualityId)}>{reagent.name}</strong><small>Item {reagent.gameItemId ?? "—"}</small></span>
                         </span>
-                        <strong role="cell">{formatNumber(expectedQuantity)}</strong>
+                        <strong role="cell">{reagent.quantity}</strong>
                         <span className="source-pill" role="cell"><i aria-hidden="true" /> Auction house</span>
-                        <strong className="material-cost" role="cell">{price === undefined ? "Unavailable" : formatCopper(price * expectedQuantity)}</strong>
+                        <strong className="material-cost" role="cell">{price === undefined ? "Unavailable" : formatCopper(price * reagent.quantity)}</strong>
                       </div>
                     );
                   })}
