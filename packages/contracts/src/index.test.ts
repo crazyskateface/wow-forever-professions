@@ -4,6 +4,8 @@ import {
   auctionPriceRequestSchema,
   healthResponseSchema,
   importedBuildDatasetSchema,
+  itemClientDataSchema,
+  productEventSchema,
   professionFixtureSchema,
   readinessResponseSchema,
   recipeOutputSchema,
@@ -15,6 +17,36 @@ import {
 } from "./index.js";
 
 describe("shared contracts", () => {
+  it("preserves ordered client-derived item tooltip stats", () => {
+    const parsed = itemClientDataSchema.parse({
+      displayName: "Minor Channeling Ring",
+      qualityId: 2,
+      equipmentSlot: "Finger",
+      stats: [
+        {
+          statId: 5,
+          value: 2,
+          displayText: "+2 Intellect",
+          displayTone: "attribute",
+        },
+        {
+          statId: 45,
+          value: 5,
+          displayText: "Equip: Increases spell power by 5.",
+          displayTone: "effect",
+        },
+      ],
+      requiredLevel: 0,
+      sellPriceCopper: 1875,
+      source: { product: "wow_classic_beta", build: "1.60.1.70450", locale: "enUS" },
+    });
+
+    expect(parsed.stats?.map(({ displayTone }) => displayTone)).toEqual([
+      "attribute",
+      "effect",
+    ]);
+  });
+
   it("accepts the health response shape", () => {
     expect(
       healthResponseSchema.parse({
@@ -37,6 +69,31 @@ describe("shared contracts", () => {
     }
   });
 
+  it("accepts only privacy-bounded anonymous product events", () => {
+    expect(productEventSchema.parse({
+      name: "route-generated",
+      buildId: "1.60.1.69977",
+      preset: "practical",
+      status: "complete",
+      segmentCount: 12,
+    })).toBeDefined();
+    expect(productEventSchema.safeParse({
+      name: "route-generated",
+      buildId: "1.60.1.69977",
+      preset: "practical",
+      status: "complete",
+      segmentCount: 12,
+      characterName: "Must not cross the boundary",
+    }).success).toBe(false);
+    expect(productEventSchema.safeParse({
+      name: "checklist-progress",
+      buildId: "1.60.1.69977",
+      preset: "practical",
+      completedSegments: 4,
+      totalSegments: 3,
+    }).success).toBe(false);
+  });
+
   it("rejects unordered thresholds", () => {
     expect(() =>
       skillThresholdsSchema.parse({ orange: 150, yellow: 180, green: 170, gray: 190 }),
@@ -50,8 +107,7 @@ describe("shared contracts", () => {
   });
 
   it("preserves structured source and verification metadata for recipe data", () => {
-    expect(
-      professionFixtureSchema.parse({
+    const parsed = professionFixtureSchema.parse({
         build: "fixture-0",
         id: "leatherworking",
         name: "Leatherworking",
@@ -64,6 +120,9 @@ describe("shared contracts", () => {
             buildId: "fixture-0",
             learnSkill: 150,
             acquisition: "trainer",
+            teachingItemId: 9999,
+            sourceKinds: ["trainer"],
+            sourceDataOrigin: "forever",
             faction: "both",
             specializationSpellId: null,
             cooldownSeconds: null,
@@ -81,12 +140,17 @@ describe("shared contracts", () => {
             },
           },
         ],
-      }).recipes[0]?.provenance,
-    ).toEqual({
+      });
+    expect(parsed.recipes[0]?.provenance).toEqual({
       source: "classic-fallback",
       sourceLabel: "Classic reference",
       verification: { status: "unverified" },
       notes: "Awaiting Forever verification.",
+    });
+    expect(parsed.recipes[0]).toMatchObject({
+      teachingItemId: 9999,
+      sourceKinds: ["trainer"],
+      sourceDataOrigin: "forever",
     });
   });
 
@@ -268,11 +332,13 @@ describe("shared contracts", () => {
         startSkill: 150,
         targetSkill: 180,
         objective: "cost",
+        confidencePolicy: "supported-only",
         constraints: {
           faction: "horde",
           specializationSpellIds: [10656],
           professionBranchId: "dragonscale",
           knownRecipeIds: ["heavy-armor-kit"],
+          allowUnknownAcquisition: false,
           allowUnknownAvailability: true,
           allowUnknownFaction: true,
           allowCooldowns: false,
@@ -298,6 +364,47 @@ describe("shared contracts", () => {
         objective: "cost",
       }),
     ).toThrow("marketId");
+    expect(
+      routeOptimizationRequestSchema.parse({
+        professionId: "leatherworking",
+        startSkill: 150,
+        targetSkill: 180,
+        preset: "practical",
+      }),
+    ).toMatchObject({ preset: "practical" });
+    for (const preset of [
+      "practical",
+      "trainer-friendly",
+      "cheapest",
+      "fewest-crafts",
+      "fewest-materials",
+      "experimental",
+    ] as const) {
+      expect(routeOptimizationRequestSchema.parse({
+        professionId: "leatherworking",
+        marketId: "forever.pvp.horde.us",
+        startSkill: 150,
+        targetSkill: 180,
+        preset,
+      }).preset).toBe(preset);
+    }
+    expect(() =>
+      routeOptimizationRequestSchema.parse({
+        professionId: "leatherworking",
+        startSkill: 150,
+        targetSkill: 180,
+        preset: "cheapest",
+      }),
+    ).toThrow("marketId");
+    expect(() =>
+      routeOptimizationRequestSchema.parse({
+        professionId: "leatherworking",
+        startSkill: 150,
+        targetSkill: 180,
+        preset: "practical",
+        objective: "crafts",
+      }),
+    ).toThrow("cannot be combined");
     expect(
       routeOptimizationRequestSchema.safeParse({
         professionId: "leatherworking",
@@ -328,7 +435,9 @@ describe("shared contracts", () => {
 
   it("accepts complete and blocked route results", () => {
     const base = {
+      preset: "practical",
       objective: "crafts",
+      confidencePolicy: "practical",
       startSkill: 150,
       targetSkill: 151,
       steps: [
@@ -350,6 +459,18 @@ describe("shared contracts", () => {
           expectedSkillUps: 1,
           expectedCrafts: 1,
           expectedMaterials: 6,
+          evidence: {
+            level: "verified",
+            reasons: [],
+            acquisition: "trainer",
+            availability: "available",
+            provenanceSource: "observed-in-game",
+            verificationStatus: "verified",
+          },
+          recommendation: {
+            reasons: ["only-eligible-recipe"],
+            summary: "This was the only eligible recipe.",
+          },
         },
       ],
       totals: {
@@ -372,6 +493,7 @@ describe("shared contracts", () => {
           ...base,
           blockedAtSkill: 151,
           reason: "no-eligible-recipe",
+          explanation: "No eligible recipe satisfied the active constraints.",
         },
       }),
     ).toBeDefined();
@@ -403,6 +525,7 @@ describe("shared contracts", () => {
               quantity: 62.5,
               unitPriceCopper: 125,
               expectedCostCopper: 7_812.5,
+              priceObservedAt: "2026-10-19T12:00:00.000Z",
             },
           ],
           crafts: [],
@@ -411,6 +534,7 @@ describe("shared contracts", () => {
           knownSubtotalCopper: 7_812.5,
           expectedCostCopper: 7_812.5,
         },
+        oldestPriceObservedAt: "2026-10-19T12:00:00.000Z",
       }),
     ).toBeDefined();
   });

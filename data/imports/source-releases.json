@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "projects": {
+    "professionDb": {
+      "projectId": 1558781,
+      "fileId": 9095167,
+      "version": "v1.9.1",
+      "displayName": "ProfessionDB-v1.9.1",
+      "fileName": "ProfessionDB-ProfessionDB-v1.9.1.zip",
+      "pageUrl": "https://www.curseforge.com/wow/addons/libprofessiondb/files/9095167",
+      "sha256": "909cb41720cf6bf6920f1c25c644f89b39ad63087f589c07737e7da943c52379"
+    },
+    "itemDb": {
+      "projectId": 1558208,
+      "fileId": 9233325,
+      "version": "v1.6.0",
+      "displayName": "ItemDB-v1.6.0",
+      "fileName": "ItemDB-ItemDB-v1.6.0.zip",
+      "pageUrl": "https://www.curseforge.com/wow/addons/libitemdb/files/9233325",
+      "sha256": "d200101f01f2e501fef0362dd5199991e930ad79c8e60080a205e4506ace5eed"
+    }
+  },
+  "targets": {
+    "foreverDataset": "data/imports/forever-1.60.1.69977-leatherworking.json",
+    "classicDataset": "data/imports/classic-era-1.15.9.69722-leatherworking.json",
+    "foreverQuality": "data/imports/forever-1.60.1.69977-leatherworking.quality.md",
+    "classicQuality": "data/imports/classic-era-1.15.9.69722-leatherworking.quality.md",
+    "overrides": "data/imports/forever-leatherworking-overrides.json",
+    "iconDirectory": "apps/web/public/icons/items"
+  }
+}

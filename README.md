@@ -2,7 +2,7 @@
 
 Forever Professions is a TypeScript monorepo for a data-driven World of Warcraft:
 Forever profession leveling planner. The current vertical slice covers Leatherworking
-and combines an optimized leveling guide, recipe calculator, shopping planner, and a
+and combines an optimized leveling guide, recipe calculator, best-crafts shortlist, and a
 build-generated Classic Era → Forever change browser.
 
 The product is guide-first:
@@ -14,7 +14,7 @@ skill-up and eligibility math
         ↓
 stateful route optimization
         ↓
-leveling guide + calculator + shopping plan
+leveling guide + calculator + best crafts
 ```
 
 Recipe and comparison data retain their build, source, and verification state. A
@@ -25,25 +25,75 @@ data.
 
 ### Leveling guide
 
-- Generates a complete current-skill → target-skill route from the loaded catalog.
-- Limits normal route targets to the current Forever base profession cap of 300,
-  configured once in the shared domain package.
-- Optimizes expected crafts, material units, or stored auction cost per skill point.
-- Uses dynamic programming with configurable recipe-switch and acquisition friction.
-- Supports known-recipe selection, trainer-only mode, faction/specialization/cooldown
+- Generates a complete 1–300 route from the loaded catalog. Current skill highlights
+  and scrolls to the player's place without removing earlier or later guide ranges.
+- Shares a native current-skill slider across guide, catalog, and changes views,
+  with a larger grab area, live updates, and keyboard/stepper controls.
+- Limits the full guide to the current Forever base profession cap of 300, configured
+  once in the shared domain package.
+- Automatically generates the web guide with the Practical preset. The optimizer API
+  also supports Trainer friendly, Cheapest, Fewest crafts, Fewest materials, and Experimental.
+- Uses dynamic programming with preset-owned recipe-switch, acquisition-friction,
+  evidence, and cost policies. Practical uses complete stored price coverage as a
+  deterministic tie-breaker when the stronger safeguards and craft score are equal.
+- Uses Practical by default: supported acquisition and availability win over unknown
+  evidence whenever they can complete the same route. Supported presets block at the
+  first skill that would require unknown evidence; Experimental may use those gaps but
+  never rejected evidence.
+- Supports known-recipe selection, faction/specialization/cooldown
   constraints, and explicit recipe or reagent exclusions at the API boundary.
 - Groups adjacent decisions into practical guide steps and exposes ordinary
-  alternatives.
+  alternatives. Every returned segment and alternative includes machine-readable
+  acquisition, availability, provenance, verification, confidence, and risk reasons.
+  Selected recipes and alternatives also carry stable recommendation/loss reason
+  codes and optimizer-authored explanations.
 - Treats reagents carrying Forever's client-defined `Scarce` label as a last resort:
   a complete non-Scarce route wins even when its ordinary objective score is higher.
 - Opens each guide step in the calculator at the relevant skill and shows New/Updated
   Forever badges when comparison data exists.
+- Presents generated segments as a checklist in the left panel with the active skill range
+  and acquisition. The calculator shows materials and recipe evidence. Completion is saved only for the exact matching
+  build, range, preset, resolved objective and confidence policy, constraints,
+  market, and route.
+
+### Best crafts
+
+- Replaces the duplicate main Leveling Route tab with a class/role equipment shortlist
+  for the selected profession (currently Leatherworking).
+- Uses fixed character-level targets of **20, 30, 40, 50, 55, and 60**, researched once
+  from the pinned catalog. Exact equip levels remain visible, and strong earlier crafts
+  can remain recommended at later targets.
+- Compares known Forever equipment stats by role, showing a leading craft and up to
+  two alternatives per slot. Recommendations use transparent editorial priorities,
+  not simulated combat output or all-source best-in-slot claims.
+- Preserves unknown learning skills, pattern availability, faction and specialization
+  restrictions. Unsupported item data, rejected/unavailable recipes, samples, and
+  Classic fallbacks never become ranked Forever recommendations.
+- Opens each craft in the existing URL-addressable calculator. Class, role and level
+  choices survive switching between workspace tabs for the current page session.
+- Documents the bracket evidence and comparison policy in
+  [`docs/CRAFTING_MILESTONES.md`](docs/CRAFTING_MILESTONES.md).
 
 ### Recipe catalog and calculator
 
 - Loads the full 603-recipe Leatherworking catalog from PostgreSQL/Aurora DSQL.
 - Provides a virtualized, searchable All Recipes list and URL-addressable recipe
   selection (`?recipe=<recipe-id>`).
+- Filters the full catalog by acquisition, learning range, item type,
+  specialization, faction compatibility, availability, verification, and stored
+  Forever comparison state. Sorts cover learning rank, current-skill usefulness,
+  expected market cost, and each difficulty threshold; incomplete price coverage
+  remains explicit and sorts after supported totals.
+- Shows compact orange/yellow/green/grey thresholds without relying on color alone,
+  keeps unknown source facts visible, and compares a selected catalog recipe with
+  the active route segment without discarding route or checklist context.
+- Provides directly addressable Leatherworking field-guide pages for the current
+  build, stored Forever changes, trainer evidence, specializations, Merchant's Favor,
+  Camping, and supported vendor, quest, reputation, and drop acquisition records.
+  Unsupported names, locations, rates, and unlock rules remain visibly unknown.
+- Records a strict set of first-party anonymous product events for the route-to-
+  shopping funnel. The accepted fields and retention boundary are documented in
+  [`docs/PRODUCT_ANALYTICS.md`](docs/PRODUCT_ANALYTICS.md).
 - Calculates difficulty, skill-up probability, expected crafts, expected reagents,
   and stored-price cost at the selected profession skill.
 - Shows the skill curve only through the configured base profession cap. Recipes
@@ -57,8 +107,9 @@ data.
 - Shows catalog-backed item details after a one-second pointer hover or when the
   owning recipe control receives keyboard focus. Calculator icons can pin the
   tooltip on click and support close-button, Escape, and outside-click dismissal.
-  Imported client metadata supplies in-game rarity, equipment slot, armor, required
-  level, and vendor sell price when those fields are available. Item names throughout
+  Imported client metadata supplies in-game rarity, equipment slot, armor, primary
+  attributes, green equip-effect text, required level, and vendor sell price when
+  those fields are available. Item names throughout
   the guide, catalog, calculator, changes view, route planner, shopping list, and
   tooltips use the familiar gray, white, green, blue, and purple rarity colors.
   Tooltips also spell out the rarity alongside the item category.
@@ -73,16 +124,23 @@ data.
 - Displays summary counts, search, profession and change-type filters, item-type
   filters, current-skill availability filters, provenance, icons, and expandable
   before/after values.
+- Loads comparison records on demand when the Forever Changes tab is first opened,
+  keeping the initial guide request burst below the API's concurrency boundary.
 - Hides unchanged recipes by default; badges are reused in the guide and All Recipes.
 - The bundled comparison currently contains 289 New, 227 Updated, 0 Removed, and 87
   Unchanged Leatherworking recipes (603 total).
 
-### Shopping and pricing
+### Shopping API and pricing
 
-- Aggregates a generated route into expected shopping quantities.
+- Provides shopping plans through `POST /api/shopping-list`. The web client's shopping
+  controls, checklist, owned-quantity persistence, copy/print actions, guide settings,
+  route sharing, bulk completion and expandable step metrics have been removed.
 - Supports cheapest, buy-only, and craft-first strategies with guarded recursive
   intermediate crafting.
-- Keeps missing prices and unresolved crafting sources explicit and detects cycles.
+- Keeps buy and craft paths separate, preserves missing prices and unresolved
+  crafting sources, and detects cycles.
+- Distinguishes complete totals from partial known subtotals and retains the oldest
+  price observation used in the API response.
 - Normalizes AH Ledger observations to integer copper and preserves attribution.
 - Reads prices refreshed ahead of time; API requests never call an auction provider
   directly.
@@ -99,10 +157,12 @@ data.
 
 ### Personalization without accounts
 
-- Saves current and target skill, route objective, trainer-only mode, shopping
-  strategy, region, market, faction, and Forever Changes filters in the browser.
+- Saves current skill, region, market, faction, and
+  Forever Changes filters in the browser. Route bounds are fixed at 1–300 and are not
+  persisted.
+- Saves individually checked route steps under a separate route fingerprint.
 - Restores the saved profile when generating the initial guide and uses its market and
-  faction in price, route, and shopping-list requests.
+  faction in price and automatic route requests.
 - Validates and versions stored preferences, falls back safely when storage is corrupt
   or unavailable, and provides a one-click reset.
 - Saves a Legacy profession bonus for future modeling but does not apply it until the
@@ -110,6 +170,9 @@ data.
 
 ### Site information and support
 
+- Centers the sidebar and main workspace together in a fluid container capped at
+  1400px, leaving room on both sides on wide displays. The masthead and navigation
+  remain full width; guide and information pages share the same content limit.
 - Includes a shared site footer with direct links to privacy, terms, contact, and the
   public source repository.
 - Serves readable, responsive Privacy Policy, Terms of Use, and Contact pages at
@@ -119,7 +182,7 @@ data.
 
 ### Reproducible client-data pipeline
 
-- Converts LibProfessionDB v1.9.1 and LibItemDB v1.4.1 Lua literals without executing
+- Converts LibProfessionDB v1.9.1 and LibItemDB v1.6.0 Lua literals without executing
   Lua.
 - Reapplies reviewed corrections from a validated, versioned override file.
 - Archives exact raw bytes by SHA-256, normalizes immutable build records, and writes
@@ -127,19 +190,22 @@ data.
 - Imports generic client item labels through
   `ItemSparse.ItemNameDescriptionID → ItemNameDescription`, preserving the source
   product, client build, and locale. The current Leatherworking set contains three
-  `Scarce` reagents and four `Crafted` outputs from client build `1.60.1.70374`.
-- Imports build-scoped item display names, rarity IDs, equipment slots, armor,
-  required levels, and vendor sell prices from the same pinned client. Armor is
-  derived from the client's armor-total, quality, location, and shield tables
-  instead of guessed from an item name.
+  `Scarce` reagents and four `Crafted` outputs from client build `1.60.1.70450`.
+- Imports build-scoped item display names, rarity IDs, equipment slots, armor, item
+  stat lines, required levels, and vendor sell prices from the same pinned client.
+  Armor is derived from the client's armor-total, quality, location, and shield
+  tables. Stat values combine the client's item allocations with its level-, quality-,
+  and slot-specific random-property budgets, and use localized client strings rather
+  than guessed item-name heuristics.
 - Extracts local client icons through `wowdata`, including the equipment-appearance
   fallback path, and writes a build-stamped manifest.
 - Produces a repeatable quality audit instead of filling unknown facts with guesses.
 
 ## Current data boundary
 
-The bundled target is Forever build `1.60.1.69977`; client-derived icons, item-name
-descriptions, and tooltip attributes come from installed beta client build
+The bundled target is Forever build `1.60.1.69977`; client-derived item-name
+descriptions and tooltip attributes come from installed beta client build
+`1.60.1.70450`, while the unchanged icon bundle remains stamped with asset build
 `1.60.1.70374`. The Classic Era baseline is build `1.15.9.69722`.
 
 The data is useful but not authoritative:
@@ -150,6 +216,7 @@ The data is useful but not authoritative:
 - 630 of 760 referenced items have client tooltip attributes, including rarity; the
   other 130 have no `ItemSparse` row in the pinned client build and remain explicitly
   unenriched;
+- 427 referenced items expose 1,174 ordered client stat lines;
 - 90 recipes reference at least one item missing an English name in the source
   snapshot;
 - 595 output quantities remain provisional after reviewed overrides.
@@ -166,6 +233,38 @@ recipes with unknown learning ranks cannot enter a leveling route.
 - AWS credentials only for deployment or live DSQL validation
 - `wowdata` and a local Forever client only when regenerating icons, client item
   classifications, or tooltip attributes
+- Python 3.12 or newer only when using the optional local operations dashboard
+
+## Local operations dashboard
+
+`admin/` contains a standalone, localhost-only NiceGUI console for health checks,
+CloudWatch logs and usage, CloudFormation deployment status, and controlled execution
+of the repository's existing imports, validation, and deployment commands. It binds
+only to `127.0.0.1`, accepts no arbitrary terminal input, and uses the normal AWS
+credential chain without storing credentials.
+
+On Windows, create its isolated environment and launch it from the repository root:
+
+```powershell
+python -m venv .venv-admin
+.\.venv-admin\Scripts\python -m pip install -e ".\admin[dev]"
+Copy-Item .env.admin.example .env.admin
+.\.venv-admin\Scripts\forever-admin
+```
+
+See [`admin/README.md`](admin/README.md) for job registration, source configuration,
+AWS permissions, and troubleshooting. The dashboard never runs imports or deploys at
+startup; data-writing jobs require confirmation. **Update latest local catalog**
+checks for newer compatible LibProfessionDB and LibItemDB releases, regenerates only
+when a source file ID changed, and checks the exact hashes already loaded in local
+PostgreSQL. It skips imports when the catalog is current; otherwise it resets the
+local catalog volume and imports Classic followed by Forever in one fail-fast workflow.
+The Jobs page reports the pinned source versions and whether that operation changed
+them. It also provides a managed Start/Stop button for the local Vite frontend at
+`http://127.0.0.1:5173` and a separate local API button that automatically uses the
+loopback PostgreSQL catalog at `127.0.0.1:55432`. These local services require no AWS
+login or token. Staging and production publication remain separate reviewable
+operations.
 
 ## Full local start
 
@@ -175,7 +274,7 @@ Install dependencies once:
 pnpm install
 ```
 
-Start disposable PostgreSQL, import the Classic baseline, then import Forever while
+Start local PostgreSQL, import the Classic baseline, then import Forever while
 generating the comparison:
 
 ```text
@@ -208,9 +307,11 @@ pnpm dev:web
 - API: `http://localhost:3001`
 - PostgreSQL: `127.0.0.1:55432`
 
-Vite proxies `/api` to the local API. PostgreSQL uses container `tmpfs`; `pnpm
-db:local:down` removes the normalized database. Content-addressed raw imports under
-ignored `.local-data/` remain on disk.
+Vite proxies `/api` to the local API. PostgreSQL uses a named Docker volume, so the
+normalized catalog survives container and Docker Desktop restarts. `pnpm db:local:down`
+stops the database without deleting it; `pnpm db:local:reset` explicitly removes the
+local catalog volume when an immutable dataset or migration mismatch requires a clean
+import. Content-addressed raw imports under ignored `.local-data/` remain on disk.
 
 The API can run without `LOCAL_DATABASE_URL`, but it then serves only the small
 illustrative fixture. The browser also falls back to that fixture if the API cannot

@@ -25,6 +25,9 @@ function buildDataset(buildId: string): ImportedBuildDataset {
               spellId: 3780,
               learnSkill: 150,
               acquisition: "trainer",
+              teachingItemId: 9999,
+              sourceKinds: ["trainer"],
+              sourceDataOrigin: "forever",
               faction: "both",
               specializationSpellId: null,
               cooldownSeconds: null,
@@ -73,6 +76,12 @@ describe("build normalization", () => {
       clientData: {
         displayName: "Heavy Leather",
         qualityId: 1,
+        stats: [{
+          statId: 5,
+          value: 2,
+          displayText: "+2 Intellect",
+          displayTone: "attribute",
+        }],
         requiredLevel: 0,
         sellPriceCopper: 15,
         source: {
@@ -93,6 +102,9 @@ describe("build normalization", () => {
       recipeVersionId: "heavy-armor-kit@11.2.7.65000",
       spellId: 3780,
       learnSkill: 150,
+      teachingItemId: 9999,
+      sourceKinds: ["trainer"],
+      sourceDataOrigin: "forever",
     });
     expect(normalized.items.map(({ id }) => id)).toEqual([
       "heavy-armor-kit-item",
@@ -111,6 +123,12 @@ describe("build normalization", () => {
     expect(normalized.items.find(({ id }) => id === "heavy-leather")?.clientData).toEqual({
       displayName: "Heavy Leather",
       qualityId: 1,
+      stats: [{
+        statId: 5,
+        value: 2,
+        displayText: "+2 Intellect",
+        displayTone: "attribute",
+      }],
       requiredLevel: 0,
       sellPriceCopper: 15,
       source: {

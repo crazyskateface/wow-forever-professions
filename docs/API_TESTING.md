@@ -23,7 +23,8 @@ pnpm dev:api
 The API reports `PostgreSQL catalog` on startup. This mode serves the 603-recipe
 Leatherworking catalog and stored recipe comparison. Reagent and output records also
 include build-scoped `clientData` when available: display name, equipment slot, armor,
-required level, sell price in integer copper, and client source metadata.
+ordered item stats with localized display text, required level, sell price in integer
+copper, and client source metadata.
 
 ### Fixture-only API
 
@@ -137,9 +138,15 @@ GET /api/auction/markets
 GET /api/auction/prices?marketId=<market>&itemIds=<comma-separated-positive-integers>
 POST /api/routes/optimize
 POST /api/shopping-list
+POST /api/product-events
 ```
 
 The auction-price route accepts at most 100 unique item IDs per request.
+
+The product-event route accepts only the strict anonymous event union documented in
+[`PRODUCT_ANALYTICS.md`](PRODUCT_ANALYTICS.md). Unknown fields are rejected with
+`400`; an unconfigured or unavailable event sink returns `503`; accepted events
+return `204` with no body. Product analytics are non-blocking for browser workflows.
 
 The recipe-change list defaults to `comparison=classic-forever`, excludes Unchanged
 records unless `changeType=unchanged` is requested, and accepts optional profession,
@@ -147,11 +154,40 @@ change-type, and search filters. The summary counts every stored logical recipe,
 including Unchanged. Both routes return `503` when no comparison reader is configured
 and `404` when the requested comparison type has not been imported.
 
-The optimizer command accepts `startSkill`, `targetSkill`, `objective`, and an optional base URL. For example:
+The optimizer command remains a legacy objective-oriented diagnostic and accepts
+`startSkill`, `targetSkill`, `objective`, and an optional base URL. For example:
 
 ```text
 pnpm api:optimize -- 150 180 crafts https://m6ulu3zwch.execute-api.us-east-1.amazonaws.com
 ```
+
+Product requests to `POST /api/routes/optimize` use one of `practical`,
+`trainer-friendly`, `cheapest`, `fewest-crafts`, `fewest-materials`, or
+`experimental`. Presets own their objective, confidence, and penalty policy, so they
+cannot be combined with legacy `objective`, `confidencePolicy`, or custom `policy`
+fields. Cheapest requires a market:
+
+```json
+{
+  "professionId": "leatherworking",
+  "marketId": "forever.pvp.horde.us",
+  "startSkill": 150,
+  "targetSkill": 225,
+  "preset": "cheapest"
+}
+```
+
+Legacy direct clients may continue to send `objective` and optional
+`confidencePolicy`/`policy` without a preset. New product surfaces should not expose
+those raw controls.
+
+Successful segments and alternatives include an `evidence` object with a confidence
+level, stable reason codes, acquisition, availability, provenance source, and
+verification status. Segments include optimizer-authored `recommendation` reason
+codes and summaries; alternatives include a primary `lossReason` and `lossSummary`.
+An evidence-boundary gap returns `reason: "unsupported-recipe-evidence"` with
+`blockedAtSkill` and a product-ready `explanation`. Missing prices and ordinary
+eligibility gaps remain `missing-price-data` and `no-eligible-recipe`.
 
 The shopping command accepts `expectedCrafts`, `strategy`, and an optional base URL:
 
@@ -160,3 +196,7 @@ pnpm api:shopping -- 33.375 cheapest https://m6ulu3zwch.execute-api.us-east-1.am
 ```
 
 Valid shopping strategies are `cheapest`, `buy-only`, and `craft-first`.
+Available purchases include `priceObservedAt`, and the response includes
+`oldestPriceObservedAt` when at least one priced purchase contributed to the plan.
+Both values come from normalized stored observations. An absent timestamp means no
+priced purchase supplied one; it is not replaced with the request time.

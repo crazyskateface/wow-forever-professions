@@ -9,7 +9,11 @@ import {
 function build(
   id: string,
   spellId: number,
-  options: { readonly clientData?: boolean; readonly quality?: boolean } = {},
+  options: {
+    readonly clientData?: boolean;
+    readonly quality?: boolean;
+    readonly stats?: boolean;
+  } = {},
 ): NormalizedBuild {
   const item = {
     id: `item-${id}`,
@@ -22,6 +26,16 @@ function build(
           clientData: {
             displayName: `Item ${id}`,
             ...(options.quality ? { qualityId: 2 } : {}),
+            ...(options.stats
+              ? {
+                  stats: [{
+                    statId: 45,
+                    value: 5,
+                    displayText: "Equip: Increases spell power by 5.",
+                    displayTone: "effect" as const,
+                  }],
+                }
+              : {}),
             requiredLevel: 0,
             sellPriceCopper: 1,
             source: { product: "wow", build: id, locale: "enUS" },
@@ -79,7 +93,7 @@ function build(
 describe("release row-count validation", () => {
   it("derives source and unchanged-inclusive comparison counts", () => {
     const base = build("base", 100);
-    const target = build("target", 100, { clientData: true, quality: true });
+    const target = build("target", 100, { clientData: true, quality: true, stats: true });
 
     expect(
       expectedReleaseRowCounts(base, target, "CLASSIC_TO_FOREVER"),
@@ -89,6 +103,7 @@ describe("release row-count validation", () => {
       recipeChanges: 1,
       targetClientItems: 1,
       targetQualityItems: 1,
+      targetItemStats: 1,
     });
   });
 
@@ -99,6 +114,7 @@ describe("release row-count validation", () => {
       recipe_changes: "0",
       target_client_items: "1",
       target_quality_items: "1",
+      target_item_stats: "1",
     });
 
     expect(() =>
@@ -109,6 +125,7 @@ describe("release row-count validation", () => {
           recipeChanges: 1,
           targetClientItems: 1,
           targetQualityItems: 1,
+          targetItemStats: 1,
         },
         persisted,
       ),
@@ -123,6 +140,7 @@ describe("release row-count validation", () => {
         recipe_changes: 1,
         target_client_items: 1,
         target_quality_items: 1,
+        target_item_stats: 1,
       }),
     ).toThrow("base_recipes");
   });

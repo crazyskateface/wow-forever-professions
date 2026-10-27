@@ -32,6 +32,30 @@ describe("leveling route application policy", () => {
     ).rejects.toThrow(/base profession cap/);
   });
 
+  it("resolves named presets without accepting raw optimizer settings", async () => {
+    const response = await optimizeFixtureRoute(
+      {
+        professionId: leatherworkingFixture.id,
+        startSkill: 150,
+        targetSkill: 151,
+        preset: "fewest-materials",
+      },
+      leatherworkingFixture,
+    );
+
+    expect(response.result).toMatchObject({
+      preset: "fewest-materials",
+      objective: "materials",
+      confidencePolicy: "supported-only",
+      segments: [{
+        recommendation: {
+          reasons: expect.any(Array),
+          summary: expect.any(String),
+        },
+      }],
+    });
+  });
+
   it("uses imported client classification and avoids scarce reagents when possible", async () => {
     const baseRecipe = leatherworkingFixture.recipes[0]!;
     const pristineRecipe = {
@@ -139,6 +163,63 @@ describe("leveling route application policy", () => {
     expect(response.result).toMatchObject({
       status: "complete",
       segments: [{ recipeId: "pristine-recipe" }],
+    });
+  });
+
+  it("returns segment evidence and enforces the supported-only boundary", async () => {
+    const baseRecipe = leatherworkingFixture.recipes[0]!;
+    const profession = {
+      ...leatherworkingFixture,
+      recipes: [{
+        ...baseRecipe,
+        acquisition: "unknown" as const,
+        availability: "unknown" as const,
+      }],
+    };
+
+    const practical = await optimizeFixtureRoute(
+      {
+        professionId: profession.id,
+        startSkill: 150,
+        targetSkill: 151,
+        objective: "materials",
+      },
+      profession,
+    );
+    expect(practical.result).toMatchObject({
+      status: "complete",
+      confidencePolicy: "practical",
+      segments: [{
+        evidence: {
+          level: "unknown",
+          reasons: [
+            "unknown-acquisition",
+            "unknown-availability",
+            "unverified-recipe",
+          ],
+          acquisition: "unknown",
+          availability: "unknown",
+          provenanceSource: "fixture",
+          verificationStatus: "unverified",
+        },
+      }],
+    });
+
+    const supportedOnly = await optimizeFixtureRoute(
+      {
+        professionId: profession.id,
+        startSkill: 150,
+        targetSkill: 151,
+        objective: "materials",
+        confidencePolicy: "supported-only",
+      },
+      profession,
+    );
+    expect(supportedOnly.result).toMatchObject({
+      status: "blocked",
+      confidencePolicy: "supported-only",
+      blockedAtSkill: 150,
+      reason: "unsupported-recipe-evidence",
     });
   });
 });

@@ -4,13 +4,13 @@ The transformed dataset in this directory incorporates data from:
 
 - LibProfessionDB v1.9.1, Forever client build 1.60.1.69977: <https://www.curseforge.com/wow/addons/libprofessiondb/files/9095167>
 - LibProfessionDB v1.9.1, Vanilla client build 1.15.9.69722 (Classic Era baseline): <https://www.curseforge.com/wow/addons/libprofessiondb/files/9095167>
-- LibItemDB v1.4.1, Forever English item names and item classifications: <https://www.curseforge.com/wow/addons/libitemdb/files/9150115>
-- LibItemDB v1.4.1, Vanilla English item names and item classifications: <https://www.curseforge.com/wow/addons/libitemdb/files/9150115>
+- LibItemDB v1.6.0, Forever English item names and item classifications: <https://www.curseforge.com/wow/addons/libitemdb/files/9233325>
+- LibItemDB v1.6.0, Vanilla English item names and item classifications: <https://www.curseforge.com/wow/addons/libitemdb/files/9233325>
 
 Source archive SHA-256 checksums used for this transform:
 
-- `ProfessionDB-v1.9.1.zip`: `909cb41720cf6bf6920f1c25c644f89b39ad63087f589c07737e7da943c52379`
-- `ItemDB-v1.4.1.zip`: `1b943c0e546c44885ef9e97abce7db6efa63857485dc855b8ed61f60645cfd3c`
+- `ProfessionDB-ProfessionDB-v1.9.1.zip`: `909cb41720cf6bf6920f1c25c644f89b39ad63087f589c07737e7da943c52379`
+- `ItemDB-ItemDB-v1.6.0.zip`: `d200101f01f2e501fef0362dd5199991e930ad79c8e60080a205e4506ace5eed`
 
 Both source archives include the following license:
 

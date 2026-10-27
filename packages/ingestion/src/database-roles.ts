@@ -21,11 +21,14 @@ const catalogTables = [
   "recipe_output",
   "provenance",
   "recipe_metadata",
+  "recipe_acquisition_detail",
+  "recipe_source_kind",
   "recipe_comparison",
   "recipe_change",
   "item_classification",
   "item_client_data",
   "item_quality",
+  "item_stat",
 ] as const;
 
 const pricingTables = ["auction_market", "auction_price_current"] as const;

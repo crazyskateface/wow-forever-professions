@@ -37,6 +37,9 @@ const server = createServer(async (request, response) => {
       ...(localCatalog === undefined ? {} : { catalog: localCatalog }),
       ...(localCatalog === undefined ? {} : { changes: localCatalog }),
       pricing: localPricingReader,
+      productEventSink(event) {
+        console.info(JSON.stringify({ event, type: "anonymous-product-event" }));
+      },
       readiness:
         localCatalog === undefined
           ? async () => undefined
@@ -52,9 +55,9 @@ const server = createServer(async (request, response) => {
   response.end(result.body);
 });
 
-server.listen(port, () => {
+server.listen(port, "127.0.0.1", () => {
   console.log(
-    `Forever Professions API listening on http://localhost:${port} (${localCatalog ? "PostgreSQL catalog" : "fixture catalog"})`,
+    `Forever Professions API listening on http://127.0.0.1:${port} (${localCatalog ? "PostgreSQL catalog" : "fixture catalog"})`,
   );
 });
 

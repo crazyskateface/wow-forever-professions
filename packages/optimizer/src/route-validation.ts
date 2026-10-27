@@ -1,4 +1,8 @@
 export type ValidationRouteObjective = "cost" | "crafts" | "materials";
+export type ValidationRouteConfidencePolicy =
+  | "practical"
+  | "supported-only"
+  | "experimental";
 
 export interface ComparableRouteStep {
   readonly skill: number;
@@ -20,6 +24,7 @@ export interface ComparableRouteSegment {
 export interface ComparableCompleteRoute {
   readonly status: "complete";
   readonly objective: ValidationRouteObjective;
+  readonly confidencePolicy: ValidationRouteConfidencePolicy;
   readonly startSkill: number;
   readonly targetSkill: number;
   readonly steps: readonly ComparableRouteStep[];
@@ -143,6 +148,7 @@ export interface GuideRouteBaseline {
   readonly professionName: string;
   readonly recipeBuildId: string;
   readonly objective: ValidationRouteObjective;
+  readonly confidencePolicy: ValidationRouteConfidencePolicy;
   readonly startSkill: number;
   readonly targetSkill: number;
   readonly totals: ComparableCompleteRoute["totals"];
@@ -538,6 +544,7 @@ export function createGuideValidation(
       professionName: input.professionName,
       recipeBuildId: input.recipeBuildId,
       objective: input.route.objective,
+      confidencePolicy: input.route.confidencePolicy,
       startSkill: input.route.startSkill,
       targetSkill: input.route.targetSkill,
       totals: input.route.totals,
@@ -605,7 +612,7 @@ export function renderGuideValidationMarkdown(result: GuideValidationResult): st
   const lines = [
     `# Guide validation: ${baseline.professionName} ${baseline.startSkill}–${baseline.targetSkill}`,
     "",
-    `Generated from recipe build \`${baseline.recipeBuildId}\` at ${baseline.generatedAt}.`,
+    `Generated from recipe build \`${baseline.recipeBuildId}\` at ${baseline.generatedAt} using the \`${baseline.confidencePolicy}\` confidence policy.`,
     `Compared with [${reference.source.publisher}](${reference.source.url}), captured ${reference.source.capturedAt}${reference.source.sourceBuildId === undefined ? "" : ` and labeled for build \`${reference.source.sourceBuildId}\``}.`,
     "",
     "> This comparison is diagnostic evidence, not an automatic recipe-data correction. A third-party route can use different prices, accessibility assumptions, or unsupported game facts.",
@@ -666,7 +673,6 @@ export function renderGuideValidationMarkdown(result: GuideValidationResult): st
     ...reference.steps.map((step) =>
       `| ${step.startSkill}–${step.endSkill} | ${markdownCell(step.recipeName)} | ${displayed(step.expectedCrafts)} |`,
     ),
-    "",
   ];
   return `${lines.join("\n")}\n`;
 }

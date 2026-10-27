@@ -25,6 +25,8 @@ export interface DataQualityReport {
     readonly qualityItems: number;
     readonly equipmentSlotItems: number;
     readonly armorItems: number;
+    readonly statItems: number;
+    readonly statLines: number;
     readonly requiredLevelItems: number;
     readonly sellPriceItems: number;
   };
@@ -291,6 +293,11 @@ export function auditImportedBuildDataset(input: ImportedBuildDataset): DataQual
         ({ clientData }) => clientData?.equipmentSlot !== undefined,
       ).length,
       armorItems: items.filter(({ clientData }) => clientData?.armor !== undefined).length,
+      statItems: items.filter(({ clientData }) => (clientData?.stats?.length ?? 0) > 0).length,
+      statLines: items.reduce(
+        (total, { clientData }) => total + (clientData?.stats?.length ?? 0),
+        0,
+      ),
       requiredLevelItems: items.filter(
         ({ clientData }) => clientData?.requiredLevel !== undefined,
       ).length,
@@ -357,6 +364,8 @@ export function renderDataQualityMarkdown(report: DataQualityReport): string {
     `- Item rarities: ${report.itemMetadata.qualityItems}/${report.items}`,
     `- Equipment slots: ${report.itemMetadata.equipmentSlotItems}/${report.items}`,
     `- Armor values: ${report.itemMetadata.armorItems}/${report.items}`,
+    `- Items with tooltip stats: ${report.itemMetadata.statItems}/${report.items}`,
+    `- Tooltip stat lines: ${report.itemMetadata.statLines}`,
     `- Required levels: ${report.itemMetadata.requiredLevelItems}/${report.items}`,
     `- Vendor sell prices: ${report.itemMetadata.sellPriceItems}/${report.items}`,
     "",

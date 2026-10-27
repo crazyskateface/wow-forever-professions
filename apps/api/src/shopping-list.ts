@@ -76,11 +76,19 @@ export async function buildFixtureShoppingList(
     gameItemIds.length === 0
       ? []
       : await pricing.getCurrentPrices({ marketId: request.marketId, gameItemIds });
-  const pricesByGameItemId = new Map<number, number>();
+  const pricesByGameItemId = new Map<
+    number,
+    { readonly unitPriceCopper: number; readonly priceObservedAt: string }
+  >();
   let attribution: AuctionPriceAttribution | undefined;
   for (const observation of observations) {
     const price = unitPrice(observation);
-    if (price !== undefined) pricesByGameItemId.set(observation.gameItemId, price);
+    if (price !== undefined && observation.status === "available") {
+      pricesByGameItemId.set(observation.gameItemId, {
+        unitPriceCopper: price,
+        priceObservedAt: observation.observedAt,
+      });
+    }
     attribution ??= observation.attribution;
   }
 
@@ -92,7 +100,12 @@ export async function buildFixtureShoppingList(
     return {
       id,
       name: item.name,
-      ...(price === undefined ? {} : { unitPriceCopper: price }),
+      ...(price === undefined
+        ? {}
+        : {
+            unitPriceCopper: price.unitPriceCopper,
+            priceObservedAt: price.priceObservedAt,
+          }),
     };
   });
   const recipes: ShoppingRecipe[] = profession.recipes.map((recipe) => ({
@@ -102,18 +115,26 @@ export async function buildFixtureShoppingList(
     outputs: recipe.outputs.map(({ itemId, quantity }) => ({ itemId, quantity })),
   }));
 
+  const plan = planShoppingList({
+    route: request.route,
+    recipes,
+    items,
+    strategy: request.strategy,
+    ...(request.knownRecipeIds === undefined
+      ? {}
+      : { knownRecipeIds: request.knownRecipeIds }),
+  });
+  const oldestPriceObservedAt = plan.purchases
+    .flatMap(({ priceObservedAt }) =>
+      priceObservedAt === undefined ? [] : [priceObservedAt],
+    )
+    .sort()[0];
+
   return shoppingListResponseSchema.parse({
     professionId: profession.id,
     marketId: request.marketId,
     ...(attribution === undefined ? {} : { attribution }),
-    plan: planShoppingList({
-      route: request.route,
-      recipes,
-      items,
-      strategy: request.strategy,
-      ...(request.knownRecipeIds === undefined
-        ? {}
-        : { knownRecipeIds: request.knownRecipeIds }),
-    }),
+    ...(oldestPriceObservedAt === undefined ? {} : { oldestPriceObservedAt }),
+    plan,
   });
 }

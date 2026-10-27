@@ -56,6 +56,13 @@ export async function handler(
       ...(catalog === undefined ? {} : { catalog }),
       ...(changes === undefined ? {} : { changes }),
       ...(pricing === undefined ? {} : { pricing }),
+      productEventSink(event) {
+        console.info(JSON.stringify({
+          event,
+          receivedAt: new Date().toISOString(),
+          type: "anonymous-product-event",
+        }));
+      },
       ...(readiness === undefined ? {} : { readiness }),
       ...(corsOrigin === undefined || corsOrigin.length === 0 ? {} : { corsOrigin }),
     },

@@ -24,6 +24,9 @@ describe("SQL recipe catalog", () => {
               spell_id: 3780,
               learn_skill: null,
               acquisition: "unknown",
+              acquisition_detail_recipe_version_id: "spell-3780@1.60.1.69977",
+              teaching_item_id: 8385,
+              source_data_origin: "forever",
               faction: "unknown",
               specialization_spell_id: null,
               cooldown_seconds: null,
@@ -95,6 +98,22 @@ describe("SQL recipe catalog", () => {
             },
           ]);
         }
+        if (sql.startsWith("SELECT item_id, stat_index")) {
+          return result([{
+            item_id: "item-2308",
+            stat_index: 0,
+            stat_id: 45,
+            stat_value: 5,
+            display_text: "Equip: Increases spell power by 5.",
+            display_tone: "effect",
+          }]);
+        }
+        if (sql.startsWith("SELECT rsk.recipe_version_id")) {
+          return result([{
+            recipe_version_id: "spell-3780@1.60.1.69977",
+            source_kind: "drop",
+          }]);
+        }
         throw new Error(`Unexpected SQL: ${sql}`);
       },
     };
@@ -110,6 +129,9 @@ describe("SQL recipe catalog", () => {
           spellId: 3780,
           buildId: "1.60.1.69977",
           learnSkill: null,
+          teachingItemId: 8385,
+          sourceKinds: ["drop"],
+          sourceDataOrigin: "forever",
           availability: "unknown",
           reagents: [{
             itemId: "item-4234",
@@ -138,6 +160,12 @@ describe("SQL recipe catalog", () => {
               qualityId: 2,
               equipmentSlot: "Back",
               armor: 14,
+              stats: [{
+                statId: 45,
+                value: 5,
+                displayText: "Equip: Increases spell power by 5.",
+                displayTone: "effect",
+              }],
               requiredLevel: 10,
               sellPriceCopper: 267,
               source: { build: "1.60.1.70374" },

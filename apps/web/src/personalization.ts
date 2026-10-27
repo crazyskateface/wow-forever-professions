@@ -1,7 +1,3 @@
-import type {
-  RouteObjective,
-  ShoppingStrategy,
-} from "@forever-professions/contracts";
 import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
 
 export type PlayerFaction = "alliance" | "horde";
@@ -28,13 +24,8 @@ export interface ForeverChangeFilters {
 }
 
 export interface PersonalizationPreferences {
-  readonly version: 1;
+  readonly version: 3;
   readonly currentSkill: number;
-  readonly routeStartSkill: number;
-  readonly targetSkill: number;
-  readonly routeObjective: RouteObjective;
-  readonly shoppingStrategy: ShoppingStrategy;
-  readonly trainerOnly: boolean;
   readonly region: string;
   readonly marketId: string;
   readonly faction: PlayerFaction;
@@ -49,6 +40,10 @@ interface BrowserStorage {
 }
 
 export const PERSONALIZATION_STORAGE_KEY =
+  "forever-professions.personalization.v3";
+const PREVIOUS_PERSONALIZATION_STORAGE_KEY =
+  "forever-professions.personalization.v2";
+const LEGACY_PERSONALIZATION_STORAGE_KEY =
   "forever-professions.personalization.v1";
 
 export const DEFAULT_CHANGE_FILTERS: ForeverChangeFilters = {
@@ -60,13 +55,8 @@ export const DEFAULT_CHANGE_FILTERS: ForeverChangeFilters = {
 };
 
 export const DEFAULT_PERSONALIZATION: PersonalizationPreferences = {
-  version: 1,
+  version: 3,
   currentSkill: 1,
-  routeStartSkill: 1,
-  targetSkill: FOREVER_BUILD_CONFIG.maxBaseSkill,
-  routeObjective: "crafts",
-  shoppingStrategy: "cheapest",
-  trainerOnly: false,
   region: "us",
   marketId: "forever.pvp.horde.us",
   faction: "horde",
@@ -74,8 +64,6 @@ export const DEFAULT_PERSONALIZATION: PersonalizationPreferences = {
   changeFilters: DEFAULT_CHANGE_FILTERS,
 };
 
-const ROUTE_OBJECTIVES = ["cost", "crafts", "materials"] as const;
-const SHOPPING_STRATEGIES = ["cheapest", "buy-only", "craft-first"] as const;
 const PLAYER_FACTIONS = ["alliance", "horde"] as const;
 const CHANGE_FILTERS = [
   "CHANGED",
@@ -129,48 +117,20 @@ function booleanValue(value: unknown, fallback: boolean): boolean {
 }
 
 export function parsePersonalization(value: unknown): PersonalizationPreferences {
-  if (!isRecord(value) || value.version !== 1) return DEFAULT_PERSONALIZATION;
-
-  const routeStartSkill = boundedInteger(
-    value.routeStartSkill,
-    DEFAULT_PERSONALIZATION.routeStartSkill,
-    0,
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2 && value.version !== 3)) {
+    return DEFAULT_PERSONALIZATION;
+  }
+  const currentSkill = boundedInteger(
+    value.currentSkill,
+    DEFAULT_PERSONALIZATION.currentSkill,
+    1,
     FOREVER_BUILD_CONFIG.maxBaseSkill,
   );
   const changeFilters = isRecord(value.changeFilters) ? value.changeFilters : {};
 
   return {
-    version: 1,
-    currentSkill: boundedInteger(
-      value.currentSkill,
-      DEFAULT_PERSONALIZATION.currentSkill,
-      0,
-      FOREVER_BUILD_CONFIG.maxBaseSkill,
-    ),
-    routeStartSkill,
-    targetSkill: Math.max(
-      routeStartSkill,
-      boundedInteger(
-        value.targetSkill,
-        DEFAULT_PERSONALIZATION.targetSkill,
-        0,
-        FOREVER_BUILD_CONFIG.maxBaseSkill,
-      ),
-    ),
-    routeObjective: oneOf(
-      value.routeObjective,
-      ROUTE_OBJECTIVES,
-      DEFAULT_PERSONALIZATION.routeObjective,
-    ),
-    shoppingStrategy: oneOf(
-      value.shoppingStrategy,
-      SHOPPING_STRATEGIES,
-      DEFAULT_PERSONALIZATION.shoppingStrategy,
-    ),
-    trainerOnly: booleanValue(
-      value.trainerOnly,
-      DEFAULT_PERSONALIZATION.trainerOnly,
-    ),
+    version: 3,
+    currentSkill,
     region: nonEmptyString(value.region, DEFAULT_PERSONALIZATION.region),
     marketId: nonEmptyString(value.marketId, DEFAULT_PERSONALIZATION.marketId),
     faction: oneOf(
@@ -218,7 +178,9 @@ export function readPersonalization(
       typeof window === "undefined" ? undefined : window.localStorage
     );
     if (resolvedStorage === undefined) return DEFAULT_PERSONALIZATION;
-    const stored = resolvedStorage.getItem(PERSONALIZATION_STORAGE_KEY);
+    const stored = resolvedStorage.getItem(PERSONALIZATION_STORAGE_KEY) ??
+      resolvedStorage.getItem(PREVIOUS_PERSONALIZATION_STORAGE_KEY) ??
+      resolvedStorage.getItem(LEGACY_PERSONALIZATION_STORAGE_KEY);
     return stored === null
       ? DEFAULT_PERSONALIZATION
       : parsePersonalization(JSON.parse(stored));
@@ -250,6 +212,8 @@ export function clearPersonalization(storage?: BrowserStorage): boolean {
     );
     if (resolvedStorage === undefined) return false;
     resolvedStorage.removeItem(PERSONALIZATION_STORAGE_KEY);
+    resolvedStorage.removeItem(PREVIOUS_PERSONALIZATION_STORAGE_KEY);
+    resolvedStorage.removeItem(LEGACY_PERSONALIZATION_STORAGE_KEY);
     return true;
   } catch {
     return false;

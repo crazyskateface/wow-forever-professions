@@ -1,6 +1,7 @@
 export * from "./leveling-cost.js";
 export * from "./profession-cap.js";
 export * from "./skill-up.js";
+export * from "./best-crafts.js";
 
 export type ProvenanceSource =
   | "client-data"
@@ -57,6 +58,6 @@ export function assessDataQuality(
     label: "Unverified",
     authoritative: false,
     explanation:
-      "This data has not yet been independently verified for World of Warcraft: Forever.",
+      "This data has not yet been independently verified for WoW Forever.",
   };
 }

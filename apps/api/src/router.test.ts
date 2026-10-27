@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   healthResponseSchema,
+  productEventSchema,
   professionFixtureSchema,
   readinessResponseSchema,
   recipeChangesResponseSchema,
@@ -32,6 +33,34 @@ describe("fixture API router", () => {
   it("omits cross-origin headers unless an origin is explicitly configured", async () => {
     const response = await routeRequest("GET", "/api/health");
     expect(response.headers).not.toHaveProperty("access-control-allow-origin");
+  });
+
+  it("accepts only contract-valid anonymous product events", async () => {
+    const captured: unknown[] = [];
+    const event = productEventSchema.parse({
+      name: "route-blocked",
+      buildId: "1.60.1.69977",
+      preset: "practical",
+      reason: "unsupported-recipe-evidence",
+    });
+    const accepted = await routeRequest("POST", "/api/product-events", {}, {
+      productEventSink(value) {
+        captured.push(value);
+      },
+    }, event);
+    expect(accepted).toMatchObject({ statusCode: 204, body: "" });
+    expect(captured).toEqual([event]);
+
+    const rejected = await routeRequest("POST", "/api/product-events", {}, {
+      productEventSink(value) {
+        captured.push(value);
+      },
+    }, { ...event, characterName: "Private" });
+    expect(rejected.statusCode).toBe(400);
+    expect(captured).toEqual([event]);
+
+    const unavailable = await routeRequest("POST", "/api/product-events", {}, {}, event);
+    expect(unavailable.statusCode).toBe(503);
   });
 
   it("returns a contract-valid health response", async () => {
@@ -405,6 +434,8 @@ describe("fixture API router", () => {
     expect(
       shoppingListResponseSchema.parse(JSON.parse(response.body)),
     ).toMatchObject({
+      marketId: "forever.pvp.horde.us",
+      oldestPriceObservedAt: "2026-10-08T06:00:00.000Z",
       plan: {
         status: "complete",
         routeReagents: [
@@ -412,8 +443,18 @@ describe("fixture API router", () => {
           { itemId: "heavy-leather", quantity: 12.5 },
         ],
         purchases: [
-          { itemId: "fine-thread", quantity: 2.5, expectedCostCopper: 25 },
-          { itemId: "heavy-leather", quantity: 12.5, expectedCostCopper: 125 },
+          {
+            itemId: "fine-thread",
+            quantity: 2.5,
+            expectedCostCopper: 25,
+            priceObservedAt: "2026-10-08T06:00:00.000Z",
+          },
+          {
+            itemId: "heavy-leather",
+            quantity: 12.5,
+            expectedCostCopper: 125,
+            priceObservedAt: "2026-10-08T06:00:00.000Z",
+          },
         ],
         crafts: [],
         expectedCostCopper: 150,

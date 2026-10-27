@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import type { ImportedBuildDataset } from "@forever-professions/contracts";
 import {
@@ -29,6 +30,16 @@ function localConnectionUrl(): string {
   return value;
 }
 
+function temporaryDatabaseUrl(connectionUrl: string, databaseName: string): string {
+  const parsed = new URL(connectionUrl);
+  parsed.pathname = `/${databaseName}`;
+  return parsed.toString();
+}
+
+function quoteIdentifier(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
 function sampleDataset(): ImportedBuildDataset {
   return {
     build: { id: "local-11.2.7.65000", version: "11.2.7" },
@@ -56,6 +67,9 @@ function sampleDataset(): ImportedBuildDataset {
               specializationSpellId: null,
               cooldownSeconds: null,
               availability: "available",
+              teachingItemId: 9999,
+              sourceKinds: ["trainer"],
+              sourceDataOrigin: "forever",
             },
             thresholds: { orange: 150, yellow: 170, green: 180, gray: 190 },
             reagents: [
@@ -70,6 +84,14 @@ function sampleDataset(): ImportedBuildDataset {
                   clientData: {
                     displayName: "Heavy Leather",
                     qualityId: 1,
+                    stats: [
+                      {
+                        statId: 45,
+                        value: 2,
+                        displayText: "Equip: Increases spell power by 2.",
+                        displayTone: "effect",
+                      },
+                    ],
                     requiredLevel: 0,
                     sellPriceCopper: 15,
                     source: {
@@ -202,11 +224,14 @@ async function clearLocalRows(pool: Pool): Promise<void> {
     await client.query("DELETE FROM recipe_output");
     await client.query("DELETE FROM recipe_reagent");
     await client.query("DELETE FROM recipe_threshold");
+    await client.query("DELETE FROM recipe_source_kind");
+    await client.query("DELETE FROM recipe_acquisition_detail");
     await client.query("DELETE FROM recipe_metadata");
     await client.query("DELETE FROM provenance");
     await client.query("DELETE FROM recipe_version");
     await client.query("DELETE FROM verification");
     await client.query("DELETE FROM recipe");
+    await client.query("DELETE FROM item_stat");
     await client.query("DELETE FROM item_quality");
     await client.query("DELETE FROM item_client_data");
     await client.query("DELETE FROM item_classification");
@@ -271,12 +296,15 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     reagents: string;
     outputs: string;
     recipe_metadata: string;
+    recipe_acquisition_details: string;
+    recipe_source_kinds: string;
     comparisons: string;
     recipe_changes: string;
     item_client_data: string;
     item_quality: string;
+    item_stats: string;
   }>(
-    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM item_client_data) AS item_client_data, (SELECT COUNT(*) FROM item_quality) AS item_quality, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
+    "SELECT (SELECT COUNT(*) FROM wow_build) AS builds, (SELECT COUNT(*) FROM item) AS items, (SELECT COUNT(*) FROM item_client_data) AS item_client_data, (SELECT COUNT(*) FROM item_quality) AS item_quality, (SELECT COUNT(*) FROM item_stat) AS item_stats, (SELECT COUNT(*) FROM recipe_version) AS recipe_versions, (SELECT COUNT(*) FROM recipe_metadata) AS recipe_metadata, (SELECT COUNT(*) FROM recipe_acquisition_detail) AS recipe_acquisition_details, (SELECT COUNT(*) FROM recipe_source_kind) AS recipe_source_kinds, (SELECT COUNT(*) FROM recipe_reagent) AS reagents, (SELECT COUNT(*) FROM recipe_output) AS outputs, (SELECT COUNT(*) FROM recipe_comparison) AS comparisons, (SELECT COUNT(*) FROM recipe_change) AS recipe_changes",
   );
   const row = counts.rows[0]!;
 
@@ -285,11 +313,14 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     "SELECT COUNT(*) AS count FROM recipe_reagent rr LEFT JOIN recipe_version rv ON rv.recipe_version_id = rr.recipe_version_id LEFT JOIN item i ON i.item_id = rr.item_id WHERE rv.recipe_version_id IS NULL OR i.item_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_output ro LEFT JOIN recipe_version rv ON rv.recipe_version_id = ro.recipe_version_id LEFT JOIN item i ON i.item_id = ro.item_id WHERE rv.recipe_version_id IS NULL OR i.item_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_metadata rm LEFT JOIN recipe_version rv ON rv.recipe_version_id = rm.recipe_version_id WHERE rv.recipe_version_id IS NULL",
+    "SELECT COUNT(*) AS count FROM recipe_acquisition_detail rad LEFT JOIN recipe_version rv ON rv.recipe_version_id = rad.recipe_version_id WHERE rv.recipe_version_id IS NULL",
+    "SELECT COUNT(*) AS count FROM recipe_source_kind rsk LEFT JOIN recipe_version rv ON rv.recipe_version_id = rsk.recipe_version_id WHERE rv.recipe_version_id IS NULL",
     "SELECT COUNT(*) AS count FROM provenance p LEFT JOIN recipe_version rv ON rv.recipe_version_id = p.recipe_version_id LEFT JOIN data_source s ON s.source_id = p.source_id LEFT JOIN verification v ON v.verification_id = p.verification_id WHERE rv.recipe_version_id IS NULL OR s.source_id IS NULL OR v.verification_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_comparison c LEFT JOIN wow_build b ON b.build_id = c.base_build_id LEFT JOIN wow_build t ON t.build_id = c.target_build_id WHERE b.build_id IS NULL OR t.build_id IS NULL",
     "SELECT COUNT(*) AS count FROM recipe_change rc LEFT JOIN recipe_comparison c ON c.comparison_id = rc.comparison_id LEFT JOIN profession p ON p.profession_id = rc.profession_id WHERE c.comparison_id IS NULL OR p.profession_id IS NULL",
     "SELECT COUNT(*) AS count FROM item_client_data icd LEFT JOIN item i ON i.item_id = icd.item_id LEFT JOIN wow_build b ON b.build_id = icd.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
     "SELECT COUNT(*) AS count FROM item_quality iq LEFT JOIN item i ON i.item_id = iq.item_id LEFT JOIN wow_build b ON b.build_id = iq.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
+    "SELECT COUNT(*) AS count FROM item_stat ist LEFT JOIN item i ON i.item_id = ist.item_id LEFT JOIN wow_build b ON b.build_id = ist.recipe_build_id WHERE i.item_id IS NULL OR b.build_id IS NULL",
   ] as const;
   let orphanCount = 0;
   for (const orphanQuery of orphanQueries) {
@@ -303,31 +334,43 @@ async function verifyDatabase(pool: Pool): Promise<Record<string, number>> {
     items: Number(row.items),
     recipeVersions: Number(row.recipe_versions),
     recipeMetadata: Number(row.recipe_metadata),
+    recipeAcquisitionDetails: Number(row.recipe_acquisition_details),
+    recipeSourceKinds: Number(row.recipe_source_kinds),
     reagents: Number(row.reagents),
     outputs: Number(row.outputs),
     comparisons: Number(row.comparisons),
     recipeChanges: Number(row.recipe_changes),
     itemClientData: Number(row.item_client_data),
     itemQualities: Number(row.item_quality),
+    itemStats: Number(row.item_stats),
     orphans: orphanCount,
   };
 }
 
 async function main(): Promise<void> {
-  const pool = new Pool({ connectionString: localConnectionUrl(), max: 3 });
+  const connectionUrl = localConnectionUrl();
+  const databaseName = `forever_professions_smoke_${randomUUID().replaceAll("-", "")}`;
+  const adminPool = new Pool({ connectionString: connectionUrl, max: 1 });
+  let pool: Pool | undefined;
   const rawStore = new MemoryRawDatasetStore();
-  const transactionRunner = createLocalTransactionRunner(pool);
   const baseDataset = sampleDataset();
   const rawBytes = new TextEncoder().encode(JSON.stringify(baseDataset));
   const targetRawBytes = new TextEncoder().encode(JSON.stringify(targetDataset()));
 
   try {
+    await adminPool.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`);
+    const testPool = new Pool({
+      connectionString: temporaryDatabaseUrl(connectionUrl, databaseName),
+      max: 3,
+    });
+    pool = testPool;
+    const transactionRunner = createLocalTransactionRunner(testPool);
     const migrations = await applySqlMigrations(transactionRunner, {
       dialect: "postgres",
       scope: "catalog",
       migrations: await loadSqlMigrations(new URL("../sql/", import.meta.url)),
     });
-    await clearLocalRows(pool);
+    await clearLocalRows(testPool);
     const firstImport = await ingestBuildDataset({
       rawBytes,
       rawStore,
@@ -368,10 +411,12 @@ async function main(): Promise<void> {
         },
       ],
     });
-    const rows = await verifyDatabase(pool);
+    const rows = await verifyDatabase(testPool);
     const database: SqlExecutor = {
       query: async (sql, values): Promise<SqlQueryResult> => {
-        const result = values === undefined ? await pool.query(sql) : await pool.query(sql, [...values]);
+        const result = values === undefined
+          ? await testPool.query(sql)
+          : await testPool.query(sql, [...values]);
         return {
           rowCount: result.rowCount,
           rows: result.rows as readonly Record<string, unknown>[],
@@ -391,6 +436,9 @@ async function main(): Promise<void> {
     if (
       rows.comparisons !== 1 ||
       rows.recipeChanges !== 3 ||
+      rows.recipeAcquisitionDetails !== 2 ||
+      rows.recipeSourceKinds !== 2 ||
+      rows.itemStats !== 2 ||
       changeSummary?.summary.new !== 1 ||
       changeSummary.summary.updated !== 1 ||
       changeSummary.summary.unchanged !== 1 ||
@@ -422,7 +470,11 @@ async function main(): Promise<void> {
       )}\n`,
     );
   } finally {
-    await pool.end();
+    await pool?.end();
+    await adminPool.query(
+      `DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)} WITH (FORCE)`,
+    );
+    await adminPool.end();
   }
 }
 

@@ -1,16 +1,17 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-14T23:07:22.212Z",
+  "generatedAt": "2026-10-20T04:38:36.474Z",
   "professionId": "leatherworking",
   "professionName": "Leatherworking",
   "recipeBuildId": "1.60.1.69977",
   "objective": "crafts",
+  "confidencePolicy": "practical",
   "startSkill": 1,
   "targetSkill": 300,
   "totals": {
     "expectedSkillUps": 299,
     "expectedCrafts": 299,
-    "expectedMaterials": 3185
+    "expectedMaterials": 3245
   },
   "segments": [
     {
@@ -65,18 +66,18 @@
       }
     },
     {
-      "recipeId": "spell-1255123",
-      "recipeName": "Forceful Medium Armor Kit",
+      "recipeId": "spell-2158",
+      "recipeName": "Fine Leather Boots",
       "startSkill": 81,
       "endSkill": 96,
       "expectedCrafts": 15,
-      "expectedMaterials": 75,
+      "expectedMaterials": 135,
       "evidence": {
-        "recipeId": "spell-1255123",
-        "recipeName": "Forceful Medium Armor Kit",
-        "learnSkill": 80,
-        "acquisition": "unknown",
-        "availability": "unknown",
+        "recipeId": "spell-2158",
+        "recipeName": "Fine Leather Boots",
+        "learnSkill": 65,
+        "acquisition": "drop",
+        "availability": "available",
         "verificationStatus": "unverified",
         "scarceReagents": []
       }
@@ -238,7 +239,7 @@
   "materials": [
     {
       "materialName": "Coarse Thread",
-      "quantity": 170
+      "quantity": 200
     },
     {
       "materialName": "Cured Heavy Hide",
@@ -255,10 +256,6 @@
     {
       "materialName": "Elemental Air",
       "quantity": 118
-    },
-    {
-      "materialName": "Elixir of Minor Strength",
-      "quantity": 30
     },
     {
       "materialName": "Heavy Hide",
@@ -282,11 +279,7 @@
     },
     {
       "materialName": "Light Leather",
-      "quantity": 280
-    },
-    {
-      "materialName": "Medium Armor Kit",
-      "quantity": 15
+      "quantity": 385
     },
     {
       "materialName": "Rugged Leather",
@@ -307,10 +300,6 @@
     {
       "materialName": "Silken Thread",
       "quantity": 82
-    },
-    {
-      "materialName": "Strange Dust",
-      "quantity": 30
     },
     {
       "materialName": "Thick Hide",

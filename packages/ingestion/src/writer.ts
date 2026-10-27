@@ -251,6 +251,68 @@ export async function writeNormalizedBuild(
     batchOptions,
   );
 
+  const itemStats = itemClientData.flatMap((row) =>
+    (row.stats ?? []).map((stat, statIndex) => ({
+      itemId: row.itemId,
+      recipeBuildId: row.recipeBuildId,
+      statIndex,
+      ...stat,
+      source: row.source,
+    })),
+  );
+  batches.itemStats = await writeBatches(
+    runner,
+    itemStats,
+    {
+      label: (row) =>
+        `item stat ${row.itemId}@${row.recipeBuildId}[${row.statIndex}]`,
+      insertSql:
+        "INSERT INTO item_stat (item_id, recipe_build_id, stat_index, stat_id, stat_value, display_text, display_tone, source_product, source_build_id, source_locale) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING",
+      insertValues: (row) => [
+        row.itemId,
+        row.recipeBuildId,
+        row.statIndex,
+        row.statId,
+        row.value,
+        row.displayText,
+        row.displayTone,
+        row.source.product,
+        row.source.build,
+        row.source.locale,
+      ],
+      selectSql:
+        "SELECT item_id, recipe_build_id, stat_index, stat_id, stat_value, display_text, display_tone, source_product, source_build_id, source_locale FROM item_stat WHERE item_id = $1 AND recipe_build_id = $2 AND stat_index = $3",
+      selectValues: (row) => [row.itemId, row.recipeBuildId, row.statIndex],
+      expected: (row) => ({
+        item_id: row.itemId,
+        recipe_build_id: row.recipeBuildId,
+        stat_index: row.statIndex,
+        stat_id: row.statId,
+        stat_value: row.value,
+        display_text: row.displayText,
+        display_tone: row.displayTone,
+        source_product: row.source.product,
+        source_build_id: row.source.build,
+        source_locale: row.source.locale,
+      }),
+      assertReferences: async (database, row) => {
+        await assertExists(
+          database,
+          "SELECT 1 AS found FROM item WHERE item_id = $1",
+          [row.itemId],
+          `Missing item ${row.itemId}.`,
+        );
+        await assertExists(
+          database,
+          "SELECT 1 AS found FROM wow_build WHERE build_id = $1",
+          [row.recipeBuildId],
+          `Missing build ${row.recipeBuildId}.`,
+        );
+      },
+    },
+    batchOptions,
+  );
+
   batches.itemClientData = await writeBatches(
     runner,
     itemClientData,
@@ -480,6 +542,78 @@ export async function writeNormalizedBuild(
         specialization_spell_id: row.specializationSpellId,
         cooldown_seconds: row.cooldownSeconds,
         availability: row.availability,
+      }),
+      assertReferences: (database, row) =>
+        assertExists(
+          database,
+          "SELECT 1 AS found FROM recipe_version WHERE recipe_version_id = $1",
+          [row.recipeVersionId],
+          `Missing recipe version ${row.recipeVersionId}.`,
+        ),
+    },
+    batchOptions,
+  );
+
+  const recipeAcquisitionDetails = build.recipeMetadata.flatMap((row) =>
+    row.teachingItemId === undefined && row.sourceDataOrigin === undefined
+      ? []
+      : [{
+          recipeVersionId: row.recipeVersionId,
+          teachingItemId: row.teachingItemId ?? null,
+          sourceDataOrigin: row.sourceDataOrigin ?? null,
+        }],
+  );
+  batches.recipeAcquisitionDetails = await writeBatches(
+    runner,
+    recipeAcquisitionDetails,
+    {
+      label: (row) => `recipe acquisition detail ${row.recipeVersionId}`,
+      insertSql:
+        "INSERT INTO recipe_acquisition_detail (recipe_version_id, teaching_item_id, source_data_origin) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+      insertValues: (row) => [
+        row.recipeVersionId,
+        row.teachingItemId,
+        row.sourceDataOrigin,
+      ],
+      selectSql:
+        "SELECT recipe_version_id, teaching_item_id, source_data_origin FROM recipe_acquisition_detail WHERE recipe_version_id = $1",
+      selectValues: (row) => [row.recipeVersionId],
+      expected: (row) => ({
+        recipe_version_id: row.recipeVersionId,
+        teaching_item_id: row.teachingItemId,
+        source_data_origin: row.sourceDataOrigin,
+      }),
+      assertReferences: (database, row) =>
+        assertExists(
+          database,
+          "SELECT 1 AS found FROM recipe_version WHERE recipe_version_id = $1",
+          [row.recipeVersionId],
+          `Missing recipe version ${row.recipeVersionId}.`,
+        ),
+    },
+    batchOptions,
+  );
+
+  const recipeSourceKinds = build.recipeMetadata.flatMap((row) =>
+    (row.sourceKinds ?? []).map((sourceKind) => ({
+      recipeVersionId: row.recipeVersionId,
+      sourceKind,
+    })),
+  );
+  batches.recipeSourceKinds = await writeBatches(
+    runner,
+    recipeSourceKinds,
+    {
+      label: (row) => `recipe source kind ${row.recipeVersionId}/${row.sourceKind}`,
+      insertSql:
+        "INSERT INTO recipe_source_kind (recipe_version_id, source_kind) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+      insertValues: (row) => [row.recipeVersionId, row.sourceKind],
+      selectSql:
+        "SELECT recipe_version_id, source_kind FROM recipe_source_kind WHERE recipe_version_id = $1 AND source_kind = $2",
+      selectValues: (row) => [row.recipeVersionId, row.sourceKind],
+      expected: (row) => ({
+        recipe_version_id: row.recipeVersionId,
+        source_kind: row.sourceKind,
       }),
       assertReferences: (database, row) =>
         assertExists(

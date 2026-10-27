@@ -35,7 +35,8 @@ The current product data is Leatherworking only:
 | --- | --- | --- |
 | Classic comparison baseline | `1.15.9.69722` | `data/imports/classic-era-1.15.9.69722-leatherworking.json` |
 | Forever target catalog | `1.60.1.69977` | `data/imports/forever-1.60.1.69977-leatherworking.json` |
-| Client icons and item labels | `1.60.1.70374` | `apps/web/public/icons/items/manifest.json` plus classification source metadata |
+| Client icons | `1.60.1.70374` | `apps/web/public/icons/items/manifest.json` |
+| Item labels and tooltip metadata | `1.60.1.70450` | Classification and client-data source metadata in the Forever catalog |
 
 The target contains 603 recipes and 760 referenced items. Its current Classic →
 Forever comparison is 289 New, 227 Updated, 0 Removed, and 87 Unchanged logical
@@ -56,8 +57,30 @@ recipes.
 | AWS resources | `ops` | CDK v2, stable construct IDs, explicit retention/removal behavior. |
 
 Applications may depend on shared packages. Shared packages must not depend on an
-application. In particular, the UI never decides which recipe is optimal and the API
+application. In particular, React components never implement route optimization and the API
 never calls AH Ledger in a user request.
+
+### Best crafts and automatic guide
+
+The main workspace contains Recipe calculator and Best crafts. The left panel owns
+the automatic Practical leveling guide and individual completion checkboxes.
+Guide settings, known-recipe selection, sharing, shopping, bulk completion and
+expandable step metrics have been removed from the web client. Their request
+handlers, dialogs and browser persistence are also removed. Old shared-route query
+parameters no longer activate settings or select a preset. The shopping and route
+optimizer APIs remain available as package/API capabilities.
+
+`packages/domain/src/best-crafts.ts` owns fixed character-level targets, class/role
+profiles, armor eligibility, and deterministic equipment comparisons. `BestCrafts.tsx`
+only presents the loaded catalog results. No new API calls or dataset regeneration
+are required. Rankings are editorial weighted stat comparisons, not profession
+skill-up optimization or all-source BiS. Keep those boundaries visible. Class, role
+and target state lives in App so opening a recipe does not reset the shortlist.
+
+See [`CRAFTING_MILESTONES.md`](CRAFTING_MILESTONES.md) for the one-time bracket
+research, source restrictions and ranking limitations. Only the current Forever
+1.60 client metadata is supported. Unknown learning skill does not prevent gear
+comparison, but still prevents entry into a leveling route under existing policies.
 
 ### Profession progression cap
 
@@ -90,10 +113,12 @@ pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
 pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
 ```
 
-The PostgreSQL container stores its database in `tmpfs`. Stopping/removing it clears
-normalized data. Raw objects under `.local-data/` are content-addressed and persist.
-The container includes `psql`; contributors do not need a host installation. For an
-interactive local query after `pnpm db:local:up`, run:
+The PostgreSQL container stores its database in a named Docker volume. Normalized data
+therefore survives container and Docker Desktop restarts. `pnpm db:local:down` stops
+the service without deleting the catalog; `pnpm db:local:reset` explicitly removes the
+volume when a clean import is required. Raw objects under `.local-data/` are
+content-addressed and persist. The container includes `psql`; contributors do not need
+a host installation. For an interactive local query after `pnpm db:local:up`, run:
 
 ```text
 docker compose -f docker-compose.local.yml exec postgres psql -U forever_professions -d forever_professions_local
@@ -104,7 +129,7 @@ docker compose -f docker-compose.local.yml exec postgres psql -U forever_profess
 `wow_build` binds one build ID to the exact imported raw hash. If a checked-in JSON
 snapshot is regenerated with different bytes but the same game build ID, importing it
 over the existing local row correctly reports an immutable-value conflict. Reset the
-disposable local database, reimport the baseline, and then reimport the target with
+local catalog volume, reimport the baseline, and then reimport the target with
 the comparison. Do not weaken the immutable writer to make this go away.
 
 The catalog reader serves the most recently imported build. The recipe-change reader
@@ -132,8 +157,9 @@ serves the latest stored comparison of the requested comparison type.
   client source product/build/locale because enrichment may come from a newer client
   than the recipe archive.
 - Tooltip records are also recipe-build scoped and retain their actual client source.
-  A missing `ItemSparse` row stays missing; do not backfill name, rarity, level, armor,
-  or sell price from another game version.
+  Ordered stat lines preserve both their numeric stat identity and the localized client
+  display text. A missing `ItemSparse` row stays missing; do not backfill name, rarity,
+  level, armor, stat lines, or sell price from another game version.
 - Missing auction prices are unavailable, never zero.
 
 ## Item assets
@@ -154,15 +180,25 @@ back to the smaller comparison snapshot because no current catalog record exists
 Calculator output and reagent icons are also buttons that pin the tooltip, move focus
 to its close control, and restore focus when the close button or Escape dismisses it;
 an outside click also closes it. Tooltip content is limited to catalog-backed item
-class, subclass, item rarity, equipment slot, armor, required level, vendor sell
-price, classification, quantity, recipe, market price, and ID facts. Do not infer
-binding, stats, or any other field absent from the imported data. Rarity comes from
+class, subclass, item rarity, equipment slot, armor, ordered item stats, required
+level, vendor sell price, classification, quantity, recipe, market price, and ID
+facts. Attribute stat lines use ordinary tooltip text and equip-effect lines use green
+text, with the effect meaning also stated in the content. Do not infer binding or any
+other field absent from the imported data. Rarity comes from
 `ItemSparse.OverallQualityID`; do not derive it from an item name or icon. Visible item
 and crafted-output names use the shared `getItemRarityNameClass` helper so the guide,
 catalog, calculator, changes view, route planner, shopping list, and tooltip stay
 consistent. Missing or unsupported quality IDs inherit the surrounding text color
 instead of being guessed. Provisional output quantities must remain visibly labeled
 provisional.
+
+The production web build runs `apps/web/scripts/check-build-budget.mjs` after Vite.
+It caps total bootstrap assets at 3.25 MB, JavaScript at 525 KB raw/155 KB gzip, CSS
+at 115 KB raw/28 KB gzip, the item-icon manifest at 80 KB, and each lazy item icon at
+10 KB. These thresholds provide modest headroom over the October 20, 2026 release
+candidate and are regression limits, not performance targets. A deliberate budget
+increase requires a measured product reason and review; do not raise a threshold just
+to make the build pass.
 
 The converter queries the installed client with `wowdata`. It resolves `latest` once,
 then pins all DB2 and icon reads to the returned build. It joins `Item` and
@@ -173,10 +209,19 @@ back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID`
 
 ## Static site pages
 
-`apps/web/src/main.tsx` resolves `/privacy`, `/terms`, and `/contact` before mounting
-the planner. Their content and metadata live in `StaticPage.tsx`, while both the
-planner and static pages reuse `SiteFooter.tsx`. Navigation uses ordinary links so
-direct loads, refreshes, and browser history work without a client router dependency.
+The shared `--content-max-width` token in `apps/web/src/styles.css` caps the combined
+planner sidebar and main content, knowledge pages, legal pages, and footer content
+at 1400px. The masthead and navigation remain outside that centered content area.
+Keep the outer margins available for future rails or background art. Planner and
+knowledge panels use named CSS containers to reflow within their available width;
+viewport breakpoints still control the full-width navigation and sidebar stacking.
+
+`apps/web/src/main.tsx` resolves `/privacy`, `/terms`, `/contact`, and the focused
+`/leatherworking/*` knowledge pages before mounting the planner. Legal/support content
+and metadata live in `StaticPage.tsx`; build-scoped profession content lives in
+`LeatherworkingKnowledgePage.tsx`; every surface reuses `SiteFooter.tsx`. Navigation
+uses ordinary links so direct loads, refreshes, and browser history work without a
+client router dependency.
 CloudFront rewrites extensionless paths to `index.html` only on the default frontend
 behavior; keep that SPA fallback when changing hosting or these clean paths will fail
 on direct load. Never restore a distribution-wide 403/404 custom error response,
@@ -233,14 +278,17 @@ LibItemDB class/subclass metadata and uses name heuristics only as a display fal
 ## Browser-local personalization
 
 The web client owns a versioned local profile in `apps/web/src/personalization.ts`.
-It persists skill range, route and shopping preferences, region, market, faction, the
-Legacy profession-bonus input, and Forever Changes filters. The profile contains no
+It persists current skill, region, market, faction,
+the Legacy profession-bonus input, and Forever Changes filters. The guide range is
+always 1–300 and is not browser state. The profile contains no
 credentials or imported game data. Keep its parser defensive and migrate by adding a
 new storage version rather than changing the meaning of an existing version.
 
 Market and faction selections are functional request inputs. The Legacy profession
 bonus is storage-only until its Forever behavior is verified and explicitly modeled;
-do not silently add it to thresholds. Known recipes remain session-only. See
+do not silently add it to thresholds. Version 3 migrates the supported fields from
+versions 1 and 2 while dropping removed route/shopping settings. Automatic guide
+requests include the full catalog's recipe IDs as their known-recipe constraint. See
 `docs/PERSONALIZATION.md` for the field and failure-behavior contract.
 
 ## Verification expectations
@@ -273,6 +321,13 @@ baseline/report under `data/guide-validation/`. Reference guides are diagnostic
 evidence only and must not be promoted into recipe overrides without a supported
 source.
 
+The optimizer exposes two evidence policies. `practical` is the default and ranks
+known acquisition and availability ahead of an otherwise cheaper unknown option,
+while still allowing an explicitly labeled unknown option when it is required to
+complete the route. `supported-only` rejects unknown acquisition and availability;
+an otherwise reachable route then returns `unsupported-recipe-evidence` at the first
+unsupported skill. Rejected recipe evidence is never routable under either policy.
+
 On some Windows sandboxed runs, parallel Vitest workers can lose transformed files
 from the sandbox temp directory and report `ENOENT` before tests execute. Re-run the
 suite outside that filesystem sandbox or run the focused suite separately; do not
@@ -290,7 +345,7 @@ misclassify that host-level temp failure as a product test failure.
   requests.
 - The add-on collection approach is deferred; the current pipeline relies on source
   archives, installed-client DB2 data, reviewed overrides, and quality reporting.
-- Aurora DSQL migrations 017–024 have not yet completed the same live revalidation as
+- Aurora DSQL migrations 017–026 have not yet completed the same live revalidation as
   migrations 001–016.
 
 ## Documentation maintenance

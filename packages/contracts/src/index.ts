@@ -149,11 +149,19 @@ export const itemClassificationSchema = z.object({
   source: itemClientSourceSchema,
 });
 
+export const itemStatSchema = z.object({
+  statId: z.number().int().nonnegative(),
+  value: z.number().int(),
+  displayText: z.string().min(1),
+  displayTone: z.enum(["attribute", "effect"]),
+});
+
 export const itemClientDataSchema = z.object({
   displayName: z.string().min(1),
   qualityId: z.number().int().nonnegative().optional(),
   equipmentSlot: z.string().min(1).optional(),
   armor: z.number().int().nonnegative().optional(),
+  stats: z.array(itemStatSchema).max(10).optional(),
   requiredLevel: z.number().int().nonnegative(),
   sellPriceCopper: z.number().int().nonnegative(),
   source: itemClientSourceSchema,
@@ -389,6 +397,21 @@ export const auctionPricesResponseSchema = z.object({
 
 export const routeObjectiveSchema = z.enum(["cost", "crafts", "materials"]);
 
+export const routePresetSchema = z.enum([
+  "practical",
+  "trainer-friendly",
+  "cheapest",
+  "fewest-crafts",
+  "fewest-materials",
+  "experimental",
+]);
+
+export const routeConfidencePolicySchema = z.enum([
+  "practical",
+  "supported-only",
+  "experimental",
+]);
+
 const recipeIdSelectionSchema = z.array(z.string().min(1)).max(3_000);
 
 export const routeConstraintsSchema = z.object({
@@ -399,6 +422,7 @@ export const routeConstraintsSchema = z.object({
   trainerOnly: z.boolean().optional(),
   excludedRecipeIds: recipeIdSelectionSchema.optional(),
   excludedItemIds: recipeIdSelectionSchema.optional(),
+  allowUnknownAcquisition: z.boolean().optional(),
   allowUnknownAvailability: z.boolean().optional(),
   allowUnknownFaction: z.boolean().optional(),
   allowCooldowns: z.boolean().optional(),
@@ -429,11 +453,14 @@ export const routeOptimizationRequestSchema = z
     marketId: z.string().min(1).optional(),
     startSkill: z.number().int().nonnegative(),
     targetSkill: z.number().int().nonnegative(),
-    objective: routeObjectiveSchema,
+    preset: routePresetSchema.optional(),
+    objective: routeObjectiveSchema.optional(),
+    confidencePolicy: routeConfidencePolicySchema.optional(),
     constraints: routeConstraintsSchema.optional(),
     policy: routeOptimizationPolicySchema.optional(),
   })
-  .superRefine(({ startSkill, targetSkill, objective, marketId }, context) => {
+  .superRefine((request, context) => {
+    const { startSkill, targetSkill, preset, objective, marketId } = request;
     if (targetSkill < startSkill) {
       context.addIssue({
         code: "custom",
@@ -448,7 +475,35 @@ export const routeOptimizationRequestSchema = z
         message: "A route may cover at most 500 skill points.",
       });
     }
-    if (objective === "cost" && marketId === undefined) {
+    if (preset === undefined && objective === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["preset"],
+        message: "preset or legacy objective is required.",
+      });
+    }
+    if (preset !== undefined && objective !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["objective"],
+        message: "objective cannot be combined with a route preset.",
+      });
+    }
+    if (preset !== undefined && request.confidencePolicy !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["confidencePolicy"],
+        message: "confidencePolicy cannot be combined with a route preset.",
+      });
+    }
+    if (preset !== undefined && request.policy !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["policy"],
+        message: "custom policy cannot be combined with a route preset.",
+      });
+    }
+    if ((preset === "cheapest" || objective === "cost") && marketId === undefined) {
       context.addIssue({
         code: "custom",
         path: ["marketId"],
@@ -467,7 +522,51 @@ export const routeSkillStepSchema = z.object({
   expectedCostCopper: z.number().nonnegative().optional(),
 });
 
-export const routeAlternativeSchema = z.object({
+export const routeEvidenceReasonSchema = z.enum([
+  "unknown-acquisition",
+  "unknown-availability",
+  "classic-fallback",
+  "unverified-recipe",
+  "rejected-recipe",
+]);
+
+export const routeRecipeEvidenceSchema = z.object({
+  level: z.enum(["verified", "unverified", "fallback", "unknown", "rejected"]),
+  reasons: z.array(routeEvidenceReasonSchema).max(5),
+  acquisition: recipeAcquisitionSchema,
+  availability: recipeAvailabilitySchema,
+  provenanceSource: dataSourceKindSchema,
+  verificationStatus: verificationStatusSchema,
+});
+
+export const routeSelectionReasonSchema = z.enum([
+  "only-eligible-recipe",
+  "practical-balance",
+  "practical-evidence-fallback",
+  "trainer-preference",
+  "trainer-fallback",
+  "lowest-supported-cost",
+  "fewest-expected-crafts",
+  "fewest-materials",
+  "experimental-evidence-accepted",
+]);
+
+export const routeAlternativeLossReasonSchema = z.enum([
+  "shorter-coverage",
+  "weaker-evidence",
+  "trainer-preference",
+  "higher-expected-cost",
+  "more-expected-crafts",
+  "more-materials",
+  "full-route-fit",
+]);
+
+export const routeRecommendationSchema = z.object({
+  reasons: z.array(routeSelectionReasonSchema).min(1).max(4),
+  summary: z.string().min(1),
+});
+
+const routeCandidateSummarySchema = z.object({
   recipeId: z.string().min(1),
   recipeName: z.string().min(1),
   startSkill: z.number().int().nonnegative(),
@@ -476,9 +575,16 @@ export const routeAlternativeSchema = z.object({
   expectedCrafts: z.number().positive(),
   expectedMaterials: z.number().nonnegative(),
   expectedCostCopper: z.number().nonnegative().optional(),
+  evidence: routeRecipeEvidenceSchema,
 });
 
-export const routeSegmentSchema = routeAlternativeSchema.extend({
+export const routeAlternativeSchema = routeCandidateSummarySchema.extend({
+  lossReason: routeAlternativeLossReasonSchema,
+  lossSummary: z.string().min(1),
+});
+
+export const routeSegmentSchema = routeCandidateSummarySchema.extend({
+  recommendation: routeRecommendationSchema,
   alternatives: z.array(routeAlternativeSchema).max(6).default([]),
 });
 
@@ -490,7 +596,9 @@ export const routeTotalsSchema = z.object({
 });
 
 const routeOptimizationResultBase = {
+  preset: routePresetSchema,
   objective: routeObjectiveSchema,
+  confidencePolicy: routeConfidencePolicySchema,
   startSkill: z.number().int().nonnegative(),
   targetSkill: z.number().int().nonnegative(),
   steps: z.array(routeSkillStepSchema),
@@ -507,7 +615,12 @@ export const blockedRouteOptimizationResultSchema = z.object({
   status: z.literal("blocked"),
   ...routeOptimizationResultBase,
   blockedAtSkill: z.number().int().nonnegative(),
-  reason: z.enum(["no-eligible-recipe", "missing-price-data"]),
+  reason: z.enum([
+    "no-eligible-recipe",
+    "missing-price-data",
+    "unsupported-recipe-evidence",
+  ]),
+  explanation: z.string().min(1),
 });
 
 export const routeOptimizationResultSchema = z.discriminatedUnion("status", [
@@ -550,6 +663,7 @@ export const shoppingQuantitySchema = z.object({
 export const shoppingPurchaseSchema = shoppingQuantitySchema.extend({
   unitPriceCopper: z.number().int().positive(),
   expectedCostCopper: z.number().nonnegative(),
+  priceObservedAt: z.iso.datetime().optional(),
 });
 
 export const shoppingCraftSchema = z.object({
@@ -604,8 +718,66 @@ export const shoppingListResponseSchema = z.object({
   professionId: z.string().min(1),
   marketId: z.string().min(1),
   attribution: auctionPriceAttributionSchema.optional(),
+  oldestPriceObservedAt: z.iso.datetime().optional(),
   plan: shoppingPlanSchema,
 });
+
+const productEventBuild = {
+  buildId: z.string().min(1).max(64),
+} as const;
+
+export const productEventSchema = z.discriminatedUnion("name", [
+  z.object({
+    name: z.literal("route-generated"),
+    ...productEventBuild,
+    preset: routePresetSchema,
+    status: z.enum(["complete", "blocked"]),
+    segmentCount: z.number().int().nonnegative().max(3_000),
+  }).strict(),
+  z.object({
+    name: z.literal("first-step-engaged"),
+    ...productEventBuild,
+    preset: routePresetSchema,
+  }).strict(),
+  z.object({
+    name: z.literal("checklist-progress"),
+    ...productEventBuild,
+    preset: routePresetSchema,
+    completedSegments: z.number().int().nonnegative().max(3_000),
+    totalSegments: z.number().int().nonnegative().max(3_000),
+  }).strict().refine(
+    ({ completedSegments, totalSegments }) => completedSegments <= totalSegments,
+    { message: "Completed segments cannot exceed total segments." },
+  ),
+  z.object({
+    name: z.literal("shopping-used"),
+    ...productEventBuild,
+    preset: routePresetSchema,
+    strategy: shoppingStrategySchema,
+    status: z.enum(["complete", "partial"]),
+  }).strict(),
+  z.object({
+    name: z.literal("route-blocked"),
+    ...productEventBuild,
+    preset: routePresetSchema,
+    reason: z.enum([
+      "no-eligible-recipe",
+      "missing-price-data",
+      "unsupported-recipe-evidence",
+    ]),
+  }).strict(),
+  z.object({
+    name: z.literal("missing-data-encountered"),
+    ...productEventBuild,
+    kind: z.enum([
+      "acquisition",
+      "availability",
+      "comparison",
+      "price",
+      "verification",
+    ]),
+  }).strict(),
+]);
 
 export const reagentSchema = z.object({
   itemId: z.string().min(1),
@@ -639,6 +811,9 @@ export const recipeSchema = z.object({
   buildId: z.string().min(1),
   learnSkill: z.number().int().nonnegative().nullable(),
   acquisition: recipeAcquisitionSchema,
+  teachingItemId: z.number().int().positive().nullable().optional(),
+  sourceKinds: z.array(recipeSourceKindSchema).optional(),
+  sourceDataOrigin: recipeEvidenceOriginSchema.optional(),
   faction: recipeFactionSchema,
   specializationSpellId: z.number().int().positive().nullable(),
   cooldownSeconds: z.number().int().positive().nullable(),
@@ -666,6 +841,7 @@ export const recipesResponseSchema = z.array(recipeSchema);
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export type ReadinessResponse = z.infer<typeof readinessResponseSchema>;
+export type ProductEvent = z.infer<typeof productEventSchema>;
 export type AuctionMarket = z.infer<typeof auctionMarketSchema>;
 export type AuctionMarketsResponse = z.infer<typeof auctionMarketsResponseSchema>;
 export type AuctionPriceAttribution = z.infer<
@@ -681,6 +857,15 @@ export type AuctionPriceRequest = z.infer<typeof auctionPriceRequestSchema>;
 export type AuctionPricesResponse = z.infer<typeof auctionPricesResponseSchema>;
 export type RouteConstraints = z.infer<typeof routeConstraintsSchema>;
 export type RouteObjective = z.infer<typeof routeObjectiveSchema>;
+export type RoutePreset = z.infer<typeof routePresetSchema>;
+export type RouteConfidencePolicy = z.infer<typeof routeConfidencePolicySchema>;
+export type RouteEvidenceReason = z.infer<typeof routeEvidenceReasonSchema>;
+export type RouteRecipeEvidence = z.infer<typeof routeRecipeEvidenceSchema>;
+export type RouteSelectionReason = z.infer<typeof routeSelectionReasonSchema>;
+export type RouteAlternativeLossReason = z.infer<
+  typeof routeAlternativeLossReasonSchema
+>;
+export type RouteRecommendation = z.infer<typeof routeRecommendationSchema>;
 export type RouteOptimizationPolicy = z.infer<
   typeof routeOptimizationPolicySchema
 >;
@@ -719,6 +904,7 @@ export type ImportedRecipe = z.infer<typeof importedRecipeSchema>;
 export type ItemClientData = z.infer<typeof itemClientDataSchema>;
 export type ItemClientSource = z.infer<typeof itemClientSourceSchema>;
 export type ItemClassification = z.infer<typeof itemClassificationSchema>;
+export type ItemStat = z.infer<typeof itemStatSchema>;
 export type ItemModel = z.infer<typeof itemModelSchema>;
 export type NormalizedBuild = z.infer<typeof normalizedBuildSchema>;
 export type ProfessionModel = z.infer<typeof professionModelSchema>;
@@ -730,6 +916,7 @@ export type Recipe = z.infer<typeof recipeSchema>;
 export type RecipeModel = z.infer<typeof recipeModelSchema>;
 export type RecipeMetadata = z.infer<typeof recipeMetadataSchema>;
 export type RecipeAcquisition = z.infer<typeof recipeAcquisitionSchema>;
+export type RecipeSourceKind = z.infer<typeof recipeSourceKindSchema>;
 export type RecipeAvailability = z.infer<typeof recipeAvailabilitySchema>;
 export type RecipeFaction = z.infer<typeof recipeFactionSchema>;
 export type RecipeOutput = z.infer<typeof recipeOutputSchema>;

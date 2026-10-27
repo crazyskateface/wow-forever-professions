@@ -10,6 +10,7 @@ export interface ReleaseRowCounts {
   readonly recipeChanges: number;
   readonly targetClientItems: number;
   readonly targetQualityItems: number;
+  readonly targetItemStats: number;
 }
 
 const RELEASE_COUNT_COLUMNS = {
@@ -18,6 +19,7 @@ const RELEASE_COUNT_COLUMNS = {
   recipeChanges: "recipe_changes",
   targetClientItems: "target_client_items",
   targetQualityItems: "target_quality_items",
+  targetItemStats: "target_item_stats",
 } as const;
 
 function nonnegativeInteger(value: unknown, label: string): number {
@@ -46,6 +48,10 @@ export function expectedReleaseRowCounts(
     targetQualityItems: target.items.filter(
       ({ clientData }) => clientData?.qualityId !== undefined,
     ).length,
+    targetItemStats: target.items.reduce(
+      (total, { clientData }) => total + (clientData?.stats?.length ?? 0),
+      0,
+    ),
   };
 }
 
