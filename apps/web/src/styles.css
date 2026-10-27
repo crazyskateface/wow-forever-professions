@@ -1371,11 +1371,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   filter: brightness(.72) saturate(.72);
 }
 .chart-heading strong {
+  --chart-title-width: clamp(320px, 58%, 520px);
   top: -25px;
   left: -19px;
-  width: clamp(320px, 58%, 520px);
+  width: var(--chart-title-width);
   height: clamp(68px, 7vw, 86px);
-  padding: 0 12% 2px 23%;
+  /* Center within the plate's inset face, clear of the diamond and arrow. */
+  padding: 0 calc(var(--chart-title-width) * .11) 2px calc(var(--chart-title-width) * .18);
   color: #f4e5c8;
   font-family: var(--font-secondary);
   font-size: clamp(17px, 1.45vw, 23px);
@@ -1668,9 +1670,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .calculator-grid { gap: 14px; }
   .chart-wrap { padding: 94px 18px 26px; }
   .chart-heading strong {
+    --chart-title-width: min(360px, calc(100% - 8px));
     top: -20px;
     left: -11px;
-    width: min(360px, calc(100% - 8px));
     height: 70px;
     font-size: 17px;
   }
@@ -1713,7 +1715,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .hero-actions { align-self: flex-end; }
   .calculator-grid { grid-template-columns: 1fr; gap: 18px; }
   .chart-wrap { padding: 94px 22px 26px; }
-  .chart-heading strong { top: -20px; left: -11px; width: min(360px, calc(100% - 8px)); height: 70px; font-size: 17px; }
+  .chart-heading strong { --chart-title-width: min(360px, calc(100% - 8px)); top: -20px; left: -11px; height: 70px; font-size: 17px; }
   .chart-heading .chart-live { top: 44px; right: 14px; width: 150px; height: 47px; font-size: 12px; }
   .outcome-feature { min-height: 190px; }
   .cost-strip article { padding: 16px 12px; gap: 8px; }
