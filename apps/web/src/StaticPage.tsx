@@ -302,7 +302,7 @@ export function StaticPage({ page }: { readonly page: StaticPageId }) {
           <span className="brand-mark" aria-hidden="true">F</span>
           <span>Forever <span>Professions</span></span>
         </a>
-        <a className="back-to-planner" href="/">Back to planner</a>
+        <a className="back-to-planner" href="/">Choose a profession</a>
       </header>
       <main className="legal-main" id="legal-main" tabIndex={-1}>
         <header className="legal-hero">

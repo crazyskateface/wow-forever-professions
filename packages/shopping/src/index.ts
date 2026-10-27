@@ -141,9 +141,8 @@ function validateInput(input: ShoppingPlanInput): void {
     for (const reagent of recipe.reagents) {
       assertPositive(reagent.quantity, `Recipe ${recipe.id} reagent quantity`);
     }
-    if (recipe.outputs.length === 0) {
-      throw new Error(`Recipe ${recipe.id} requires at least one output.`);
-    }
+    // Enchantments can consume route materials without creating an item.
+    // Only actual item outputs enter the intermediate-crafting index below.
     for (const output of recipe.outputs) {
       assertPositive(output.quantity, `Recipe ${recipe.id} output quantity`);
     }

@@ -20,6 +20,7 @@ export * from "./import.js";
 export * from "./item-icons.js";
 export * from "./migrations.js";
 export * from "./professiondb.js";
+export * from "./professiondb-bundle.js";
 export * from "./overrides.js";
 export * from "./postgres.js";
 export * from "./raw-store.js";

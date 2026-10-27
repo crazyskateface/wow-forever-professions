@@ -1,8 +1,8 @@
 # Forever Professions
 
 Forever Professions is a TypeScript monorepo for a data-driven World of Warcraft:
-Forever profession leveling planner. The current vertical slice covers Leatherworking
-and combines an optimized leveling guide, recipe calculator, best-crafts shortlist, and a
+Forever profession leveling planner. It covers all six crafting professions, Cooking,
+First Aid, Fishing, and Mining (smelting), and combines an optimized leveling guide, recipe calculator, best-crafts shortlist, and a
 build-generated Classic Era → Forever change browser.
 
 The product is guide-first:
@@ -23,9 +23,25 @@ data.
 
 ## Current features
 
+### Profession selection
+
+- Start at `/` and choose a profession before entering its workspace at
+  `/professions/<profession-id>`.
+- Switch professions with the native dropdown in the top-left navigation. Each
+  workspace loads its own catalog, route, prices, and Classic-to-Forever comparison.
+- Current skill is saved independently per profession. Existing root recipe links
+  and Leatherworking field-guide URLs remain supported.
+- Missing catalogs show an explicit loading, empty, or retryable error state.
+- The full import includes 2,511 Forever records and 1,565 Classic baseline records.
+  First Aid, Fishing, and Mining currently have evidence gaps that block complete
+  routes; those gaps are shown instead of inventing progression data. Fishing
+  records are recipes/training spells, not a catch-rate or activity-leveling model.
+- Enchantments and training spells without item outputs remain usable records;
+  teaching items are never presented as crafted outputs.
+
 ### Leveling guide
 
-- Generates a complete 1–300 route from the loaded catalog. Current skill highlights
+- Generates a 1–300 route where the loaded catalog supports it, with explicit blockers for evidence gaps. Current skill highlights
   and scrolls to the player's place without removing earlier or later guide ranges.
 - Shares a native current-skill slider across guide, catalog, and changes views,
   with a larger grab area, live updates, and keyboard/stepper controls.
@@ -59,7 +75,7 @@ data.
 ### Best crafts
 
 - Replaces the duplicate main Leveling Route tab with a class/role equipment shortlist
-  for the selected profession (currently Leatherworking).
+  for the selected profession across loaded professions. Recommendations require supported item stats.
 - Uses fixed character-level targets of **20, 30, 40, 50, 55, and 60**, researched once
   from the pinned catalog. Exact equip levels remain visible, and strong earlier crafts
   can remain recommended at later targets.
@@ -76,7 +92,7 @@ data.
 
 ### Recipe catalog and calculator
 
-- Loads the full 603-recipe Leatherworking catalog from PostgreSQL/Aurora DSQL.
+- Loads ten profession catalogs (2,511 records) from PostgreSQL/Aurora DSQL.
 - Provides a virtualized, searchable All Recipes list and URL-addressable recipe
   selection (`?recipe=<recipe-id>`).
 - Filters the full catalog by acquisition, learning range, item type,
@@ -102,7 +118,7 @@ data.
 - Shows materials, output, acquisition facts, build, provenance, and verification
   status. Requirements above the base cap remain visible and are flagged as unusual
   rather than silently rewritten.
-- Uses 760 build-stamped WebP item icons. Off-screen list and change-card images are
+- Uses 2,720 build-stamped WebP item icons. Off-screen list and change-card images are
   browser-lazy-loaded; missing assets fall back to item initials.
 - Shows catalog-backed item details after a one-second pointer hover or when the
   owning recipe control receives keyboard focus. Calculator icons can pin the
@@ -127,8 +143,8 @@ data.
 - Loads comparison records on demand when the Forever Changes tab is first opened,
   keeping the initial guide request burst below the API's concurrency boundary.
 - Hides unchanged recipes by default; badges are reused in the guide and All Recipes.
-- The bundled comparison currently contains 289 New, 227 Updated, 0 Removed, and 87
-  Unchanged Leatherworking recipes (603 total).
+- The bundled comparison contains 965 New, 972 Updated, 19 Removed, and 574
+  Unchanged records (2,530 logical recipes), scoped to the selected profession.
 
 ### Shopping API and pricing
 
@@ -189,8 +205,8 @@ data.
   resumable DSQL-safe batches.
 - Imports generic client item labels through
   `ItemSparse.ItemNameDescriptionID → ItemNameDescription`, preserving the source
-  product, client build, and locale. The current Leatherworking set contains three
-  `Scarce` reagents and four `Crafted` outputs from client build `1.60.1.70450`.
+  product, client build, and locale. The full set contains 13 classified items
+  from client build `1.60.1.70630`, preserving `Scarce` and `Crafted` labels.
 - Imports build-scoped item display names, rarity IDs, equipment slots, armor, item
   stat lines, required levels, and vendor sell prices from the same pinned client.
   Armor is derived from the client's armor-total, quality, location, and shield
@@ -203,23 +219,22 @@ data.
 
 ## Current data boundary
 
-The bundled target is Forever build `1.60.1.69977`; client-derived item-name
-descriptions and tooltip attributes come from installed beta client build
-`1.60.1.70450`, while the unchanged icon bundle remains stamped with asset build
-`1.60.1.70374`. The Classic Era baseline is build `1.15.9.69722`.
+The target recipe snapshot is Forever build `1.60.1.69977` and the Classic Era
+baseline is `1.15.9.69722`. Item labels, rarity, and tooltip attributes come from
+installed Forever product `wowf`, client build `1.60.1.70630`, locale `enUS`.
+All 2,720 referenced items have WebP icons from the same client build. The compact
+schema-v2 manifest preserves item-to-FileDataID mappings and source identity; missing
+assets still use the initials fallback.
 
 The data is useful but not authoritative:
 
-- all 603 Forever recipes are still marked unverified;
-- 484 recipes have supported Forever learning ranks and 119 remain unknown;
-- 589 acquisition and availability states remain unknown;
-- 630 of 760 referenced items have client tooltip attributes, including rarity; the
-  other 130 have no `ItemSparse` row in the pinned client build and remain explicitly
-  unenriched;
-- 427 referenced items expose 1,174 ordered client stat lines;
-- 90 recipes reference at least one item missing an English name in the source
-  snapshot;
-- 595 output quantities remain provisional after reviewed overrides.
+- all 2,511 Forever records remain unverified;
+- 1,923 learning ranks are supported; 588 remain unknown;
+- 2,470 acquisition and availability states remain unknown;
+- 2,346 of 2,720 referenced items have client metadata; 374 remain unenriched;
+- 1,172 items expose 3,028 client stat lines;
+- 278 recipes reference an item without an English source name;
+- 2,316 output quantities remain provisional; 187 spells have no recorded item output.
 
 Unknown eligibility remains visible in the UI. Explicitly unavailable recipes and
 recipes with unknown learning ranks cannot enter a leveling route.
@@ -279,8 +294,8 @@ generating the comparison:
 
 ```text
 pnpm db:local:up
-pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
-pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
+pnpm data:import:local data/imports/classic-era-1.15.9.69722-professions.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-professions.json --compare-against data/imports/classic-era-1.15.9.69722-professions.json --comparison-type classic-forever
 ```
 
 Start the API in one terminal. PowerShell:
@@ -330,7 +345,7 @@ pnpm api:request -- /api/health
 pnpm api:optimize -- 150 180 crafts
 pnpm api:shopping -- 33.375 cheapest  # fixture recipe IDs; fixture API only
 pnpm guide:validate               # compare the real 1–300 route with the checked-in reference
-pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
+pnpm data:audit data/imports/forever-1.60.1.69977-professions.json data/imports/forever-1.60.1.69977-professions.quality.md
 pnpm infra:synth:staging          # strict CDK + cdk-nag validation of existing stacks
 pnpm infra:synth:production       # strict validation of isolated production stacks
 pnpm infra:synth:delivery         # validate GitHub OIDC roles and the cost guardrail
@@ -368,16 +383,16 @@ LibItemDB roots are available, regenerate the target dataset, client labels, ico
 manifest, and icons with:
 
 ```text
-pnpm data:convert:professiondb <ProfessionDB-root> <ItemDB-root> data/imports/forever-1.60.1.69977-leatherworking.json Forever - data/imports/forever-leatherworking-overrides.json "C:\World of Warcraft" apps/web/public/icons/items
-pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
+pnpm data:convert:professiondb <ProfessionDB-root> <ItemDB-root> data/imports/forever-1.60.1.69977-professions.json Forever - data/imports/forever-leatherworking-overrides.json "C:\World of Warcraft" apps/web/public/icons/items
+pnpm data:audit data/imports/forever-1.60.1.69977-professions.json data/imports/forever-1.60.1.69977-professions.quality.md
 ```
 
 When the source snapshot is already current, refresh only its pinned client metadata
 without the addon archives:
 
 ```text
-pnpm data:enrich:client data/imports/forever-1.60.1.69977-leatherworking.json "C:\World of Warcraft"
-pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
+pnpm data:enrich:client data/imports/forever-1.60.1.69977-professions.json "C:\World of Warcraft"
+pnpm data:audit data/imports/forever-1.60.1.69977-professions.json data/imports/forever-1.60.1.69977-professions.quality.md
 ```
 
 The converter resolves one installed client build and pins every subsequent DB2 and

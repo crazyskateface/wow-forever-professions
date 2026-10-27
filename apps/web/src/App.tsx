@@ -8,7 +8,6 @@ import {
 import {
   auctionMarketsResponseSchema,
   auctionPricesResponseSchema,
-  professionFixtureSchema,
   recipeChangesResponseSchema,
   recipeChangesSummaryResponseSchema,
   routeOptimizationResponseSchema,
@@ -83,6 +82,9 @@ import {
   type CatalogSort,
 } from "./catalog-discovery.js";
 import { recipeKnowledgeHref } from "./leatherworking-knowledge.js";
+import { ProfessionMasthead, ProfessionSwitcher } from "./ProfessionNavigation.js";
+import { readProfessionSkill, writeProfessionSkill } from "./profession-navigation.js";
+import { getProfessionDefinition } from "@forever-professions/contracts";
 import { recordProductEvent } from "./product-analytics.js";
 
 type WorkspaceView = "calculator" | "crafts";
@@ -318,7 +320,8 @@ function outputQuantityIsProvisional(recipe: Recipe): boolean {
   ]);
 }
 
-function outputTooltipItem(recipe: Recipe, professionName: string, output = recipe.outputs[0]!): ItemTooltipData {
+function outputTooltipItem(recipe: Recipe, professionName: string, output = recipe.outputs[0]): ItemTooltipData {
+  if (output === undefined) return { name: recipe.name, details: [{ text: "No crafted item output recorded", tone: "muted" }] };
   const provisionalQuantity = outputQuantityIsProvisional(recipe);
   return {
     ...tooltipItemData(output),
@@ -392,7 +395,7 @@ function DataQualityNotice({ build, recipe }: { build: string; recipe: Recipe })
     recipe.provenance.source,
     recipe.provenance.verification.status,
   );
-  const acquisitionGuideHref = recipeKnowledgeHref(recipe.acquisition, recipe.id);
+  const acquisitionGuideHref = recipe.professionId === "leatherworking" ? recipeKnowledgeHref(recipe.acquisition, recipe.id) : undefined;
 
   return (
     <section
@@ -446,10 +449,10 @@ function DataQualityNotice({ build, recipe }: { build: string; recipe: Recipe })
           {acquisitionGuideHref === undefined ? null : (
             <a href={acquisitionGuideHref}>Open acquisition guide</a>
           )}
-          {recipe.specializationSpellId === null ? null : (
+          {recipe.professionId !== "leatherworking" || recipe.specializationSpellId === null ? null : (
             <a href={`/leatherworking/specializations#${recipe.id}`}>Review specialization gate</a>
           )}
-          <a href="/leatherworking">Leatherworking evidence overview</a>
+          {recipe.professionId === "leatherworking" ? <a href="/leatherworking">Leatherworking evidence overview</a> : null}
         </div>
       </div>
     </section>
@@ -552,13 +555,17 @@ function SkillChart({
   );
 }
 
-export function App() {
+export function App({ initialProfession = leatherworkingFixture, initialCatalogState = "loading" }: { readonly initialProfession?: ProfessionFixture; readonly initialCatalogState?: CatalogState }) {
   const maxBaseSkill = FOREVER_BUILD_CONFIG.maxBaseSkill;
   const fullGuideRange = getFullGuideRange(maxBaseSkill);
-  const [initialPreferences] = useState(readPersonalization);
-  const [profession, setProfession] = useState<ProfessionFixture>(leatherworkingFixture);
-  const [catalogState, setCatalogState] = useState<CatalogState>("loading");
-  const [recipeId, setRecipeId] = useState(leatherworkingFixture.recipes[0]!.id);
+  const [initialPreferences] = useState(() => {
+    const profile = readPersonalization();
+    return { ...profile, currentSkill: readProfessionSkill(initialProfession.id, profile.currentSkill) };
+  });
+  const profession = initialProfession;
+  const professionDefinition = getProfessionDefinition(profession.id);
+  const catalogState = initialCatalogState;
+  const [recipeId, setRecipeId] = useState(() => profession.recipes.find(({ id }) => id === recipeIdFromUrl())?.id ?? profession.recipes[0]!.id);
   const recipe =
     profession.recipes.find(({ id }) => id === recipeId) ?? profession.recipes[0]!;
   const maxCatalogLearningSkill = useMemo(
@@ -621,9 +628,16 @@ export function App() {
   const missingDataEventsRecordedRef = useRef(new Set<string>());
 
   useEffect(() => {
+    const explicitlySelected = recipeIdFromUrl() === recipeId;
+    writeRecipeUrl(recipeId, "replace");
+    if (explicitlySelected) scrollToWorkspaceOnMobile();
+  }, []);
+
+  useEffect(() => {
+    writeProfessionSkill(profession.id, skill);
     setPreferencesStorageAvailable(writePersonalization({
       version: 3,
-      currentSkill: skill,
+      currentSkill: profession.id === "leatherworking" ? skill : readPersonalization().currentSkill,
       region,
       marketId,
       faction,
@@ -666,47 +680,6 @@ export function App() {
       })
       .finally(() => {
         if (!controller.signal.aborted) setMarketsLoading(false);
-      });
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setCatalogState("loading");
-    fetch(`/api/professions/${leatherworkingFixture.id}`, {
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return professionFixtureSchema.parse(await response.json());
-      })
-      .then((loadedProfession) => {
-        if (loadedProfession.recipes.length === 0) {
-          throw new Error("The profession catalog contains no usable recipes.");
-        }
-        const requestedRecipeId = recipeIdFromUrl();
-        const selectedRecipe = loadedProfession.recipes.find(
-          ({ id }) => id === requestedRecipeId,
-        ) ?? loadedProfession.recipes[0]!;
-        const usesFixtureCatalog = loadedProfession.recipes.every(
-          ({ provenance }) => provenance.source === "fixture",
-        );
-        setProfession(loadedProfession);
-        setRecipeId(selectedRecipe.id);
-        setCatalogState(usesFixtureCatalog ? "fixture" : "ready");
-        writeRecipeUrl(selectedRecipe.id, "replace");
-        if (requestedRecipeId === selectedRecipe.id) scrollToWorkspaceOnMobile();
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error("Failed to load the profession catalog.", error);
-        const fallbackRecipe = leatherworkingFixture.recipes.find(
-          ({ id }) => id === recipeIdFromUrl(),
-        ) ?? leatherworkingFixture.recipes[0]!;
-        setProfession(leatherworkingFixture);
-        setRecipeId(fallbackRecipe.id);
-        setCatalogState("fallback");
-        writeRecipeUrl(fallbackRecipe.id, "replace");
       });
     return () => controller.abort();
   }, []);
@@ -773,10 +746,11 @@ export function App() {
   useEffect(() => {
     if (!shouldLoadRecipeChanges(recipeListView, changesLoadedRef.current)) return;
     const controller = new AbortController();
-    const query = new URLSearchParams({ comparison: "classic-forever" });
+    const query = new URLSearchParams({ comparison: "classic-forever", profession: profession.id });
     const unchangedQuery = new URLSearchParams({
       comparison: "classic-forever",
       changeType: "unchanged",
+      profession: profession.id,
     });
     setChangesLoading(true);
     setChangesError(undefined);
@@ -823,7 +797,7 @@ export function App() {
       });
 
     return () => controller.abort();
-  }, [changesReload, recipeListView]);
+  }, [changesReload, recipeListView, profession.id]);
 
   useEffect(() => {
     function selectRecipeFromHistory(): void {
@@ -1377,17 +1351,9 @@ export function App() {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-workspace">Skip to workspace</a>
-      <header className="brand-masthead" aria-labelledby="site-title">
-        <div className="masthead-content">
-          <p className="masthead-title" id="site-title">Forever Professions</p>
-          <p className="masthead-tagline">A fan-made crafting planner for WoW Forever players</p>
-        </div>
-      </header>
+      <ProfessionMasthead />
       <header className="topbar">
-        <a className="brand profession-brand" href="#top" aria-label="Leatherworking workspace">
-          <ItemIcon className="brand-mark" eager gameItemId={2302} name="Handstitched Leather Boots" />
-          <span><small>Profession</small>{profession.name}</span>
-        </a>
+        <ProfessionSwitcher professionId={profession.id} />
         <label className="global-search">
           <SearchIcon className="search-icon" />
           <input aria-label="Search recipes" onChange={(event) => setSearch(event.target.value)} placeholder={recipeListView === "changes" ? "Search changed recipes, fields, or spell IDs…" : `Search ${profession.recipes.length} recipes…`} ref={searchRef} type="search" value={search} />
@@ -1462,10 +1428,11 @@ export function App() {
         </details>
       </header>
 
+      {profession.id === "fishing" ? <p className="profession-activity-note">Fishing shows imported recipes and training records. These records do not describe catch rates or a complete activity-based leveling guide.</p> : null}
       <div className={recipeListView === "changes" ? "workspace workspace-changes" : "workspace"} id="top">
         <aside className="profession-rail" aria-label="Profession and recipe selection">
           <div className="profession-select">
-            <span className="profession-icon" aria-hidden="true">LW</span>
+            <span className="profession-icon" aria-hidden="true">{professionDefinition?.initials}</span>
             <strong>{profession.name}</strong>
           </div>
 
@@ -1777,8 +1744,8 @@ export function App() {
               ) : null}
               {!routeLoading && routeError === undefined && guideRows.length === 0 ? (
                 <div className="guide-message">
-                  <strong>{search ? "No guide steps match" : "No route steps yet"}</strong>
-                  <small>{search ? `Clear “${search}” to see the complete route.` : "The guide appears automatically when recipe data is ready."}</small>
+                  <strong>{search ? "No guide steps match" : routeResponse?.result.status === "blocked" ? "No supported route steps" : "No route steps yet"}</strong>
+                  <small>{search ? `Clear “${search}” to see the route.` : routeResponse?.result.status === "blocked" ? "The imported evidence cannot support a route from the starting skill. Browse All recipes to inspect the available records." : "The guide appears automatically when recipe data is ready."}</small>
                 </div>
               ) : null}
               {routeResponse?.result.status === "blocked" && search.length === 0 ? (
@@ -2094,6 +2061,7 @@ export function App() {
                 {pricing.attribution ? <a className="attribution" href={pricing.attribution.url} rel="noreferrer" target="_blank">{pricing.attribution.text}</a> : null}
               </section>
 
+              {recipe.outputs.length === 0 ? <p className="price-status">No crafted item output is recorded for this spell. Teaching items are not treated as crafted outputs.</p> : null}
               <DataQualityNotice build={profession.build} recipe={recipe} />
             </>
           ) : (

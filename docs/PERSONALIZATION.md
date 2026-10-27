@@ -77,3 +77,12 @@ In Chrome, check all three sidebar views on desktop and a narrow viewport:
    its corresponding limit is disabled; the slider always permits dragging back.
 4. Switch views and reload. The selected skill should be shared and restored, and
    changing it must not rebuild or truncate the leveling route.
+
+## Profession skills
+
+`forever-professions.skill.<profession-id>` stores a bounded integer skill independently
+for each profession. Leatherworking migrates its initial value from the existing v3
+profile when no profession skill exists. Other professions start at 1. Non-Leatherworking
+workspaces do not overwrite that legacy Leatherworking skill. Region, market, faction,
+and change-filter preferences remain shared. Resetting preferences in a workspace
+resets that profession's skill along with the shared profile.

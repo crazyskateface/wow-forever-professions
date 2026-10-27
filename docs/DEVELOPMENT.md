@@ -29,18 +29,20 @@ LibProfessionDB + LibItemDB + reviewed overrides + pinned client DB2
                       React/Vite client
 ```
 
-The current product data is Leatherworking only:
+The current product data covers ten professions:
 
 | Purpose | Build | File |
 | --- | --- | --- |
-| Classic comparison baseline | `1.15.9.69722` | `data/imports/classic-era-1.15.9.69722-leatherworking.json` |
-| Forever target catalog | `1.60.1.69977` | `data/imports/forever-1.60.1.69977-leatherworking.json` |
-| Client icons | `1.60.1.70374` | `apps/web/public/icons/items/manifest.json` |
-| Item labels and tooltip metadata | `1.60.1.70450` | Classification and client-data source metadata in the Forever catalog |
+| Classic comparison baseline | `1.15.9.69722` | `data/imports/classic-era-1.15.9.69722-professions.json` |
+| Forever target catalog | `1.60.1.69977` | `data/imports/forever-1.60.1.69977-professions.json` |
+| Client icons | `1.60.1.70630` (`wowf`, `enUS`) | `apps/web/public/icons/items/manifest.json` |
+| Item labels and tooltip metadata | `1.60.1.70630` (`wowf`, `enUS`) | Classification and client-data source metadata in the Forever catalog |
 
-The target contains 603 recipes and 760 referenced items. Its current Classic →
-Forever comparison is 289 New, 227 Updated, 0 Removed, and 87 Unchanged logical
-recipes.
+The target contains 2,511 records and 2,720 referenced items. Its Classic →
+Forever comparison is 965 New, 972 Updated, 19 Removed, and 574 Unchanged logical
+recipes. All 2,720 referenced items have generated WebP icons; missing assets
+still use the initials fallback. The compact schema-v2 manifest retains item IDs,
+FileDataIDs, and client provenance, with paths derived from item IDs.
 
 ## Ownership boundaries
 
@@ -109,8 +111,8 @@ Use this import order for the complete UI:
 
 ```text
 pnpm db:local:up
-pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
-pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
+pnpm data:import:local data/imports/classic-era-1.15.9.69722-professions.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-professions.json --compare-against data/imports/classic-era-1.15.9.69722-professions.json --comparison-type classic-forever
 ```
 
 The PostgreSQL container stores its database in a named Docker volume. Normalized data
@@ -216,7 +218,10 @@ Keep the outer margins available for future rails or background art. Planner and
 knowledge panels use named CSS containers to reflow within their available width;
 viewport breakpoints still control the full-width navigation and sidebar stacking.
 
-`apps/web/src/main.tsx` resolves `/privacy`, `/terms`, `/contact`, and the focused
+`apps/web/src/main.tsx` shows the profession directory at `/` and resolves
+`/professions/<id>` to a profession-specific workspace. Legacy root recipe links remain
+supported. The native dropdown navigates between professions using ordinary links
+with full page state isolation. It also resolves `/privacy`, `/terms`, `/contact`, and the focused
 `/leatherworking/*` knowledge pages before mounting the planner. Legal/support content
 and metadata live in `StaticPage.tsx`; build-scoped profession content lives in
 `LeatherworkingKnowledgePage.tsx`; every surface reuses `SiteFooter.tsx`. Navigation
@@ -335,7 +340,8 @@ misclassify that host-level temp failure as a product test failure.
 
 ## Known limitations
 
-- Leatherworking is the only complete imported profession.
+- Ten professions are imported. First Aid, Fishing, and Mining have supported-data gaps
+  that block complete routes; Fishing does not model catches or activity-based skill gains.
 - Most acquisition/availability facts and every recipe's final verification remain
   incomplete.
 - Item-type display heuristics remain necessary for records without LibItemDB type
@@ -355,3 +361,27 @@ same change. Keep exact dataset hashes in `data/imports/README.md`, endpoint exa
 `docs/API_TESTING.md`, and component/package invariants in their package README or
 scoped `AGENTS.md`. Mark dated roadmap claims as historical rather than silently
 treating them as current truth.
+
+## Full profession imports
+
+The shared `PROFESSIONS` registry defines the ten source-backed profession identities,
+including the `first-aid` slug and upstream `Firstaid.lua` filename. The converter
+requires every registered core and English-name table and validates a single build
+before bundling. Non-Leatherworking recipe IDs are namespaced by profession to avoid
+cross-profession spell collisions; Leatherworking IDs retain existing public links.
+Comparison identity remains `(professionId, spellId)`.
+
+The existing normalized profession/recipe tables already support this expansion;
+no schema migration is needed. Import each complete build once, not one dataset per
+profession: a build hash is immutable. Reset the disposable local catalog when
+replacing the earlier Leatherworking-only build, then import Classic followed by
+Forever. Never replace applied migrations or relax immutable writes.
+
+Enchantments and training spells may have empty item-output arrays at import,
+catalog, comparison, and shopping boundaries. This means no item output is recorded;
+it does not identify the teaching item as an output. Shopping still aggregates their
+reagents and indexes only actual outputs for nested crafting.
+
+Run `pnpm api:smoke:professions` after importing to exercise catalog reconstruction,
+profession-scoped comparisons, full-range route eligibility, and shopping for every
+profession against local PostgreSQL. Prices in this test are deliberately unavailable.

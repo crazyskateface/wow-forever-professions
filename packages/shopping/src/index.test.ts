@@ -38,6 +38,14 @@ const baseInput: ShoppingPlanInput = {
 };
 
 describe("shopping planner", () => {
+  it("plans reagents for enchantments without inventing an item output", () => {
+    const result = planShoppingList({
+      route: [{ recipeId: "enchant", expectedCrafts: 3 }],
+      items: [{ id: "dust", name: "Dust", unitPriceCopper: 10 }],
+      recipes: [{ id: "enchant", name: "Enchant", reagents: [{ itemId: "dust", quantity: 2 }], outputs: [] }],
+    });
+    expect(result).toMatchObject({ status: "complete", routeReagents: [{ itemId: "dust", quantity: 6 }], crafts: [], expectedCostCopper: 60 });
+  });
   it("aggregates route reagents and crafts a cheaper intermediate", () => {
     const result = planShoppingList(baseInput);
     expect(result).toMatchObject({

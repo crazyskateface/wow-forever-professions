@@ -108,8 +108,8 @@ category = "Data tools"
 working_directory = "."
 timeout_seconds = 900
 commands = [
-  ["pnpm", "data:audit", "data/imports/forever-1.60.1.69977-leatherworking.json", "data/imports/forever-1.60.1.69977-leatherworking.quality.md"],
-  ["pnpm", "data:audit", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "data/imports/classic-era-1.15.9.69722-leatherworking.quality.md"],
+  ["pnpm", "data:audit", "data/imports/forever-1.60.1.69977-professions.json", "data/imports/forever-1.60.1.69977-professions.quality.md"],
+  ["pnpm", "data:audit", "data/imports/classic-era-1.15.9.69722-professions.json", "data/imports/classic-era-1.15.9.69722-professions.quality.md"],
 ]
 
 [[jobs]]
@@ -150,8 +150,8 @@ working_directory = "."
 timeout_seconds = 1800
 confirmation = "This writes both current snapshots to the disposable local PostgreSQL catalog. A same-build hash conflict requires resetting that local database."
 commands = [
-  ["pnpm", "data:import:local", "data/imports/classic-era-1.15.9.69722-leatherworking.json"],
-  ["pnpm", "data:import:local", "data/imports/forever-1.60.1.69977-leatherworking.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "--comparison-type", "classic-forever"],
+  ["pnpm", "data:import:local", "data/imports/classic-era-1.15.9.69722-professions.json"],
+  ["pnpm", "data:import:local", "data/imports/forever-1.60.1.69977-professions.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-professions.json", "--comparison-type", "classic-forever"],
 ]
 
 [[jobs]]
@@ -213,9 +213,9 @@ environment = { DSQL_ENDPOINT = "${STAGING_DSQL_ENDPOINT}", RAW_DATA_BUCKET = "$
 commands = [
   ["pnpm", "db:migrate:dsql"],
   ["pnpm", "db:roles:dsql"],
-  ["pnpm", "data:import", "data/imports/classic-era-1.15.9.69722-leatherworking.json"],
-  ["pnpm", "data:import", "data/imports/forever-1.60.1.69977-leatherworking.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "--comparison-type", "classic-forever"],
-  ["pnpm", "data:release:dsql", "data/imports/forever-1.60.1.69977-leatherworking.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "--comparison-type", "classic-forever"],
+  ["pnpm", "data:import", "data/imports/classic-era-1.15.9.69722-professions.json"],
+  ["pnpm", "data:import", "data/imports/forever-1.60.1.69977-professions.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-professions.json", "--comparison-type", "classic-forever"],
+  ["pnpm", "data:release:dsql", "data/imports/forever-1.60.1.69977-professions.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-professions.json", "--comparison-type", "classic-forever"],
 ]
 [[jobs]]
 id = "publish-current-data-production"
@@ -229,7 +229,7 @@ environment = { DSQL_ENDPOINT = "${PRODUCTION_DSQL_ENDPOINT}", RAW_DATA_BUCKET =
 commands = [
   ["pnpm", "db:migrate:dsql"],
   ["pnpm", "db:roles:dsql"],
-  ["pnpm", "data:import", "data/imports/classic-era-1.15.9.69722-leatherworking.json"],
-  ["pnpm", "data:import", "data/imports/forever-1.60.1.69977-leatherworking.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "--comparison-type", "classic-forever"],
-  ["pnpm", "data:release:dsql", "data/imports/forever-1.60.1.69977-leatherworking.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-leatherworking.json", "--comparison-type", "classic-forever"],
+  ["pnpm", "data:import", "data/imports/classic-era-1.15.9.69722-professions.json"],
+  ["pnpm", "data:import", "data/imports/forever-1.60.1.69977-professions.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-professions.json", "--comparison-type", "classic-forever"],
+  ["pnpm", "data:release:dsql", "data/imports/forever-1.60.1.69977-professions.json", "--compare-against", "data/imports/classic-era-1.15.9.69722-professions.json", "--comparison-type", "classic-forever"],
 ]

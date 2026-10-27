@@ -186,3 +186,10 @@ of committed files because endpoints and role ARNs are environment-specific.
 - **A deploy requests approval:** this is the existing CDK broadening safeguard. Use
   the console attached to the admin process or stop the job; do not weaken the deploy
   script to suppress an unexpected IAM change.
+
+The catalog workflows target the complete `*-professions.json` snapshots. Conversion
+requires all ten registered profession source tables. Set `WOW_CLIENT_PRODUCT=wowf`
+alongside `WOW_CLIENT_ROOT` for the installed Forever client; the extractor retains
+its actual product, resolved build, and locale. Existing item icons remain reusable
+only for the same product and build. Source archives and runtime credentials remain
+outside Git.

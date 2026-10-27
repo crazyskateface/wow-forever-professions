@@ -46,6 +46,7 @@
     "api:shopping": "pnpm --filter @forever-professions/api shopping",
     "api:optimize": "pnpm --filter @forever-professions/api optimize",
     "api:smoke": "pnpm --filter @forever-professions/api smoke",
+    "api:smoke:professions": "pnpm --filter @forever-professions/api smoke:professions",
     "api:smoke:cloud": "pnpm --filter @forever-professions/api smoke:cloud",
     "db:local:down": "docker compose -f docker-compose.local.yml down",
     "db:local:reset": "docker compose -f docker-compose.local.yml down --volumes",

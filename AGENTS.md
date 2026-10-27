@@ -23,8 +23,8 @@ and may be replaced independently of this repository.
 ## Project purpose
 
 Forever Professions is a TypeScript/pnpm monorepo for a World of Warcraft: Forever
-profession leveling planner. The current production-shaped slice is Leatherworking
-and includes:
+profession leveling planner. The current catalogs cover all crafting and secondary
+professions plus Mining smelting, and include:
 
 - a stateful leveling-route optimizer;
 - a recipe catalog and skill-aware calculator;
@@ -184,8 +184,8 @@ The full local catalog requires this import order:
 
 ```text
 pnpm db:local:up
-pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
-pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
+pnpm data:import:local data/imports/classic-era-1.15.9.69722-professions.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-professions.json --compare-against data/imports/classic-era-1.15.9.69722-professions.json --comparison-type classic-forever
 ```
 
 Local endpoints:

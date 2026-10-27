@@ -44,3 +44,9 @@ They are © Blizzard Entertainment and are not covered by the MIT license above.
 The generated manifest identifies the client build and FileDataID used for each
 asset. World of Warcraft and Blizzard Entertainment are trademarks or registered
 trademarks of Blizzard Entertainment, Inc.
+
+The complete profession snapshots also include item labels, rarity, and tooltip
+metadata extracted from installed Forever product `wowf`, client build
+`1.60.1.70630`, locale `enUS`. These client facts retain Blizzard attribution;
+MIT licensing of the source libraries does not relicense Blizzard game data.
+The earlier Leatherworking-only snapshots retain their original client provenance.
