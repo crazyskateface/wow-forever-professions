@@ -7,6 +7,12 @@ import {
 } from "./optimize-route.js";
 
 describe("leveling route application policy", () => {
+  it("returns an explicit guaranteed-skill-up gap for the default guide instead of green crafts", async () => {
+    const profession = { ...leatherworkingFixture, recipes: [{ ...leatherworkingFixture.recipes[0]!, learnSkill: 1, thresholds: { orange: 1, yellow: 2, green: 4, gray: 6 } }] };
+    const response = await optimizeFixtureRoute({ professionId: profession.id, startSkill: 1, targetSkill: 5, preset: "practical" }, profession);
+    expect(response.result).toMatchObject({ status: "blocked", objective: "materials", blockedAtSkill: 3, reason: "no-guaranteed-skill-up" });
+    expect(response.result.steps.every(step => step.skillUpProbability === 1)).toBe(true);
+  });
   const scarceClassification = {
     id: 14483,
     label: "Scarce",

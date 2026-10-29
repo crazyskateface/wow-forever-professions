@@ -1,5 +1,77 @@
 # Imported Forever datasets
 
+The current full catalogs are `forever-1.60.1.69977-professions.json` and
+`classic-era-1.15.9.69722-professions.json`. They contain all six crafting professions,
+Cooking, First Aid, Fishing, and Mining's smelting records from the pinned
+LibProfessionDB v1.9.1 / LibItemDB v1.6.0 archives. Original archive hashes and licenses
+are retained in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Herbalism and Skinning appear in the site directory with client-derived icons, but
+the pinned LibProfessionDB archive has no recipe tables for either. They are not
+part of these ten recipe catalogs. Their client abilities and community location
+evidence are imported separately in `forever-1.60.1.70630-gathering.json`; see
+[Gathering data](../../docs/GATHERING_DATA.md). No recipe data is inferred to fill the gap.
+
+| Profession | Forever records | Classic records |
+| --- | ---: | ---: |
+| Alchemy | 195 | 131 |
+| Blacksmithing | 512 | 315 |
+| Enchanting | 261 | 199 |
+| Engineering | 275 | 193 |
+| Leatherworking | 603 | 314 |
+| Tailoring | 477 | 291 |
+| Cooking | 133 | 91 |
+| First Aid | 33 | 16 |
+| Fishing | 4 | 2 |
+| Mining | 18 | 13 |
+
+The complete comparison stores 965 New, 972 Updated, 19 Removed, and 574 Unchanged
+logical recipes (2,530 total), identified by `(professionId, spellId)`.
+Leatherworking recipe IDs remain unchanged; other professions use
+`<profession-id>:spell-<spell-id>` to avoid collisions.
+
+All 2,511 Forever records remain unverified. There are 1,923 supported learning ranks,
+588 unknown ranks, and 2,470 unknown acquisition/availability states. First Aid,
+Fishing, and Mining have evidence gaps that prevent complete 1–300 routes. The 187
+spells with no recorded crafted item retain empty output arrays. Teaching items
+are never substituted as outputs; 2,316 item-producing records retain provisional
+stack quantities. Audits are generated separately for both full snapshots.
+
+Item enrichment comes from installed product `wowf`, build `1.60.1.70630`, locale
+`enUS`: 2,346/2,720 items have tooltip metadata, 1,172 have 3,028 ordered stat lines,
+and 13 carry generic client classification labels. All 2,720 referenced items also
+have lossless WebP icons from the same client build. The compact schema-v2 manifest
+retains FileDataID mappings and full client provenance; missing assets still use
+the initials fallback.
+
+Full snapshot SHA-256 values:
+
+- `classic-era-1.15.9.69722-professions.json`: `9bbeccbece62c96ddd04af41e5ef5491e58b96bea85fd8bd085e04b88047b437`
+- `forever-1.60.1.69977-professions.json`: `c549a25012a287642d5b2a177bb9db331559c741b3600ab6782eecfc40f03b55`
+
+The converter now requires all registered profession tables by default. Use the
+commands in [the ingestion README](../../packages/ingestion/README.md), setting
+`WOW_CLIENT_PRODUCT=wowf` for the current installed client. Regenerate the full
+snapshots and audits; never edit generated JSON or reports manually.
+
+To replace an earlier Leatherworking-only local import, run `pnpm db:local:reset`
+(the local database is disposable), then:
+
+```text
+pnpm db:local:up
+pnpm data:import:local data/imports/classic-era-1.15.9.69722-professions.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-professions.json --compare-against data/imports/classic-era-1.15.9.69722-professions.json --comparison-type classic-forever
+pnpm api:smoke:professions
+```
+
+The existing schema supports all professions without a migration. Import a whole
+build atomically; importing a different same-build hash over existing rows correctly
+fails. Admin refresh/sync and deployment jobs now target the complete catalogs via
+`source-releases.json`. The old Leatherworking files below are retained as historical
+references and must not be imported alongside the full catalogs in the same database.
+
+# Historical Leatherworking snapshots
+
 `classic-era-1.15.9.69722-leatherworking.json` is the normalized Classic Era
 baseline used by the recipe-diff pipeline. It contains 314 Leatherworking
 recipes from the Vanilla tables shipped in the same LibProfessionDB v1.9.1 and

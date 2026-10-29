@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export * from "./recipe-changes.js";
 export * from "./guide-validation.js";
+export * from "./professions.js";
+export * from "./gathering.js";
 
 export const healthResponseSchema = z.object({
   service: z.literal("forever-professions-api"),
@@ -262,8 +264,7 @@ export const importedRecipeSchema = z
             ({ minimumQuantity, maximumQuantity }) => minimumQuantity <= maximumQuantity,
             { message: "Output quantities must be ordered minimum <= maximum." },
           ),
-      )
-      .min(1),
+      ),
     sourceId: z.string().min(1),
     verification: verificationSchema.omit({ id: true }),
     provenanceNotes: z.string().min(1).optional(),
@@ -619,6 +620,7 @@ export const blockedRouteOptimizationResultSchema = z.object({
     "no-eligible-recipe",
     "missing-price-data",
     "unsupported-recipe-evidence",
+    "no-guaranteed-skill-up",
   ]),
   explanation: z.string().min(1),
 });
@@ -764,6 +766,7 @@ export const productEventSchema = z.discriminatedUnion("name", [
       "no-eligible-recipe",
       "missing-price-data",
       "unsupported-recipe-evidence",
+      "no-guaranteed-skill-up",
     ]),
   }).strict(),
   z.object({
@@ -820,7 +823,7 @@ export const recipeSchema = z.object({
   availability: recipeAvailabilitySchema,
   thresholds: skillThresholdsSchema,
   reagents: z.array(reagentSchema),
-  outputs: z.array(fixtureRecipeOutputSchema).min(1),
+  outputs: z.array(fixtureRecipeOutputSchema),
   provenance: provenanceSchema,
 });
 

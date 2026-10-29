@@ -1,13 +1,36 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ImportedBuildDataset } from "@forever-professions/contracts";
 import {
   collectDatasetGameItemIds,
+  clientProduct,
+  parseItemIconManifest,
+  serializeItemIconManifest,
   parseWowdataItemClientData,
   parseWowdataItemClassifications,
   parseWowdataItemRows,
 } from "./item-icons.js";
 
 describe("item icon extraction", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("retains the explicit Forever product and rejects unrelated client products", () => {
+    vi.stubEnv("WOW_CLIENT_PRODUCT", "wowf");
+    expect(clientProduct()).toBe("wowf");
+    vi.stubEnv("WOW_CLIENT_PRODUCT", "wow");
+    expect(() => clientProduct()).toThrow(/Forever client/);
+  });
+  it("round-trips all profession icon mappings below the existing manifest budget and reads v1", () => {
+    const manifest = {
+      schemaVersion: 1 as const, recipeBuild: "1.60.1.69977", assetBuild: "1.60.1.70630",
+      product: "wowf" as const, locale: "enUS" as const, format: "webp" as const,
+      icons: Object.fromEntries(Array.from({ length: 2720 }, (_, index) => [String(index + 1), { fileDataId: index + 100000, path: `/icons/items/${index + 1}.webp` }])),
+      missingItemIds: [99999],
+    };
+    const serialized = serializeItemIconManifest(manifest);
+    expect(Buffer.byteLength(serialized)).toBeLessThan(80000);
+    expect(parseItemIconManifest(JSON.parse(serialized))).toEqual(manifest);
+    expect(parseItemIconManifest(manifest)).toEqual(manifest);
+    expect(parseItemIconManifest({ schemaVersion: 2, icons: { "1": "invalid" } })).toBeUndefined();
+  });
   it("collects sorted, unique reagent and output item IDs", () => {
     const dataset = {
       professions: [

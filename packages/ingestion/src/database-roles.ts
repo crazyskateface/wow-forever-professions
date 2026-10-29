@@ -29,6 +29,12 @@ const catalogTables = [
   "item_client_data",
   "item_quality",
   "item_stat",
+  "gathering_dataset",
+  "gathering_evidence",
+  "gathering_ability",
+  "gathering_source",
+  "gathering_location",
+  "gathering_yield",
 ] as const;
 
 const pricingTables = ["auction_market", "auction_price_current"] as const;

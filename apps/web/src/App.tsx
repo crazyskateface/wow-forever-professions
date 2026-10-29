@@ -8,7 +8,6 @@ import {
 import {
   auctionMarketsResponseSchema,
   auctionPricesResponseSchema,
-  professionFixtureSchema,
   recipeChangesResponseSchema,
   recipeChangesSummaryResponseSchema,
   routeOptimizationResponseSchema,
@@ -36,6 +35,8 @@ import { ForeverChanges, RecipeChangeBadge } from "./ForeverChanges.js";
 import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
 import { BestCrafts, type CraftSelection } from "./BestCrafts.js";
+import { bestCraftDefaults } from "./best-crafts-professions.js";
+import { createInitialRecipeSelection } from "./initial-recipe-selection.js";
 import { SiteFooter } from "./SiteFooter.js";
 import { ChevronDownIcon, SearchIcon } from "./UiIcons.js";
 import {
@@ -83,6 +84,9 @@ import {
   type CatalogSort,
 } from "./catalog-discovery.js";
 import { recipeKnowledgeHref } from "./leatherworking-knowledge.js";
+import { ProfessionMasthead, ProfessionSwitcher } from "./ProfessionNavigation.js";
+import { ProfessionIcon } from "./ProfessionIcon.js";
+import { readProfessionSkill, writeProfessionSkill } from "./profession-navigation.js";
 import { recordProductEvent } from "./product-analytics.js";
 
 type WorkspaceView = "calculator" | "crafts";
@@ -261,26 +265,6 @@ function sourceDataOriginLabel(sourceDataOrigin: string | undefined): string {
   return sourceDataOrigin[0]!.toUpperCase() + sourceDataOrigin.slice(1);
 }
 
-function recipeComparisonMetrics(
-  recipe: Recipe,
-  skill: number,
-  pricesByItemId: ReadonlyMap<number, AuctionPriceObservation>,
-) {
-  const probability = getSkillUpProbability(skill, recipe.thresholds);
-  return {
-    probability,
-    expectedCrafts: probability <= 0 ? undefined : getExpectedCraftsForSkillUp(probability),
-    expectedMaterialUnits: probability <= 0
-      ? undefined
-      : recipe.reagents.reduce(
-          (total, reagent) =>
-            total + getExpectedReagentQuantity(reagent.quantity, probability),
-          0,
-        ),
-    expectedCost: getRecipeExpectedCost(recipe, skill, pricesByItemId),
-  };
-}
-
 type TooltipRecipeItem = Recipe["outputs"][number] | Recipe["reagents"][number];
 
 function recipeOutputQualityId(recipe: Recipe | undefined): number | undefined {
@@ -318,7 +302,8 @@ function outputQuantityIsProvisional(recipe: Recipe): boolean {
   ]);
 }
 
-function outputTooltipItem(recipe: Recipe, professionName: string, output = recipe.outputs[0]!): ItemTooltipData {
+function outputTooltipItem(recipe: Recipe, professionName: string, output = recipe.outputs[0]): ItemTooltipData {
+  if (output === undefined) return { name: recipe.name, details: [{ text: "No crafted item output recorded", tone: "muted" }] };
   const provisionalQuantity = outputQuantityIsProvisional(recipe);
   return {
     ...tooltipItemData(output),
@@ -392,7 +377,7 @@ function DataQualityNotice({ build, recipe }: { build: string; recipe: Recipe })
     recipe.provenance.source,
     recipe.provenance.verification.status,
   );
-  const acquisitionGuideHref = recipeKnowledgeHref(recipe.acquisition, recipe.id);
+  const acquisitionGuideHref = recipe.professionId === "leatherworking" ? recipeKnowledgeHref(recipe.acquisition, recipe.id) : undefined;
 
   return (
     <section
@@ -446,10 +431,10 @@ function DataQualityNotice({ build, recipe }: { build: string; recipe: Recipe })
           {acquisitionGuideHref === undefined ? null : (
             <a href={acquisitionGuideHref}>Open acquisition guide</a>
           )}
-          {recipe.specializationSpellId === null ? null : (
+          {recipe.professionId !== "leatherworking" || recipe.specializationSpellId === null ? null : (
             <a href={`/leatherworking/specializations#${recipe.id}`}>Review specialization gate</a>
           )}
-          <a href="/leatherworking">Leatherworking evidence overview</a>
+          {recipe.professionId === "leatherworking" ? <a href="/leatherworking">Leatherworking evidence overview</a> : null}
         </div>
       </div>
     </section>
@@ -552,13 +537,22 @@ function SkillChart({
   );
 }
 
-export function App() {
+export function App({ initialProfession = leatherworkingFixture, initialCatalogState = "loading" }: { readonly initialProfession?: ProfessionFixture; readonly initialCatalogState?: CatalogState }) {
   const maxBaseSkill = FOREVER_BUILD_CONFIG.maxBaseSkill;
   const fullGuideRange = getFullGuideRange(maxBaseSkill);
-  const [initialPreferences] = useState(readPersonalization);
-  const [profession, setProfession] = useState<ProfessionFixture>(leatherworkingFixture);
-  const [catalogState, setCatalogState] = useState<CatalogState>("loading");
-  const [recipeId, setRecipeId] = useState(leatherworkingFixture.recipes[0]!.id);
+  const [initialPreferences] = useState(() => {
+    const profile = readPersonalization();
+    return { ...profile, currentSkill: readProfessionSkill(initialProfession.id, profile.currentSkill) };
+  });
+  const profession = initialProfession;
+  const craftDefaults = bestCraftDefaults(profession.id);
+  const catalogState = initialCatalogState;
+  const [initialRecipeSelection] = useState(() => createInitialRecipeSelection(
+    profession.recipes,
+    recipeIdFromUrl(),
+    typeof window === "undefined" ? "guide" : recipeListViewFromUrlValue(window.location.href),
+  ));
+  const [recipeId, setRecipeId] = useState(initialRecipeSelection.recipeId);
   const recipe =
     profession.recipes.find(({ id }) => id === recipeId) ?? profession.recipes[0]!;
   const maxCatalogLearningSkill = useMemo(
@@ -574,7 +568,7 @@ export function App() {
   const [prices, setPrices] = useState<readonly AuctionPriceObservation[]>([]);
   const [priceError, setPriceError] = useState<string>();
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("calculator");
-  const [craftSelection, setCraftSelection] = useState<CraftSelection>({ classId: "rogue", roleId: "melee", level: 20 });
+  const [craftSelection, setCraftSelection] = useState<CraftSelection>(() => craftDefaults ?? { classId: "rogue", roleId: "melee", level: 20 });
   const [recipeListView, setRecipeListView] = useState<RecipeListView>(() =>
     typeof window === "undefined"
       ? "guide"
@@ -621,9 +615,17 @@ export function App() {
   const missingDataEventsRecordedRef = useRef(new Set<string>());
 
   useEffect(() => {
+    if (initialRecipeSelection.pendingGuide) return;
+    const explicitlySelected = recipeIdFromUrl() === recipeId;
+    writeRecipeUrl(recipeId, "replace");
+    if (explicitlySelected) scrollToWorkspaceOnMobile();
+  }, []);
+
+  useEffect(() => {
+    writeProfessionSkill(profession.id, skill);
     setPreferencesStorageAvailable(writePersonalization({
       version: 3,
-      currentSkill: skill,
+      currentSkill: profession.id === "leatherworking" ? skill : readPersonalization().currentSkill,
       region,
       marketId,
       faction,
@@ -666,47 +668,6 @@ export function App() {
       })
       .finally(() => {
         if (!controller.signal.aborted) setMarketsLoading(false);
-      });
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setCatalogState("loading");
-    fetch(`/api/professions/${leatherworkingFixture.id}`, {
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return professionFixtureSchema.parse(await response.json());
-      })
-      .then((loadedProfession) => {
-        if (loadedProfession.recipes.length === 0) {
-          throw new Error("The profession catalog contains no usable recipes.");
-        }
-        const requestedRecipeId = recipeIdFromUrl();
-        const selectedRecipe = loadedProfession.recipes.find(
-          ({ id }) => id === requestedRecipeId,
-        ) ?? loadedProfession.recipes[0]!;
-        const usesFixtureCatalog = loadedProfession.recipes.every(
-          ({ provenance }) => provenance.source === "fixture",
-        );
-        setProfession(loadedProfession);
-        setRecipeId(selectedRecipe.id);
-        setCatalogState(usesFixtureCatalog ? "fixture" : "ready");
-        writeRecipeUrl(selectedRecipe.id, "replace");
-        if (requestedRecipeId === selectedRecipe.id) scrollToWorkspaceOnMobile();
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error("Failed to load the profession catalog.", error);
-        const fallbackRecipe = leatherworkingFixture.recipes.find(
-          ({ id }) => id === recipeIdFromUrl(),
-        ) ?? leatherworkingFixture.recipes[0]!;
-        setProfession(leatherworkingFixture);
-        setRecipeId(fallbackRecipe.id);
-        setCatalogState("fallback");
-        writeRecipeUrl(fallbackRecipe.id, "replace");
       });
     return () => controller.abort();
   }, []);
@@ -773,10 +734,11 @@ export function App() {
   useEffect(() => {
     if (!shouldLoadRecipeChanges(recipeListView, changesLoadedRef.current)) return;
     const controller = new AbortController();
-    const query = new URLSearchParams({ comparison: "classic-forever" });
+    const query = new URLSearchParams({ comparison: "classic-forever", profession: profession.id });
     const unchangedQuery = new URLSearchParams({
       comparison: "classic-forever",
       changeType: "unchanged",
+      profession: profession.id,
     });
     setChangesLoading(true);
     setChangesError(undefined);
@@ -823,10 +785,11 @@ export function App() {
       });
 
     return () => controller.abort();
-  }, [changesReload, recipeListView]);
+  }, [changesReload, recipeListView, profession.id]);
 
   useEffect(() => {
     function selectRecipeFromHistory(): void {
+      initialRecipeSelection.cancelGuide();
       setRecipeListView(recipeListViewFromUrlValue(window.location.href));
       const requestedRecipeId = recipeIdFromUrl();
       const requestedRecipe = profession.recipes.find(
@@ -1134,22 +1097,6 @@ export function App() {
       return matches ? [{ alternatives, segment, recipe: guideRecipe }] : [];
     });
   }, [profession.recipes, routeResponse, search]);
-  const activeRouteSegment = routeResponse?.result.segments.find(
-    (segment) => skill >= segment.startSkill && skill < segment.endSkill,
-  ) ?? routeResponse?.result.segments.find((segment) => segment.startSkill > skill);
-  const activeRouteRecipe = activeRouteSegment === undefined
-    ? undefined
-    : profession.recipes.find(({ id }) => id === activeRouteSegment.recipeId);
-  const selectedComparisonMetrics = useMemo(
-    () => recipeComparisonMetrics(recipe, skill, catalogPricesByItemId),
-    [catalogPricesByItemId, recipe, skill],
-  );
-  const activeRouteComparisonMetrics = useMemo(
-    () => activeRouteRecipe === undefined
-      ? undefined
-      : recipeComparisonMetrics(activeRouteRecipe, skill, catalogPricesByItemId),
-    [activeRouteRecipe, catalogPricesByItemId, skill],
-  );
   const recipeRequiredSkill = recipe.learnSkill ?? recipe.thresholds.orange;
   const recipeIsAboveCurrentSkill = skill < recipeRequiredSkill;
   const recipeCapStatus = getRecipeSkillCapStatus(
@@ -1219,6 +1166,11 @@ export function App() {
       segments: response.result.segments,
     });
     setRouteResponse(response);
+    const firstGuideRecipeId = initialRecipeSelection.resolveGuide(response.result.segments[0]?.recipeId);
+    if (firstGuideRecipeId !== undefined) {
+      setRecipeId(firstGuideRecipeId);
+      writeRecipeUrl(firstGuideRecipeId, "replace");
+    }
     setRouteProgress(readRouteProgress(fingerprint));
     firstStepEngagementRecordedRef.current = false;
     void recordProductEvent({
@@ -1272,19 +1224,6 @@ export function App() {
     persistRouteProgress([...next]);
   }
 
-  function resumeRouteAt(segmentKey: string | undefined): void {
-    if (segmentKey === undefined) return;
-    selectRecipeListView("guide");
-    setSearch("");
-    window.requestAnimationFrame(() => {
-      const entry = [...document.querySelectorAll<HTMLElement>(
-        "[data-route-segment-key]",
-      )].find((candidate) => candidate.dataset.routeSegmentKey === segmentKey);
-      entry?.scrollIntoView({ behavior: "auto", block: "center" });
-      entry?.focus({ preventScroll: true });
-    });
-  }
-
   function invalidatePlanningResults(): void {
     routeRequestGuardRef.current.invalidate();
     routeAbortControllerRef.current?.abort();
@@ -1330,6 +1269,7 @@ export function App() {
   }
 
   function selectRecipe(nextRecipe: Recipe, historyMode: "push" | "replace" = "push"): void {
+    initialRecipeSelection.cancelGuide();
     setRecipeId(nextRecipe.id);
     setWorkspaceView("calculator");
     writeRecipeUrl(nextRecipe.id, historyMode);
@@ -1349,7 +1289,23 @@ export function App() {
     historyMode: "push" | "replace" = "push",
   ): void {
     setRecipeListView(nextView);
+    initialRecipeSelection.cancelGuide();
     writeRecipeListViewUrl(nextView, historyMode);
+  }
+
+  function openChangedRecipe(nextRecipe: Recipe): void {
+    initialRecipeSelection.cancelGuide();
+    setRecipeId(nextRecipe.id);
+    setRecipeListView("recipes");
+    setWorkspaceView("calculator");
+    setSearch("");
+    const url = urlWithRecipeListView(urlWithRecipeId(window.location.href, nextRecipe.id), "recipes");
+    window.history.pushState({}, "", url);
+    window.requestAnimationFrame(() => {
+      const workspace = document.getElementById("main-workspace");
+      workspace?.scrollIntoView({ block: "start" });
+      workspace?.focus({ preventScroll: true });
+    });
   }
 
   function updateCurrentSkill(value: number): void {
@@ -1367,6 +1323,7 @@ export function App() {
   function openRouteRecipe(nextRecipeId: string): void {
     const nextRecipe = profession.recipes.find(({ id }) => id === nextRecipeId);
     if (nextRecipe === undefined) return;
+    initialRecipeSelection.cancelGuide();
     recordFirstStepEngagement();
     setRecipeId(nextRecipe.id);
     setWorkspaceView("calculator");
@@ -1377,17 +1334,9 @@ export function App() {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-workspace">Skip to workspace</a>
-      <header className="brand-masthead" aria-labelledby="site-title">
-        <div className="masthead-content">
-          <p className="masthead-title" id="site-title">Forever Professions</p>
-          <p className="masthead-tagline">A fan-made crafting planner for WoW Forever players</p>
-        </div>
-      </header>
+      <ProfessionMasthead />
       <header className="topbar">
-        <a className="brand profession-brand" href="#top" aria-label="Leatherworking workspace">
-          <ItemIcon className="brand-mark" eager gameItemId={2302} name="Handstitched Leather Boots" />
-          <span><small>Profession</small>{profession.name}</span>
-        </a>
+        <ProfessionSwitcher professionId={profession.id} />
         <label className="global-search">
           <SearchIcon className="search-icon" />
           <input aria-label="Search recipes" onChange={(event) => setSearch(event.target.value)} placeholder={recipeListView === "changes" ? "Search changed recipes, fields, or spell IDs…" : `Search ${profession.recipes.length} recipes…`} ref={searchRef} type="search" value={search} />
@@ -1462,10 +1411,11 @@ export function App() {
         </details>
       </header>
 
+      {profession.id === "fishing" ? <p className="profession-activity-note">Fishing shows imported recipes and training records. These records do not describe catch rates or a complete activity-based leveling guide.</p> : null}
       <div className={recipeListView === "changes" ? "workspace workspace-changes" : "workspace"} id="top">
         <aside className="profession-rail" aria-label="Profession and recipe selection">
           <div className="profession-select">
-            <span className="profession-icon" aria-hidden="true">LW</span>
+            <ProfessionIcon className="profession-icon profession-art" professionId={profession.id} eager />
             <strong>{profession.name}</strong>
           </div>
 
@@ -1777,8 +1727,8 @@ export function App() {
               ) : null}
               {!routeLoading && routeError === undefined && guideRows.length === 0 ? (
                 <div className="guide-message">
-                  <strong>{search ? "No guide steps match" : "No route steps yet"}</strong>
-                  <small>{search ? `Clear “${search}” to see the complete route.` : "The guide appears automatically when recipe data is ready."}</small>
+                  <strong>{search ? "No guide steps match" : routeResponse?.result.status === "blocked" ? "No supported route steps" : "No route steps yet"}</strong>
+                  <small>{search ? `Clear “${search}” to see the route.` : routeResponse?.result.status === "blocked" ? "The imported evidence cannot support a route from the starting skill. Browse All recipes to inspect the available records." : "The guide appears automatically when recipe data is ready."}</small>
                 </div>
               ) : null}
               {routeResponse?.result.status === "blocked" && search.length === 0 ? (
@@ -1929,7 +1879,7 @@ export function App() {
           {recipeListView === "changes" ? null : (
             <nav className="workspace-nav" aria-label="Workspace views">
               <button aria-pressed={workspaceView === "calculator"} className={workspaceView === "calculator" ? "active" : ""} onClick={() => setWorkspaceView("calculator")} type="button">Recipe calculator</button>
-              <button aria-pressed={workspaceView === "crafts"} className={workspaceView === "crafts" ? "active" : ""} onClick={() => setWorkspaceView("crafts")} type="button">Best crafts</button>
+              {craftDefaults ? <button aria-pressed={workspaceView === "crafts"} className={workspaceView === "crafts" ? "active" : ""} onClick={() => setWorkspaceView("crafts")} type="button">Best crafts</button> : null}
             </nav>
           )}
 
@@ -1943,73 +1893,14 @@ export function App() {
               loading={changesLoading}
               onFiltersChange={setChangeFilters}
               onRetry={() => setChangesReload((value) => value + 1)}
+              onSelectRecipe={openChangedRecipe}
+              recipes={profession.recipes}
               recipeTooltipBySpellId={recipeTooltipBySpellId}
               search={search}
               summary={changeSummary}
             />
-          ) : workspaceView === "calculator" ? (
+          ) : workspaceView === "calculator" || !craftDefaults ? (
             <>
-              {recipeListView === "recipes" && activeRouteSegment && activeRouteRecipe && activeRouteComparisonMetrics ? (
-                <section className="route-context-compare" aria-labelledby="route-context-title">
-                  <div className="route-context-heading">
-                    <div>
-                      <span className="section-kicker">Active route · skill {activeRouteSegment.startSkill}–{activeRouteSegment.endSkill}</span>
-                      <h2 id="route-context-title">
-                        {recipe.id === activeRouteRecipe.id
-                          ? "This recipe matches your active route step"
-                          : `Compare with ${activeRouteRecipe.name}`}
-                      </h2>
-                    </div>
-                    <button
-                      onClick={() => {
-                        selectRecipeListView("guide");
-                        resumeRouteAt(routeSegmentKey(activeRouteSegment));
-                      }}
-                      type="button"
-                    >
-                      Back to route
-                    </button>
-                  </div>
-                  {recipe.id === activeRouteRecipe.id ? (
-                    <p className="route-context-match">
-                      The generated route recommends this recipe at your current skill.
-                      Browse alternatives here without losing route or checklist progress.
-                    </p>
-                  ) : (
-                    <div className="route-compare-grid">
-                      {[
-                        {
-                          label: "Selected recipe",
-                          candidate: recipe,
-                          metrics: selectedComparisonMetrics,
-                        },
-                        {
-                          label: "Route recommendation",
-                          candidate: activeRouteRecipe,
-                          metrics: activeRouteComparisonMetrics,
-                        },
-                      ].map(({ label, candidate, metrics }) => (
-                        <article className={candidate.id === activeRouteRecipe.id ? "recommended" : ""} key={candidate.id}>
-                          <span>{label}</span>
-                          <strong className={getItemRarityNameClass(recipeOutputQualityId(candidate))}>{candidate.name}</strong>
-                          <dl>
-                            <div><dt>Skill-up chance</dt><dd>{Math.round(metrics.probability * 100)}%</dd></div>
-                            <div><dt>Expected crafts</dt><dd>{metrics.expectedCrafts === undefined ? "No skill-up" : formatNumber(metrics.expectedCrafts)}</dd></div>
-                            <div><dt>Material units</dt><dd>{metrics.expectedMaterialUnits === undefined ? "No skill-up" : formatNumber(metrics.expectedMaterialUnits)}</dd></div>
-                            <div><dt>Expected cost</dt><dd>{metrics.expectedCost === undefined ? "Unknown" : formatCopper(metrics.expectedCost)}</dd></div>
-                            <div><dt>Acquisition</dt><dd>{acquisitionLabel(candidate)}</dd></div>
-                          </dl>
-                          {candidate.id === activeRouteRecipe.id ? (
-                            <button onClick={() => openRouteRecipe(candidate.id)} type="button">
-                              Open recommended recipe
-                            </button>
-                          ) : null}
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              ) : null}
               <section className="recipe-hero" aria-labelledby="recipe-title">
                 <div className="hero-title-row">
                   <ItemTooltip item={outputTooltipItem(recipe, profession.name)} pinnable>
@@ -2066,15 +1957,14 @@ export function App() {
 
               <section className="materials-card" aria-labelledby="materials-title">
                 <div className="section-title-row materials-heading">
-                  <div><h2 id="materials-title">Materials required</h2><small className="section-subtitle">For {formatNumber(calculation.expectedCrafts)} attempts</small></div>
+                  <div><h2 id="materials-title">Materials required</h2><small className="section-subtitle">For 1 craft</small></div>
                   <span className="price-mode">Market prices</span>
                 </div>
                 <div className="materials-table" role="table" aria-label="Required materials">
-                  <div className="materials-header" role="row"><span role="columnheader">Name</span><span role="columnheader">Amount</span><span role="columnheader">Source</span><span role="columnheader">Estimated cost</span></div>
+                  <div className="materials-header" role="row"><span role="columnheader">Name</span><span role="columnheader">Quantity</span><span role="columnheader">Source</span><span role="columnheader">Estimated cost</span></div>
                   {recipe.reagents.map((reagent, index) => {
                     const observation = reagent.gameItemId === undefined ? undefined : pricing.byItem.get(reagent.gameItemId);
                     const price = unitPrice(observation);
-                    const expectedQuantity = getExpectedReagentQuantity(reagent.quantity, calculation.probability);
                     return (
                       <div className="material-row" key={reagent.itemId} role="row">
                         <span className="material-name" role="cell">
@@ -2083,9 +1973,9 @@ export function App() {
                           </ItemTooltip>
                           <span><strong className={getItemRarityNameClass(reagent.clientData?.qualityId)}>{reagent.name}</strong><small>Item {reagent.gameItemId ?? "—"}</small></span>
                         </span>
-                        <strong role="cell">{formatNumber(expectedQuantity)}</strong>
+                        <strong role="cell">{reagent.quantity}</strong>
                         <span className="source-pill" role="cell"><i aria-hidden="true" /> Auction house</span>
-                        <strong className="material-cost" role="cell">{price === undefined ? "Unavailable" : formatCopper(price * expectedQuantity)}</strong>
+                        <strong className="material-cost" role="cell">{price === undefined ? "Unavailable" : formatCopper(price * reagent.quantity)}</strong>
                       </div>
                     );
                   })}
@@ -2094,6 +1984,7 @@ export function App() {
                 {pricing.attribution ? <a className="attribution" href={pricing.attribution.url} rel="noreferrer" target="_blank">{pricing.attribution.text}</a> : null}
               </section>
 
+              {recipe.outputs.length === 0 ? <p className="price-status">No crafted item output is recorded for this spell. Teaching items are not treated as crafted outputs.</p> : null}
               <DataQualityNotice build={profession.build} recipe={recipe} />
             </>
           ) : (

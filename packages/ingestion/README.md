@@ -54,14 +54,14 @@ From the repository root, run `pnpm db:local:up`, `pnpm db:local:test`, and `pnp
 
 ## Forever client-data conversion
 
-The narrow Lua-literal converter reads generated Leatherworking, acquisition, teaching-item, source, hidden-recipe, item-name, and item-type tables from extracted LibProfessionDB and LibItemDB archives. It does not execute Lua. A versioned override file reapplies reviewed corrections after every conversion. When a WoW installation root is supplied, the same command also uses `wowdata` against one resolved client build to import generic `ItemSparse.ItemNameDescriptionID -> ItemNameDescription` labels, including Forever's `Scarce` gathering classification, plus item display names, rarity IDs, equipment slots, armor, ordered item stats, required levels, and vendor sell prices. Armor is deterministically derived from the pinned client's armor-total, quality, location, and shield tables. Stat values combine `ItemSparse` allocations with the matching `RandPropPoints` level, quality, and inventory-slot budget; display text comes from the pinned client's localized `GlobalStrings` data. It resolves `Item.IconFileDataID`, falls back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID` for Forever-only equipment, and exports local lossless WebP assets plus a build-stamped manifest. Install the extractor once with `npm install -g @follenfang/wowdata`. From the repository root:
+The narrow Lua-literal converter reads every registered crafting, secondary, and smelting profession plus acquisition, teaching-item, source, hidden-recipe, item-name, and item-type tables from extracted LibProfessionDB and LibItemDB archives. It does not execute Lua. A versioned override file reapplies reviewed corrections after every conversion. When a WoW installation root is supplied, the same command also uses `wowdata` against one resolved client build to import generic `ItemSparse.ItemNameDescriptionID -> ItemNameDescription` labels, including Forever's `Scarce` gathering classification, plus item display names, rarity IDs, equipment slots, armor, ordered item stats, required levels, and vendor sell prices. Armor is deterministically derived from the pinned client's armor-total, quality, location, and shield tables. Stat values combine `ItemSparse` allocations with the matching `RandPropPoints` level, quality, and inventory-slot budget; display text comes from the pinned client's localized `GlobalStrings` data. It resolves `Item.IconFileDataID`, falls back through `ItemModifiedAppearance` and `ItemAppearance.DefaultIconFileDataID` for Forever-only equipment, and exports local lossless WebP assets plus a build-stamped manifest. Install the extractor once with `npm install -g @follenfang/wowdata`. From the repository root:
 
 ```text
-pnpm data:convert:professiondb <ProfessionDB-root> <ItemDB-root> data/imports/forever-1.60.1.69977-leatherworking.json Forever - data/imports/forever-leatherworking-overrides.json "C:\World of Warcraft" apps/web/public/icons/items
-pnpm data:audit data/imports/forever-1.60.1.69977-leatherworking.json data/imports/forever-1.60.1.69977-leatherworking.quality.md
+pnpm data:convert:professiondb <ProfessionDB-root> <ItemDB-root> data/imports/forever-1.60.1.69977-professions.json Forever - data/imports/forever-leatherworking-overrides.json "C:\World of Warcraft" apps/web/public/icons/items
+pnpm data:audit data/imports/forever-1.60.1.69977-professions.json data/imports/forever-1.60.1.69977-professions.quality.md
 pnpm db:local:up
-pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
-pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
+pnpm data:import:local data/imports/classic-era-1.15.9.69722-professions.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-professions.json --compare-against data/imports/classic-era-1.15.9.69722-professions.json --comparison-type classic-forever
 ```
 
 The local admin dashboard first runs `pnpm data:status:local <classic.json>
@@ -77,7 +77,7 @@ is supplied. When the addon archives are unchanged and only the pinned client me
 to be refreshed, run the narrower command before auditing and importing:
 
 ```text
-pnpm data:enrich:client data/imports/forever-1.60.1.69977-leatherworking.json "C:\World of Warcraft"
+pnpm data:enrich:client data/imports/forever-1.60.1.69977-professions.json "C:\World of Warcraft"
 ```
 
 The override file contains only reviewed field corrections and their provenance; reagents, outputs, names, and item types continue to come from the source archives, while item-name-description labels come from the pinned client build. The converter rejects duplicate, missing-source, or unmatched override records instead of silently dropping them. `WOW_CLIENT_ROOT` and `ITEM_ICON_OUTPUT_DIR` may be used instead of the final two positional arguments. `WOWDATA_PATH` can select a non-default extractor binary. Existing icons are reused only when their manifest records the same client asset build and FileDataID.
@@ -87,7 +87,7 @@ source refreshes set `PROFESSION_DB_VERSION`, `ITEM_DB_VERSION`, and
 `PROFESSION_DB_SOURCE_URL` so regenerated records retain the release actually used;
 these values are provenance metadata, not credentials.
 
-The current Leatherworking conversion finds seven item-name-description labels among
+The historical Leatherworking-only conversion found seven item-name-description labels among
 the 760 referenced items: Pristine Leather, Pristine Hide, and Pristine Scale are
 `Scarce`; four Spiritcaller outputs are `Crafted`. These values are examples of the
 generic import result, not a converter-maintained allowlist.
@@ -115,3 +115,46 @@ pnpm data:release:dsql <target.json> --compare-against <base.json> --comparison-
 Use `pnpm db:roles:dsql` after migrations to idempotently map and verify the ingestion, application-reader, and pricing-writer roles. To ingest any schema-valid build snapshot into Aurora DSQL, use `pnpm data:import <path-to-json>`; this supports the Classic fallback baseline as well as client-data targets. After importing both builds and their comparison, `pnpm data:release:dsql <target> --compare-against <base> --comparison-type classic-forever` verifies source hashes and compares live recipe, client-data, rarity, item-stat, and per-change-type counts with the normalized snapshots and a freshly generated comparison. `UNCHANGED` rows are part of that gate. Any missing or extra persisted row blocks publication before the command stores its immutable machine audit and deterministic data-release manifest.
 
 The bundled LibProfessionDB-derived Leatherworking build is real client data, but it remains unverified rather than being misrepresented as authoritative. The staging Phase 3 proof produced release `c45372dc8b6264dec83d1275d5691ed0`; the prior release audit records 314 Classic recipes, 603 Forever recipes, 603 comparison rows, and 630 target items with client data and quality. A new release audit after migrations 025–026 must also account for the 1,174 imported target item-stat rows.
+
+## Complete profession snapshots
+
+Conversion now bundles Alchemy, Blacksmithing, Enchanting, Engineering,
+Leatherworking, Tailoring, Cooking, First Aid, Fishing, and Mining. Both the Forever
+and Vanilla tables are required. The source lock, admin refresh/sync jobs, and import
+commands use `*-professions.json`. Previous `*-leatherworking.json` files remain
+historical references. Do not import both variants of the same build into one database.
+
+The shared profession directory also includes Herbalism and Skinning. Neither has a
+recipe table in the pinned source archive: their `sourceName` is explicitly null.
+The converter and recipe API smoke check use `RECIPE_PROFESSIONS`, the source-backed
+subset of `PROFESSIONS`. Their absence is not an import failure, and no synthetic
+recipes or build rows are generated for them. The recipe importer remains separate
+from the gathering evidence pipeline described in
+[GATHERING_DATA.md](../../docs/GATHERING_DATA.md). That pipeline imports client
+abilities and pinned community locations into independent content-addressed datasets.
+
+Set `WOW_CLIENT_PRODUCT=wowf` for the installed Forever client. The default is `wowf`; set `wow_classic_beta` explicitly for the older beta client.
+Only these explicit Forever products are accepted.
+The extractor resolves a build once, pins all subsequent reads, and retains the actual
+product/build/locale on every enriched record. Current full snapshots use client
+build `1.60.1.70630` for both item metadata and all 2,720 generated item icons.
+
+Spells without `craftedItemId` retain an empty output array, including enchantments
+and training records. The converter never substitutes `itemId` (a teaching item).
+Missing learning ranks, native acquisition facts, and output stack sizes remain
+explicit. The generated audits report route coverage separately for every profession.
+
+Icon manifests now serialize as compact schema v2 (`icons` maps item IDs to FileDataIDs;
+paths are deterministically `/icons/items/<id>.webp`). The reader still accepts v1.
+This removes repeated URL strings so complete profession assets fit the existing
+80 KB manifest budget without increasing web performance thresholds.
+
+## Profession icon export
+
+Run `pnpm data:icons:professions "C:\World of Warcraft" 1.60.1.70630` from the root.
+The command resolves the supplied client build, reads `SkillLine.SpellIconFileID` for
+all registered professions, and exports WebP assets plus a source-stamped manifest
+to `apps/web/public/icons/professions/`. The optional third argument selects a different
+output directory. `WOW_CLIENT_PRODUCT` and `WOWDATA_PATH` have the same meaning as
+in client-item enrichment. Missing or invalid skill-line icons fail explicitly.
+This artwork export never modifies recipe snapshots or requires a database import.

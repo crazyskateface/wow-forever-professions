@@ -9,8 +9,8 @@ its comparison:
 
 ```text
 pnpm db:local:up
-pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
-pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
+pnpm data:import:local data/imports/classic-era-1.15.9.69722-professions.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-professions.json --compare-against data/imports/classic-era-1.15.9.69722-professions.json --comparison-type classic-forever
 ```
 
 Start the PostgreSQL-backed API in one PowerShell terminal:
@@ -200,3 +200,24 @@ Available purchases include `priceObservedAt`, and the response includes
 `oldestPriceObservedAt` when at least one priced purchase contributed to the plan.
 Both values come from normalized stored observations. An absent timestamp means no
 priced purchase supplied one; it is not replaced with the request time.
+
+## All professions after import
+
+Run `pnpm api:smoke:professions` against local PostgreSQL after importing both complete
+snapshots. It validates the ten-profession directory, every catalog's count and build,
+empty item outputs, scoped comparisons, route recipe eligibility, and shopping plans.
+The controlled pricing reader returns no observations so missing prices stay explicit.
+Full routes currently complete for the six crafting professions and Cooking; First
+Aid, Fishing, and Mining report blockers from missing supported progression evidence.
+
+## Gathering evidence
+
+After `pnpm data:import:gathering:local data/imports/forever-1.60.1.70630-gathering.json`,
+read `GET /api/professions/herbalism/gathering` (also Mining and Skinning). Its
+`datasetId` and a source ID pin location reads:
+`GET /api/professions/herbalism/gathering/locations?datasetId=<hash>&sourceId=object-1617&offset=0&limit=25`.
+An optional `mapId` restricts location results to a zone. Limits above 100, invalid
+offsets, and missing required IDs return 400. Cross-profession source requests
+return 404. Missing gathering dependencies return 503, with no fixture fallback.
+Run `pnpm data:test:gathering:local` for the isolated full-import and persistence
+gate described in [GATHERING_DATA.md](GATHERING_DATA.md).

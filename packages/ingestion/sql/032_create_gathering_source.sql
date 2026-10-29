@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS gathering_source (dataset_id VARCHAR(128) NOT NULL, record_id VARCHAR(128) NOT NULL, profession_id VARCHAR(64) NOT NULL, data_json TEXT NOT NULL, PRIMARY KEY (dataset_id, record_id));

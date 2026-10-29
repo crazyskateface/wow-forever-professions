@@ -1,5 +1,5 @@
 const FOOTER_LINKS = [
-  { href: "/leatherworking", label: "Leatherworking guide" },
+  { href: "/", label: "Professions" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
   { href: "/contact", label: "Contact" },

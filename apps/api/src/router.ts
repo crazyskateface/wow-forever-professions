@@ -3,6 +3,10 @@ import {
   auctionPriceRequestSchema,
   auctionPricesResponseSchema,
   healthResponseSchema,
+  gatheringCatalogSchema,
+  gatheringProfessionIdSchema,
+  gatheringLocationsQuerySchema,
+  gatheringLocationsResponseSchema,
   productEventSchema,
   professionFixtureSchema,
   professionsResponseSchema,
@@ -23,6 +27,7 @@ import type {
   RecipeChangeReader,
   RecipeChangeType,
   RecipeComparisonType,
+  GatheringReader,
 } from "@forever-professions/ingestion";
 import type { CurrentAuctionPriceReader } from "@forever-professions/pricing";
 import {
@@ -43,6 +48,7 @@ export interface ApiResponse {
 }
 
 export interface ApiDependencies {
+  readonly gathering?: GatheringReader;
   readonly catalog?: RecipeCatalogReader;
   readonly changes?: RecipeChangeReader;
   readonly pricing?: CurrentAuctionPriceReader;
@@ -274,6 +280,23 @@ export async function routeRequest(
     } catch {
       return json(503, { error: "Recipe changes are temporarily unavailable." });
     }
+  }
+
+  const gatheringMatch = normalizedPath.match(/^\/professions\/([^/]+)\/gathering(\/locations)?$/);
+  if (gatheringMatch) {
+    const id = gatheringProfessionIdSchema.safeParse(gatheringMatch[1]);
+    if (!id.success) return json(404, { error: "Gathering profession not found." });
+    if (!dependencies.gathering) return json(503, { error: "Gathering data is not configured." });
+    const locationQuery = gatheringMatch[2] ? gatheringLocationsQuerySchema.safeParse(query) : undefined;
+    if (locationQuery && !locationQuery.success) return json(400, { error: "Invalid gathering location query." });
+    try {
+      if (locationQuery?.success) {
+        const result = await dependencies.gathering.getLocations(id.data, locationQuery.data);
+        return result ? json(200, gatheringLocationsResponseSchema.parse(result)) : json(404, { error: "Gathering source or dataset not found." });
+      }
+      const result = await dependencies.gathering.getGathering(id.data);
+      return result ? json(200, gatheringCatalogSchema.parse(result)) : json(404, { error: "No gathering dataset has been imported." });
+    } catch { return json(503, { error: "Gathering data is temporarily unavailable." }); }
   }
 
   const professionMatch = normalizedPath.match(/^\/professions\/([^/]+)$/);

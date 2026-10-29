@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "product": "wowf",
+    "build": "1.60.1.70630",
+    "region": "us",
+    "locale": "enUS",
+    "table": "SkillLine",
+    "iconField": "SpellIconFileID"
+  },
+  "icons": {
+    "alchemy": {
+      "skillLineId": 171,
+      "displayName": "Alchemy",
+      "fileDataId": 136240,
+      "path": "/icons/professions/alchemy.webp",
+      "sha256": "c5d0efb569de063d01ba70868457bb15d8aaed0043f66dce9c3aa8e26369339c"
+    },
+    "blacksmithing": {
+      "skillLineId": 164,
+      "displayName": "Blacksmithing",
+      "fileDataId": 136241,
+      "path": "/icons/professions/blacksmithing.webp",
+      "sha256": "e4320d6794aa1ad038449d806caa873cda0e1b07118422da1f6f423f4b8e1171"
+    },
+    "enchanting": {
+      "skillLineId": 333,
+      "displayName": "Enchanting",
+      "fileDataId": 136244,
+      "path": "/icons/professions/enchanting.webp",
+      "sha256": "957d10ab5a70fdd04c9e9b6c87d28f879a4ac6deac313a45832f5bc44a6d58a9"
+    },
+    "engineering": {
+      "skillLineId": 202,
+      "displayName": "Engineering",
+      "fileDataId": 136243,
+      "path": "/icons/professions/engineering.webp",
+      "sha256": "60b95bc3076dbea6e233c382a872128d5cf1ada8609c32c3cfc800b485c50375"
+    },
+    "leatherworking": {
+      "skillLineId": 165,
+      "displayName": "Leatherworking",
+      "fileDataId": 136247,
+      "path": "/icons/professions/leatherworking.webp",
+      "sha256": "9c84e2b1c07b23da1bf47f878d164797306039c669f24c9b86a84ee7ad8e2fa6"
+    },
+    "tailoring": {
+      "skillLineId": 197,
+      "displayName": "Tailoring",
+      "fileDataId": 136249,
+      "path": "/icons/professions/tailoring.webp",
+      "sha256": "0c1a63974c12e2201382e00ec8e316f3a00d7c0a82bbf8b5470d69f3a57fba03"
+    },
+    "cooking": {
+      "skillLineId": 185,
+      "displayName": "Cooking",
+      "fileDataId": 133971,
+      "path": "/icons/professions/cooking.webp",
+      "sha256": "6174629e3853b9d736c838a9e67fd0dd403475b239e6bba28e3d698e3cbed13f"
+    },
+    "first-aid": {
+      "skillLineId": 129,
+      "displayName": "First Aid",
+      "fileDataId": 135966,
+      "path": "/icons/professions/first-aid.webp",
+      "sha256": "6618951f9d50ff39735c78a2327b48a4c93a0ad2376880016d411f43b12d67fd"
+    },
+    "fishing": {
+      "skillLineId": 356,
+      "displayName": "Fishing",
+      "fileDataId": 136245,
+      "path": "/icons/professions/fishing.webp",
+      "sha256": "387a591a4a96e6ff207dd7dd1cec374bdfa16d8976c28bfbe09058be1487adec"
+    },
+    "herbalism": {
+      "skillLineId": 182,
+      "displayName": "Herbalism",
+      "fileDataId": 136246,
+      "path": "/icons/professions/herbalism.webp",
+      "sha256": "a10444c57fa40fad503c7252ec6b55f6105284dc2059c18e47c0602519cd6a36"
+    },
+    "mining": {
+      "skillLineId": 186,
+      "displayName": "Mining",
+      "fileDataId": 136248,
+      "path": "/icons/professions/mining.webp",
+      "sha256": "48c211b5ba639a3e639cf47b5d47ef8b4fcbbfa6cbed679151a48072cae92f58"
+    },
+    "skinning": {
+      "skillLineId": 393,
+      "displayName": "Skinning",
+      "fileDataId": 134366,
+      "path": "/icons/professions/skinning.webp",
+      "sha256": "90f071ad25a950291bd7495c50c34610d698e95cb66ea2c56d5dee6f2686107e"
+    }
+  }
+}

@@ -55,6 +55,19 @@ lib:LoadNames({
 `;
 
 describe("ProfessionDB conversion", () => {
+  it("keeps spells without crafted items without treating teaching items as outputs", () => {
+    const converted = convertProfessionDbSnapshot({
+      coreLua: coreLua.replace('["craftedItemId"] = 4265,', '["itemId"] = 9999,'),
+      recipeNamesLua,
+      itemNamesLua,
+      recipeItemsLua,
+      profession: { id: "enchanting", name: "Enchanting", skillLineId: 165 },
+      professionDbVersion: "v1.9.1", itemDbVersion: "v1.6.0",
+      sourceUrl: "https://example.com/source",
+    });
+    expect(converted.dataset.professions[0]!.recipes[0]).toMatchObject({ outputs: [], metadata: { teachingItemId: 9999 } });
+    expect(converted.report.provisionalOutputQuantityRecipes).toBe(0);
+  });
   it("converts client-backed recipe records and reports borrowed omissions", () => {
     const converted = convertProfessionDbSnapshot({
       coreLua,

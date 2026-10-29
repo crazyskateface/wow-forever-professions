@@ -19,19 +19,20 @@ Leveling Guide | All Recipes | Forever Changes
 
 ## Current snapshot
 
-The bundled Leatherworking comparison is:
+The bundled ten-profession comparison is:
 
 ```text
 Classic Era 1.15.9.69722 → Forever 1.60.1.69977
 
-289 New
-227 Updated
-  0 Removed
- 87 Unchanged
-603 total logical recipes
+965 New
+972 Updated
+ 19 Removed
+574 Unchanged
+2530 total logical recipes
 ```
 
-These are normalized logical recipes, not counts of abilities, recipe items, crafted
+The workspace requests changed, unchanged, and summary data scoped to its selected
+profession. These are normalized logical recipes, not counts of abilities, recipe items, crafted
 items, faction duplicates, or unused client records.
 
 ## End-to-end pipeline
@@ -55,8 +56,8 @@ Classic baseline JSON        Forever target JSON
 Comparison generation happens during target ingestion, not when a browser page loads:
 
 ```text
-pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
-pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
+pnpm data:import:local data/imports/classic-era-1.15.9.69722-professions.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-professions.json --compare-against data/imports/classic-era-1.15.9.69722-professions.json --comparison-type classic-forever
 ```
 
 Use `--comparison-type forever-build` with a previous Forever snapshot. IDs and

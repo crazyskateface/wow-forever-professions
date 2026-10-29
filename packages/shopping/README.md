@@ -14,3 +14,7 @@ Run the focused suite with:
 ```text
 pnpm --filter @forever-professions/shopping test
 ```
+
+Enchantment and training spells can have no item outputs. Their route reagents still
+contribute to the shopping plan. Only actual outputs participate in nested crafting;
+a teaching item is never an output or a synthetic crafting source.

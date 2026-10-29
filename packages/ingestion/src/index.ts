@@ -12,6 +12,8 @@ export {
   type DsqlBatchOptions,
 } from "./batching.js";
 export * from "./catalog.js";
+export * from "./gathering-conversion.js";
+export * from "./gathering-store.js";
 export * from "./cli.js";
 export * from "./dsql.js";
 export * from "./data-quality.js";
@@ -20,6 +22,7 @@ export * from "./import.js";
 export * from "./item-icons.js";
 export * from "./migrations.js";
 export * from "./professiondb.js";
+export * from "./professiondb-bundle.js";
 export * from "./overrides.js";
 export * from "./postgres.js";
 export * from "./raw-store.js";

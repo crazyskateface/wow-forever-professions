@@ -1,4 +1,6 @@
 import { FOREVER_BUILD_CONFIG } from "@forever-professions/domain";
+import { GEAR_SLOTS, type GearSlot } from "./gear-slots.js";
+import type { ChangeSort } from "./change-sort.js";
 
 export type PlayerFaction = "alliance" | "horde";
 export type ChangeFilter =
@@ -15,10 +17,11 @@ export type RecipeItemType =
   | "MATERIAL"
   | "OTHER";
 
-export interface ForeverChangeFilters {
+export interface ForeverChangeFilters extends ChangeSort {
   readonly professionId: string;
   readonly changeFilter: ChangeFilter;
   readonly itemType: RecipeItemType;
+  readonly gearSlots: readonly GearSlot[];
   readonly showAboveSkill: boolean;
   readonly showUnknownSkill: boolean;
 }
@@ -50,6 +53,9 @@ export const DEFAULT_CHANGE_FILTERS: ForeverChangeFilters = {
   professionId: "",
   changeFilter: "CHANGED",
   itemType: "ALL",
+  gearSlots: [],
+  sortBy: "name",
+  sortDirection: "asc",
   showAboveSkill: true,
   showUnknownSkill: true,
 };
@@ -127,6 +133,7 @@ export function parsePersonalization(value: unknown): PersonalizationPreferences
     FOREVER_BUILD_CONFIG.maxBaseSkill,
   );
   const changeFilters = isRecord(value.changeFilters) ? value.changeFilters : {};
+  const storedGearSlots = changeFilters.gearSlots;
 
   return {
     version: 3,
@@ -158,6 +165,11 @@ export function parsePersonalization(value: unknown): PersonalizationPreferences
         ITEM_TYPES,
         DEFAULT_CHANGE_FILTERS.itemType,
       ),
+      gearSlots: Array.isArray(storedGearSlots)
+        ? GEAR_SLOTS.filter(slot => storedGearSlots.includes(slot.id)).map(slot => slot.id)
+        : DEFAULT_CHANGE_FILTERS.gearSlots,
+      sortBy: oneOf(changeFilters.sortBy, ["name", "skill"], DEFAULT_CHANGE_FILTERS.sortBy),
+      sortDirection: oneOf(changeFilters.sortDirection, ["asc", "desc"], DEFAULT_CHANGE_FILTERS.sortDirection),
       showAboveSkill: booleanValue(
         changeFilters.showAboveSkill,
         DEFAULT_CHANGE_FILTERS.showAboveSkill,

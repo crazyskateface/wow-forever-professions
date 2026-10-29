@@ -63,8 +63,9 @@ External context consulted:
 
 ## Accepted product decisions
 
-- Recommend the best crafts within the selected profession. The current catalog is
-  Leatherworking; do not claim superiority to all dungeon, quest or raid equipment.
+- Recommend the best crafts within Leatherworking, Tailoring, or Blacksmithing;
+  other professions hide this tab. Start with Rogue, Mage, and Warrior profiles
+  respectively. Do not claim superiority to all dungeon, quest or raid equipment.
 - Users choose class and role, including Rogue, Feral Cat/Bear, Balance and
   Restoration Druid, Hunter, and Enhancement/Elemental/Restoration Shaman. Other
   classes can compare compatible armor and cloaks in this profession too.
@@ -100,7 +101,9 @@ specialization bonuses, talents, set bonuses, procs, current equipped gear, uniq
 effects, or class restrictions absent from the imported fields. Show the item's
 exact stats and source so players can compare those tradeoffs.
 
-Only `wow_classic_beta` item metadata from a `1.60.*` build is currently ranked.
+Only `wowf` or earlier `wow_classic_beta` item metadata from a `1.60.*` build is
+ranked. The current multi-profession snapshot uses `wowf` build `1.60.1.70630`;
+the Leatherworking-only snapshot above records the original checkpoint research.
 Missing stat arrays, item classification, or item metadata stay excluded and counted;
 empty stat arrays are permitted (base armor can matter to tanks). Do not substitute
 Classic stats. Explicitly unavailable, rejected, fallback and fixture recipes are

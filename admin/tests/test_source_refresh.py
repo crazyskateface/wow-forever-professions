@@ -225,10 +225,10 @@ def test_refresh_build_mismatch_leaves_published_targets_untouched(
     imports.mkdir(parents=True)
     icons.mkdir(parents=True)
     targets = {
-        "foreverDataset": "data/imports/forever-1.60.1.69977-leatherworking.json",
-        "classicDataset": "data/imports/classic-era-1.15.9.69722-leatherworking.json",
-        "foreverQuality": "data/imports/forever-1.60.1.69977-leatherworking.quality.md",
-        "classicQuality": "data/imports/classic-era-1.15.9.69722-leatherworking.quality.md",
+        "foreverDataset": "data/imports/forever-1.60.1.69977-professions.json",
+        "classicDataset": "data/imports/classic-era-1.15.9.69722-professions.json",
+        "foreverQuality": "data/imports/forever-1.60.1.69977-professions.quality.md",
+        "classicQuality": "data/imports/classic-era-1.15.9.69722-professions.quality.md",
         "overrides": "data/imports/forever-leatherworking-overrides.json",
         "iconDirectory": "apps/web/public/icons/items",
     }

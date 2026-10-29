@@ -44,3 +44,47 @@ They are © Blizzard Entertainment and are not covered by the MIT license above.
 The generated manifest identifies the client build and FileDataID used for each
 asset. World of Warcraft and Blizzard Entertainment are trademarks or registered
 trademarks of Blizzard Entertainment, Inc.
+
+The complete profession snapshots also include item labels, rarity, and tooltip
+metadata extracted from installed Forever product `wowf`, client build
+`1.60.1.70630`, locale `enUS`. These client facts retain Blizzard attribution;
+MIT licensing of the source libraries does not relicense Blizzard game data.
+The earlier Leatherworking-only snapshots retain their original client provenance.
+
+Profession icons under `apps/web/public/icons/professions/` are also Blizzard
+Entertainment artwork, extracted from `SkillLine.SpellIconFileID` in Forever
+product `wowf`, build `1.60.1.70630`, locale `enUS`. Their separate manifest records
+the exact FileDataIDs and asset checksums. They are not covered by the MIT license.
+
+Gathering node definitions and coordinate reports in the gathering snapshot derive
+from GatherLite, revision 934c920705a5fca852bbde8669f2b0bc52f56779:
+https://github.com/Wuild/GatherLite/tree/934c920705a5fca852bbde8669f2b0bc52f56779
+Its Forever coordinate generator identifies Wowhead Forever as the upstream source.
+These are unverified community reports; exact game-data build is unknown. Pinned
+source hashes and the license review are in gathering-sources.json and
+../../docs/GATHERING_DATA.md. Blizzard client facts and artwork retain Blizzard
+attribution separately. ForeverDB records are excluded pending reuse permission.
+
+```text
+MIT License
+
+Copyright (c) 2019 Wuild
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

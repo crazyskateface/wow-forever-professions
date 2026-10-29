@@ -17,6 +17,14 @@ const DEFAULT_CONCURRENCY = 4;
 const ITEM_QUERY_BATCH_SIZE = 400;
 const WOWDATA_ATTEMPTS = 3;
 
+export function clientProduct(): "wow_classic_beta" | "wowf" {
+  const product = process.env.WOW_CLIENT_PRODUCT ?? "wowf";
+  if (product !== "wow_classic_beta" && product !== "wowf") {
+    throw new Error("WOW_CLIENT_PRODUCT must identify a Forever client (wow_classic_beta or wowf).");
+  }
+  return product;
+}
+
 function defaultWowdataExecutable(): string {
   return process.env.WOWDATA_PATH ?? (process.platform === "win32"
     ? join(homedir(), ".wowdata", "bin", "wowdata.exe")
@@ -136,7 +144,7 @@ export interface ItemIconManifest {
   readonly schemaVersion: 1;
   readonly recipeBuild: string;
   readonly assetBuild: string;
-  readonly product: "wow_classic_beta";
+  readonly product: "wow_classic_beta" | "wowf";
   readonly locale: "enUS";
   readonly format: "webp";
   readonly icons: Readonly<Record<string, ItemIconManifestEntry>>;
@@ -757,7 +765,7 @@ function wowdataTargetArguments(
     "--region",
     "us",
     "--product",
-    "wow_classic_beta",
+    clientProduct(),
     "--build",
     build,
     "--locale",
@@ -820,11 +828,31 @@ async function mapConcurrent<Item>(
 
 async function readExistingManifest(path: string): Promise<ItemIconManifest | undefined> {
   try {
-    const value = JSON.parse(await readFile(path, "utf8")) as Partial<ItemIconManifest>;
-    return value.schemaVersion === 1 ? value as ItemIconManifest : undefined;
+    return parseItemIconManifest(JSON.parse(await readFile(path, "utf8")));
   } catch {
     return undefined;
   }
+}
+
+/** V2 removes repeated URL paths so all professions fit the existing asset budget. */
+export function serializeItemIconManifest(manifest: ItemIconManifest): string {
+  return `${JSON.stringify({
+    ...manifest, schemaVersion: 2,
+    icons: Object.fromEntries(Object.entries(manifest.icons).map(([id, entry]) => [id, entry.fileDataId])),
+  })}\n`;
+}
+
+export function parseItemIconManifest(input: unknown): ItemIconManifest | undefined {
+  if (typeof input !== "object" || input === null) return undefined;
+  const value = input as Record<string, unknown>;
+  if (value.schemaVersion === 1) return value as unknown as ItemIconManifest;
+  if (value.schemaVersion !== 2 || typeof value.icons !== "object" || value.icons === null) return undefined;
+  const icons: Record<string, ItemIconManifestEntry> = {};
+  for (const [id, fileDataId] of Object.entries(value.icons)) {
+    if (!/^\d+$/.test(id) || !positiveInteger(fileDataId)) return undefined;
+    icons[id] = { fileDataId, path: `/icons/items/${id}.webp` };
+  }
+  return { ...value, schemaVersion: 1, icons } as unknown as ItemIconManifest;
 }
 
 export async function enrichItemClientData({
@@ -908,7 +936,7 @@ export async function enrichItemClientData({
   }
 
   const source = {
-    product: "wow_classic_beta",
+    product: clientProduct(),
     build: cascInfo.buildName,
     locale: "enUS",
   } as const;
@@ -1183,7 +1211,7 @@ export async function extractItemIcons({
   await mkdir(resolvedOutputDirectory, { recursive: true });
   const manifestPath = join(resolvedOutputDirectory, "manifest.json");
   const existingManifest = await readExistingManifest(manifestPath);
-  const canReuseExisting = existingManifest?.assetBuild === cascInfo.buildName;
+  const canReuseExisting = existingManifest?.assetBuild === cascInfo.buildName && existingManifest.product === clientProduct();
   const entries = new Map<number, ItemIconManifestEntry>();
   const missingItemIds = itemIds.filter((itemId) => !iconFileDataIds.has(itemId));
   const itemsByFileDataId = new Map<number, number[]>();
@@ -1256,7 +1284,7 @@ export async function extractItemIcons({
     schemaVersion: 1,
     recipeBuild: dataset.build.id,
     assetBuild: cascInfo.buildName,
-    product: "wow_classic_beta",
+    product: clientProduct(),
     locale: "enUS",
     format: "webp",
     icons: Object.fromEntries(
@@ -1267,7 +1295,7 @@ export async function extractItemIcons({
     ),
     missingItemIds,
   };
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  await writeFile(manifestPath, serializeItemIconManifest(manifest), "utf8");
 
   return {
     assetBuild: cascInfo.buildName,

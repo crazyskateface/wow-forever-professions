@@ -198,9 +198,9 @@ export function resolveRoutePreset(preset: RoutePreset): ResolvedRoutePreset {
   }
   return {
     preset,
-    objective: "crafts",
+    objective: "materials",
     confidencePolicy: "practical",
-    policy: DEFAULT_ROUTE_OPTIMIZATION_POLICY,
+    policy: PURE_OBJECTIVE_POLICY,
   };
 }
 
@@ -304,6 +304,7 @@ export interface BlockedRouteResult extends RouteResultBase {
   readonly reason:
     | "no-eligible-recipe"
     | "missing-price-data"
+    | "no-guaranteed-skill-up"
     | "unsupported-recipe-evidence";
   readonly explanation: string;
 }
@@ -316,11 +317,13 @@ interface Candidate {
   readonly stepScore: number;
   readonly scarceMaterials: number;
   readonly unknownEvidenceSteps: number;
+  readonly externalAcquisitionSteps: number;
 }
 
 interface PathCandidate extends Candidate {
   readonly totalScarceMaterials: number;
   readonly totalUnknownEvidenceSteps: number;
+  readonly totalExternalAcquisitionSteps: number;
   readonly totalScore: number;
   readonly missingPriceSteps: number;
   readonly knownCostCopper: number;
@@ -330,6 +333,7 @@ interface PathCandidate extends Candidate {
 interface PathScore {
   readonly scarceMaterials: number;
   readonly unknownEvidenceSteps: number;
+  readonly externalAcquisitionSteps: number;
   readonly objectiveScore: number;
   readonly missingPriceSteps: number;
   readonly knownCostCopper: number;
@@ -341,6 +345,7 @@ type ActiveRecipeState = string | typeof NO_ACTIVE_RECIPE;
 interface EvaluatedSkill {
   readonly skill: number;
   readonly possibleSteps: readonly RouteSkillStep[];
+  readonly alternativeSteps: readonly RouteSkillStep[];
   readonly candidates: readonly Candidate[];
 }
 
@@ -533,6 +538,7 @@ function comparePathCandidates(
   return (left, right) =>
     left.totalScarceMaterials - right.totalScarceMaterials ||
     left.totalUnknownEvidenceSteps - right.totalUnknownEvidenceSteps ||
+    left.totalExternalAcquisitionSteps - right.totalExternalAcquisitionSteps ||
     left.totalScore - right.totalScore ||
     (preferSupportedCost &&
     left.missingPriceSteps === 0 &&
@@ -582,6 +588,8 @@ function pathCandidate(
       candidate.scarceMaterials + futureScore.scarceMaterials,
     totalUnknownEvidenceSteps:
       candidate.unknownEvidenceSteps + futureScore.unknownEvidenceSteps,
+    totalExternalAcquisitionSteps:
+      candidate.externalAcquisitionSteps + futureScore.externalAcquisitionSteps,
     totalScore:
       candidate.stepScore * (1 + penaltyRatio) + futureScore.objectiveScore,
     missingPriceSteps:
@@ -598,6 +606,7 @@ function evaluateSkill(
   skill: number,
   scarceItemIds: ReadonlySet<string>,
   confidencePolicy: RouteConfidencePolicy,
+  preferTrainerAccess: boolean,
 ): EvaluatedSkill {
   const possible = input.recipes
     .map((recipe) => ({
@@ -612,9 +621,13 @@ function evaluateSkill(
   return {
     skill,
     possibleSteps: possible.map(({ step }) => step),
+    alternativeSteps: possible.filter(({ step }) =>
+      scoreFor(step, input.objective) !== undefined &&
+      (input.preset !== "practical" || step.skillUpProbability >= 0.75),
+    ).map(({ step }) => step),
     candidates: possible.flatMap(({ recipe, step }) => {
       const stepScore = scoreFor(step, input.objective);
-      return stepScore === undefined
+      return stepScore === undefined || (input.preset === "practical" && step.skillUpProbability !== 1)
         ? []
         : [
             {
@@ -632,6 +645,7 @@ function evaluateSkill(
                 recipe.availability === "unknown")
                   ? 1
                   : 0,
+              externalAcquisitionSteps: preferTrainerAccess && !isTrainerAcquisition(recipe.acquisition) ? 1 : 0,
             },
           ];
     }),
@@ -662,6 +676,7 @@ function reconstructOptimalSteps(
       {
         scarceMaterials: 0,
         unknownEvidenceSteps: 0,
+        externalAcquisitionSteps: 0,
         objectiveScore: 0,
         missingPriceSteps: 0,
         knownCostCopper: 0,
@@ -730,6 +745,7 @@ function reconstructOptimalSteps(
     scores.set(NO_ACTIVE_RECIPE, {
       scarceMaterials: initial.totalScarceMaterials,
       unknownEvidenceSteps: initial.totalUnknownEvidenceSteps,
+      externalAcquisitionSteps: initial.totalExternalAcquisitionSteps,
       objectiveScore: initial.totalScore,
       missingPriceSteps: initial.missingPriceSteps,
       knownCostCopper: initial.knownCostCopper,
@@ -753,6 +769,7 @@ function reconstructOptimalSteps(
       scores.set(previousRecipeId, {
         scarceMaterials: selected.totalScarceMaterials,
         unknownEvidenceSteps: selected.totalUnknownEvidenceSteps,
+        externalAcquisitionSteps: selected.totalExternalAcquisitionSteps,
         objectiveScore: selected.totalScore,
         missingPriceSteps: selected.missingPriceSteps,
         knownCostCopper: selected.knownCostCopper,
@@ -857,10 +874,10 @@ function alternativeRunsFor(
           segment.startSkill - routeStartSkill,
           segment.endSkill - routeStartSkill,
         )
-        .flatMap(({ candidates }) =>
-          candidates
-            .filter(({ recipe }) => recipe.id !== segment.recipeId)
-            .map(({ recipe }) => recipe.id),
+        .flatMap(({ alternativeSteps }) =>
+          alternativeSteps
+            .filter(step => step.recipeId !== segment.recipeId)
+            .map(step => step.recipeId),
         ),
     ),
   ];
@@ -869,9 +886,9 @@ function alternativeRunsFor(
   for (const recipeId of recipeIds) {
     let run: RouteSkillStep[] = [];
     for (let skill = segment.startSkill; skill < segment.endSkill; skill += 1) {
-      const step = evaluatedSkills[skill - routeStartSkill]?.candidates.find(
-        ({ recipe }) => recipe.id === recipeId,
-      )?.step;
+      const step = evaluatedSkills[skill - routeStartSkill]?.alternativeSteps.find(
+        step => step.recipeId === recipeId,
+      );
       if (step !== undefined) {
         run.push(step);
       } else if (run.length > 0) {
@@ -929,12 +946,12 @@ function explainAlternative(
     lossReason = "weaker-evidence";
     lossSummary = "Uses weaker supporting evidence than the selected recipe.";
   } else if (
-    preset === "trainer-friendly" &&
+    (preset === "trainer-friendly" || preset === "practical") &&
     isTrainerAcquisition(selected.evidence.acquisition) &&
     !isTrainerAcquisition(alternative.evidence.acquisition)
   ) {
     lossReason = "trainer-preference";
-    lossSummary = "Trainer friendly prefers the selected supported trainer path.";
+    lossSummary = "The selected preset prefers automatically learned or trainer recipes before externally acquired patterns.";
   } else {
     const selectedScore = scoreForAlternative(selected, objective);
     const alternativeScore = scoreForAlternative(alternative, objective);
@@ -959,11 +976,24 @@ function recommendationFor(
   segment: RouteCandidateSummary,
   alternatives: readonly RouteAlternative[],
   preset: RoutePreset,
+  guaranteedGuide: boolean,
 ): RouteRecommendation {
   if (preset === "practical" && segment.evidence.level === "unknown") {
     return {
       reasons: ["practical-evidence-fallback"],
       summary: "No supported option completed this range, so Practical used this clearly labeled evidence gap as a last resort.",
+    };
+  }
+  if (preset === "practical" && !isTrainerAcquisition(segment.evidence.acquisition)) {
+    return {
+      reasons: ["trainer-fallback"],
+      summary: "Practical used an externally acquired recipe where automatic or trainer recipes could not cover the range while preserving Scarce-material and evidence priorities. This pattern must be acquired separately.",
+    };
+  }
+  if (preset === "practical" && alternatives.some(alternative => !isTrainerAcquisition(alternative.evidence.acquisition))) {
+    return {
+      reasons: ["trainer-preference"],
+      summary: "Practical prefers this automatically learned or trainer recipe over acquiring a separate pattern, even when that pattern uses fewer materials.",
     };
   }
   if (alternatives.length === 0) {
@@ -1014,7 +1044,9 @@ function recommendationFor(
   }
   return {
     reasons: ["practical-balance"],
-    summary: "Selected for the best full-route balance of expected crafts, recipe continuity, acquisition friction, Scarce avoidance, and evidence confidence.",
+    summary: guaranteedGuide
+      ? "Selected for the lowest material use among guaranteed skill-ups under Practical's Scarce-material, evidence, and acquisition priorities; complete prices break material ties."
+      : "Selected for the best full-route balance of the requested objective, recipe continuity, acquisition friction, Scarce avoidance, and evidence confidence.",
   };
 }
 
@@ -1105,7 +1137,7 @@ function segmentsFor(
     );
     return {
       ...segment,
-      recommendation: recommendationFor(segment, alternatives, preset),
+      recommendation: recommendationFor(segment, alternatives, preset, input.preset === "practical"),
       alternatives,
     };
   });
@@ -1146,6 +1178,9 @@ function blockedExplanation(
   reason: BlockedRouteResult["reason"],
 ): string {
   const label = preset.replaceAll("-", " ");
+  if (reason === "no-guaranteed-skill-up") {
+    return `The ${label} guide stopped at skill ${skill} because no eligible recipe has a 100% skill-up chance there. Recipes below 75% are excluded from alternatives; missing guaranteed coverage is not filled with green crafts.`;
+  }
   if (reason === "missing-price-data") {
     return `The ${label} preset stopped at skill ${skill} because every eligible recipe there is missing required market price data. Missing prices were not treated as zero.`;
   }
@@ -1195,7 +1230,7 @@ export function optimizeLevelingRoute(
     skill += 1
   ) {
     evaluatedSkills.push(
-      evaluateSkill(resolvedInput, skill, scarceItemIds, confidencePolicy),
+      evaluateSkill(resolvedInput, skill, scarceItemIds, confidencePolicy, preset === "practical"),
     );
   }
 
@@ -1212,7 +1247,9 @@ export function optimizeLevelingRoute(
   );
 
   if (firstBlocked !== undefined) {
-    const reason = firstBlocked.possibleSteps.length > 0 &&
+    const reason = resolvedInput.preset === "practical" && firstBlocked.possibleSteps.some(step => step.skillUpProbability < 1)
+      ? "no-guaranteed-skill-up"
+      : firstBlocked.possibleSteps.length > 0 &&
       resolvedInput.objective === "cost"
       ? "missing-price-data"
       : hasUnknownEvidenceCandidate(resolvedInput, firstBlocked.skill)

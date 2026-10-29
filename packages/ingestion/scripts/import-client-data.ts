@@ -5,6 +5,7 @@ import {
   createAuroraDsqlTransactionRunner,
   createS3RawDatasetStore,
   ingestBuildDataset,
+  ingestGatheringDataset,
   normalizeBuildDataset,
   parseBuildImportScriptArguments,
   parseRawDatasetBytes,
@@ -43,7 +44,10 @@ async function main(): Promise<void> {
         ),
       )
     : undefined;
-  parseRawDatasetBytes(rawBytes);
+  const payload = JSON.parse(rawBytes.toString("utf8"));
+  const gathering = "client" in payload && "abilities" in payload;
+  if (gathering && compareAgainst) throw new Error("Gathering evidence imports do not use recipe comparisons.");
+  if (!gathering) parseRawDatasetBytes(rawBytes);
 
   const credentials = fromTemporaryCredentials({
     clientConfig: { region },
@@ -66,6 +70,10 @@ async function main(): Promise<void> {
   });
 
   try {
+    if (gathering) {
+      console.log(JSON.stringify(await ingestGatheringDataset({ rawBytes, rawStore, runner: writer }), null, 2));
+      return;
+    }
     const result = await ingestBuildDataset({
       rawBytes,
       rawStore,

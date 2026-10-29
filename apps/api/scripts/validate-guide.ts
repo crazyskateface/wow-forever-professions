@@ -77,7 +77,7 @@ const optimization = routeOptimizationResponseSchema.parse(
       professionId: reference.professionId,
       startSkill: reference.startSkill,
       targetSkill: reference.targetSkill,
-      objective: "crafts",
+      preset: "practical",
     }),
   }),
 );

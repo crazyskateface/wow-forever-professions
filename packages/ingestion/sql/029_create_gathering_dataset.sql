@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS gathering_dataset (dataset_id VARCHAR(128) PRIMARY KEY, client_build VARCHAR(64) NOT NULL, imported_at TIMESTAMP NOT NULL, raw_sha256 VARCHAR(64) NOT NULL, raw_object_key TEXT NOT NULL, data_json TEXT NOT NULL);

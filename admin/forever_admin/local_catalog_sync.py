@@ -7,8 +7,8 @@ import sys
 from forever_admin.source_refresh import CACHE_ROOT, SourceRefreshError, _run
 
 
-CLASSIC_DATASET = "data/imports/classic-era-1.15.9.69722-leatherworking.json"
-FOREVER_DATASET = "data/imports/forever-1.60.1.69977-leatherworking.json"
+CLASSIC_DATASET = "data/imports/classic-era-1.15.9.69722-professions.json"
+FOREVER_DATASET = "data/imports/forever-1.60.1.69977-professions.json"
 STATUS_PATH = CACHE_ROOT / "local-catalog-status.json"
 
 

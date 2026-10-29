@@ -80,7 +80,7 @@ export const recipeComparisonSnapshotSchema = z.object({
   professionName: z.string().min(1),
   name: z.string().min(1),
   reagents: z.array(recipeChangeReagentSchema),
-  outputs: z.array(recipeChangeOutputSchema).min(1),
+  outputs: z.array(recipeChangeOutputSchema),
   orangeSkill: z.number().int().nonnegative(),
   yellowSkill: z.number().int().nonnegative(),
   greenSkill: z.number().int().nonnegative(),

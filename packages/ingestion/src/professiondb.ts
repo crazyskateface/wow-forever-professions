@@ -202,6 +202,12 @@ class LuaLiteralParser {
   }
 }
 
+export function parseLuaLiteralTable(source: string): LuaTable {
+  const start = source.indexOf("{");
+  if (start < 0) throw new Error("Missing Lua literal table.");
+  return new LuaLiteralParser(source).parseTableAt(start);
+}
+
 function parseCallTable(source: string, call: string): LuaTable {
   const callStart = source.indexOf(call);
   if (callStart === -1) throw new Error(`Could not find ${call} in Lua source.`);
@@ -374,9 +380,10 @@ export function convertProfessionDbSnapshot(
     const name = requireString(nameRecord.get("name"), `Recipe ${spellId} name`);
     const difficulty = requireTable(recipe.get("difficulty"), `Recipe ${spellId} difficulty`);
     const reagentTable = requireTable(recipe.get("reagents"), `Recipe ${spellId} reagents`);
-    const craftedItemId = requireNumber(
-      recipe.get("craftedItemId"),
-      `Recipe ${spellId} crafted item ID`,
+    // Enchantments and training spells do not necessarily create an item.
+    // itemId identifies the teaching item and must never stand in for the output.
+    const craftedItemId = recipe.get("craftedItemId") === undefined ? undefined : requireNumber(
+      recipe.get("craftedItemId"), `Recipe ${spellId} crafted item ID`,
     );
     const rawRequiredSkill = recipe.get("requiredSkill");
     const borrowedLearnSkill = borrowedRequiredSkills.has(spellId) && rawRequiredSkill !== undefined
@@ -456,7 +463,7 @@ export function convertProfessionDbSnapshot(
         quantity,
       };
     });
-    registeredItemIds.add(craftedItemId);
+    if (craftedItemId !== undefined) registeredItemIds.add(craftedItemId);
 
     return {
       id: `spell-${spellId}`,
@@ -484,7 +491,7 @@ export function convertProfessionDbSnapshot(
       },
       thresholds,
       reagents,
-      outputs: [
+      outputs: craftedItemId === undefined ? [] : [
         {
           item: itemRecord(
             itemNames,
@@ -500,8 +507,9 @@ export function convertProfessionDbSnapshot(
       sourceId: `${sourceId}-${buildId}`,
       verification: {
         status: "unverified" as const,
-        notes:
-          "Client-derived recipe structure. Output quantity is provisionally one because the published ProfessionDB snapshot does not encode stack size.",
+        notes: craftedItemId === undefined
+          ? "Client-derived spell structure. No crafted item output is recorded in the source."
+          : "Client-derived recipe structure. Output quantity is provisionally one because the published ProfessionDB snapshot does not encode stack size.",
       },
       provenanceNotes: [
         `Thresholds, reagents, and crafted item are ${sourceLabel} client data.`,
@@ -518,7 +526,7 @@ export function convertProfessionDbSnapshot(
           ? undefined
           : "The client orange value of 1 is an unanchored placeholder, not a verified skill threshold.",
         `Item names and classifications come from the matching LibItemDB ${sourceLabel} snapshot.`,
-        "Output quantity remains unverified.",
+        craftedItemId === undefined ? "No crafted item output is recorded." : "Output quantity remains unverified.",
       ].filter((value): value is string => value !== undefined).join(" "),
     };
   });
@@ -559,7 +567,7 @@ export function convertProfessionDbSnapshot(
       hiddenRecipeRecords,
       classifiedItems: [...registeredItemIds].filter((id) => itemClassifications.has(id)).length,
       specializationRecipes,
-      provisionalOutputQuantityRecipes: recipes.length,
+      provisionalOutputQuantityRecipes: recipes.filter(({ outputs }) => outputs.length > 0).length,
     },
   };
 }

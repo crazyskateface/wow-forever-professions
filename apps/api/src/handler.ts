@@ -6,6 +6,7 @@ import {
   createAuroraDsqlTransactionRunner,
   SqlRecipeChangeReader,
   SqlRecipeCatalogReader,
+  SqlGatheringReader,
 } from "@forever-professions/ingestion";
 import { DsqlAuctionPricingRepository } from "@forever-professions/pricing";
 import { routeRequest } from "./router.js";
@@ -27,6 +28,7 @@ const database =
 const pricing = database ? new DsqlAuctionPricingRepository(database) : undefined;
 const catalog = database ? new SqlRecipeCatalogReader(database) : undefined;
 const changes = database ? new SqlRecipeChangeReader(database) : undefined;
+const gathering = database ? new SqlGatheringReader(database) : undefined;
 const readiness = database
   ? async () => {
       await database.query("SELECT 1 AS ready");
@@ -55,6 +57,7 @@ export async function handler(
     {
       ...(catalog === undefined ? {} : { catalog }),
       ...(changes === undefined ? {} : { changes }),
+      ...(gathering === undefined ? {} : { gathering }),
       ...(pricing === undefined ? {} : { pricing }),
       productEventSink(event) {
         console.info(JSON.stringify({

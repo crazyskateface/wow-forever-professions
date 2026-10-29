@@ -29,18 +29,21 @@ LibProfessionDB + LibItemDB + reviewed overrides + pinned client DB2
                       React/Vite client
 ```
 
-The current product data is Leatherworking only:
+The current recipe data covers ten professions. The directory additionally includes
+Herbalism and Skinning. Separate gathering evidence covers all three gathering professions:
 
 | Purpose | Build | File |
 | --- | --- | --- |
-| Classic comparison baseline | `1.15.9.69722` | `data/imports/classic-era-1.15.9.69722-leatherworking.json` |
-| Forever target catalog | `1.60.1.69977` | `data/imports/forever-1.60.1.69977-leatherworking.json` |
-| Client icons | `1.60.1.70374` | `apps/web/public/icons/items/manifest.json` |
-| Item labels and tooltip metadata | `1.60.1.70450` | Classification and client-data source metadata in the Forever catalog |
+| Classic comparison baseline | `1.15.9.69722` | `data/imports/classic-era-1.15.9.69722-professions.json` |
+| Forever target catalog | `1.60.1.69977` | `data/imports/forever-1.60.1.69977-professions.json` |
+| Client icons | `1.60.1.70630` (`wowf`, `enUS`) | `apps/web/public/icons/items/manifest.json` |
+| Item labels and tooltip metadata | `1.60.1.70630` (`wowf`, `enUS`) | Classification and client-data source metadata in the Forever catalog |
 
-The target contains 603 recipes and 760 referenced items. Its current Classic →
-Forever comparison is 289 New, 227 Updated, 0 Removed, and 87 Unchanged logical
-recipes.
+The target contains 2,511 records and 2,720 referenced items. Its Classic →
+Forever comparison is 965 New, 972 Updated, 19 Removed, and 574 Unchanged logical
+recipes. All 2,720 referenced items have generated WebP icons; missing assets
+still use the initials fallback. The compact schema-v2 manifest retains item IDs,
+FileDataIDs, and client provenance, with paths derived from item IDs.
 
 ## Ownership boundaries
 
@@ -62,8 +65,28 @@ never calls AH Ledger in a user request.
 
 ### Best crafts and automatic guide
 
-The main workspace contains Recipe calculator and Best crafts. The left panel owns
+The main workspace contains Recipe calculator, with Best crafts available only for
+Leatherworking, Tailoring, and Blacksmithing. Their initial class profiles are
+Rogue, Mage, and Warrior respectively. The left panel owns
 the automatic Practical leveling guide and individual completion checkboxes.
+Practical requires 100% modeled skill-up chance throughout every recommendation;
+alternatives are limited to contiguous sub-ranges at or above 75%. It minimizes
+material units among qualifying recipes, with complete prices breaking ties and no
+switch penalty overriding fewer materials. Automatic/trainer access comes first, after Scarce
+avoidance and supported-evidence priorities. Drop/vendor/quest/reputation patterns
+are fallback choices, not automatic exclusions; unknown acquisition is never
+reclassified as trainer access. This policy lives in the optimizer's full-route score.
+`no-guaranteed-skill-up` identifies a missing 100% option; the route remains blocked
+rather than silently relaxing the floor. These guarantees refer to imported curves,
+not independent verification of in-game behavior. Other presets and raw objectives
+retain their own probability behavior. Guide validation explicitly requests Practical.
+The calculator starts with the selected recipe. It does not display an active-route
+comparison panel above the recipe; route progress remains in the left panel.
+On a guide landing without a valid recipe link, the first generated guide recipe
+becomes the initial calculator selection and replaces the current URL's recipe
+parameter. The asynchronous default is consumed once; manual recipe/view choices
+and history navigation cancel it. Empty/blocked guides do not invent a guide recipe,
+and later route refreshes do not override the player's selected recipe.
 Guide settings, known-recipe selection, sharing, shopping, bulk completion and
 expandable step metrics have been removed from the web client. Their request
 handlers, dialogs and browser persistence are also removed. Old shared-route query
@@ -79,7 +102,8 @@ and target state lives in App so opening a recipe does not reset the shortlist.
 
 See [`CRAFTING_MILESTONES.md`](CRAFTING_MILESTONES.md) for the one-time bracket
 research, source restrictions and ranking limitations. Only the current Forever
-1.60 client metadata is supported. Unknown learning skill does not prevent gear
+1.60 client metadata from `wowf` or the earlier `wow_classic_beta` product is
+supported. Unknown learning skill does not prevent gear
 comparison, but still prevents entry into a leveling route under existing policies.
 
 ### Profession progression cap
@@ -109,8 +133,8 @@ Use this import order for the complete UI:
 
 ```text
 pnpm db:local:up
-pnpm data:import:local data/imports/classic-era-1.15.9.69722-leatherworking.json
-pnpm data:import:local data/imports/forever-1.60.1.69977-leatherworking.json --compare-against data/imports/classic-era-1.15.9.69722-leatherworking.json --comparison-type classic-forever
+pnpm data:import:local data/imports/classic-era-1.15.9.69722-professions.json
+pnpm data:import:local data/imports/forever-1.60.1.69977-professions.json --compare-against data/imports/classic-era-1.15.9.69722-professions.json --comparison-type classic-forever
 ```
 
 The PostgreSQL container stores its database in a named Docker volume. Normalized data
@@ -172,7 +196,7 @@ native lazy loading for non-hero images.
 
 Every recipe, change-card, output, and reagent icon uses the shared item-tooltip
 surface. Pointer hover opens a preview after one second and leaving the owning
-control closes that preview immediately. Focusing a recipe button or change summary
+control closes that preview immediately. Focusing a recipe button or change row
 opens the same preview for keyboard users, and Escape dismisses either mode.
 Forever Changes resolves current recipes through the calculator's catalog tooltip
 payload so the same item exposes the same fields in both views; removed recipes fall
@@ -216,7 +240,10 @@ Keep the outer margins available for future rails or background art. Planner and
 knowledge panels use named CSS containers to reflow within their available width;
 viewport breakpoints still control the full-width navigation and sidebar stacking.
 
-`apps/web/src/main.tsx` resolves `/privacy`, `/terms`, `/contact`, and the focused
+`apps/web/src/main.tsx` shows the profession directory at `/` and resolves
+`/professions/<id>` to a profession-specific workspace. Legacy root recipe links remain
+supported. The native dropdown navigates between professions using ordinary links
+with full page state isolation. It also resolves `/privacy`, `/terms`, `/contact`, and the focused
 `/leatherworking/*` knowledge pages before mounting the planner. Legal/support content
 and metadata live in `StaticPage.tsx`; build-scoped profession content lives in
 `LeatherworkingKnowledgePage.tsx`; every surface reuses `SiteFooter.tsx`. Navigation
@@ -270,10 +297,26 @@ updates.
 The UI currently has no comparison chooser. The Forever Changes tab intentionally
 shows the stored Classic Era → Forever comparison. API and persistence support
 `forever-build` comparisons for future use.
+Change rows open the current recipe calculator instead of expanding comparison
+details. Selection resolves by `(professionId, spellId)`, updates `?recipe=...&view=recipes`
+in one history entry, and supports reloads and Back navigation. Removed recipes
+without a matching current catalog row remain visible with calculator navigation
+unavailable; Classic data never becomes an invented current recipe. Field-level
+comparison evidence remains available through the comparison API.
 
 The shared current-skill slider powers change availability tags and the filters for
 recipes above current skill or with unknown requirements. Item-type filtering prefers
 LibItemDB class/subclass metadata and uses name heuristics only as a display fallback.
+The image-only gear-slot toggles use imported output `inventoryType` metadata only,
+combine selected slots with OR, and intersect with the other filters. Removed
+recipes use the base snapshot; current recipes never borrow a missing target slot
+from Classic. With no slot selected, unknown and non-equipment outputs remain visible. Reset filters
+clears the saved slot selection along with the other optional filters.
+The Sort popover sorts the filtered list by name or learning skill, toggling
+ascending/descending when the selected option is clicked again. Unknown skill
+requirements remain last in both directions; removed recipes use their base rank.
+Sorting is client-side and saved separately from filter restrictions, so Reset
+filters preserves the chosen order. Older profiles default to alphabetical ascending.
 
 ## Browser-local personalization
 
@@ -335,7 +378,8 @@ misclassify that host-level temp failure as a product test failure.
 
 ## Known limitations
 
-- Leatherworking is the only complete imported profession.
+- Ten professions are imported. First Aid, Fishing, and Mining have supported-data gaps
+  that block complete routes; Fishing does not model catches or activity-based skill gains.
 - Most acquisition/availability facts and every recipe's final verification remain
   incomplete.
 - Item-type display heuristics remain necessary for records without LibItemDB type
@@ -355,3 +399,59 @@ same change. Keep exact dataset hashes in `data/imports/README.md`, endpoint exa
 `docs/API_TESTING.md`, and component/package invariants in their package README or
 scoped `AGENTS.md`. Mark dated roadmap claims as historical rather than silently
 treating them as current truth.
+
+## Full profession imports
+
+The shared `PROFESSIONS` registry defines twelve directory identities, including
+Herbalism and Skinning. These two have null `sourceName` values because the pinned
+recipe archive has no tables for them. Their dedicated web pages request the separate
+gathering API, with explicit loading, retryable errors, provenance, and missing-data
+states. Mining's gathering page is available through its Gathering link while its
+normal route remains the smelting calculator.
+`RECIPE_PROFESSIONS` selects the ten source-backed recipe identities, including the
+`first-aid` slug and upstream `Firstaid.lua` filename. The converter
+requires every selected core and English-name table and validates a single build
+before bundling. Non-Leatherworking recipe IDs are namespaced by profession to avoid
+cross-profession spell collisions; Leatherworking IDs retain existing public links.
+Comparison identity remains `(professionId, spellId)`.
+
+The existing normalized profession/recipe tables already support this expansion;
+no schema migration is needed. Import each complete build once, not one dataset per
+profession: a build hash is immutable. Reset the disposable local catalog when
+replacing the earlier Leatherworking-only build, then import Classic followed by
+Forever. Never replace applied migrations or relax immutable writes.
+
+Enchantments and training spells may have empty item-output arrays at import,
+catalog, comparison, and shopping boundaries. This means no item output is recorded;
+it does not identify the teaching item as an output. Shopping still aggregates their
+reagents and indexes only actual outputs for nested crafting.
+
+Run `pnpm api:smoke:professions` after importing to exercise catalog reconstruction,
+profession-scoped comparisons, full-range route eligibility, and shopping for every
+recipe-backed profession against local PostgreSQL. Prices in this test are deliberately unavailable.
+
+### Profession artwork
+
+`ProfessionIcon` reuses the lazy-loading and error fallback in `ItemIcon`. Directory
+entries load lazily; profession switchers and the Leatherworking field guide load the
+selected profession icon eagerly. Profession artwork comes from the pinned client's
+`SkillLine.SpellIconFileID`, separate from item icons and gameplay snapshots.
+`apps/web/public/icons/professions/manifest.json` records the source product, build,
+region, locale, skill-line identity, FileDataID, output path, and SHA-256 for each asset.
+Regenerate it with `pnpm data:icons:professions "C:\World of Warcraft" 1.60.1.70630`.
+
+### Gathering evidence
+
+[GATHERING_DATA.md](GATHERING_DATA.md) documents the client extractor, pinned external
+source review, observation interchange, migrations 029–037, local/live import paths,
+and API boundaries. Gathering datasets use independent content hashes and publication
+headers; they never change recipe-build hashes. Page requests read stored facts only,
+and location pagination pins the dataset hash. Client ranks and community skill
+claims do not become verified harvest requirements or optimizer inputs.
+
+### Recipe material quantities
+
+The calculator's Materials required table displays the recipe's canonical integer
+reagent quantities for exactly one craft, independent of current skill or skill-up
+probability. Its material costs also cover one craft. Expected attempts and expected
+cost per skill-up remain explicitly labeled estimates in the calculator summary.

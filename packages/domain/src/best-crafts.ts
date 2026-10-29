@@ -128,7 +128,7 @@ export function recommendCrafts<R extends CraftRecipe>(
       if ((recipe.faction === "alliance" || recipe.faction === "horde") && recipe.faction !== options.faction) continue;
       const data = output.clientData;
       if (data === undefined || data.stats === undefined || output.itemSubClassId === undefined ||
-          data.source.product !== "wow_classic_beta" || !data.source.build.startsWith("1.60.")) {
+          !["wowf", "wow_classic_beta"].includes(data.source.product) || !data.source.build.startsWith("1.60.")) {
         missingDataCount += 1;
         continue;
       }

@@ -9,7 +9,7 @@ web client stores one versioned JSON profile under the local-storage key
 - current calculator and guide-progress skill;
 - region, auction market, and character faction;
 - the Legacy profession skill-bonus input;
-- Forever Changes profession, change-type, item-type, and skill-availability filters.
+- Forever Changes profession, change-type, item-type, gear-slot, and skill-availability filters.
 
 The internal market is selected from the active region and faction and is used for
 recipe prices and automatic guide requests. The market remains in
@@ -32,6 +32,11 @@ IDs as their known-recipe constraint.
 Version-1 and version-2 profiles are migrated when read. Current skill and supported
 profile/filter preferences are retained. Removed route presets, shopping strategies,
 route bounds and linkage fields are dropped. Reset clears all three profile versions.
+
+The additive gear-slot selection defaults to no slot restriction for older profiles;
+unknown slot IDs and duplicates are discarded when reading preferences.
+The additive change-sort fields default to alphabetical ascending. Name/skill order
+and direction are retained across reloads; invalid values return to those defaults.
 
 Checklist completion is stored separately under a route fingerprint containing the
 recipe build, profession, skill range, preset, resolved objective and confidence
@@ -77,3 +82,12 @@ In Chrome, check all three sidebar views on desktop and a narrow viewport:
    its corresponding limit is disabled; the slider always permits dragging back.
 4. Switch views and reload. The selected skill should be shared and restored, and
    changing it must not rebuild or truncate the leveling route.
+
+## Profession skills
+
+`forever-professions.skill.<profession-id>` stores a bounded integer skill independently
+for each profession. Leatherworking migrates its initial value from the existing v3
+profile when no profession skill exists. Other professions start at 1. Non-Leatherworking
+workspaces do not overwrite that legacy Leatherworking skill. Region, market, faction,
+and change-filter preferences remain shared. Resetting preferences in a workspace
+resets that profession's skill along with the shared profile.

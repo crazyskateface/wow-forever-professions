@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { mkdir } from "node:fs/promises";
 import {
   applyRecipeOverrides,
+  bundleProfessionDbSnapshots,
   convertProfessionDbSnapshot,
   enrichItemClientData,
   extractItemIcons,
@@ -11,6 +12,7 @@ import {
 } from "../src/index.js";
 import {
   importedRecipeOverridesSchema,
+  RECIPE_PROFESSIONS,
   type ImportedRecipeOverrides,
 } from "@forever-professions/contracts";
 
@@ -117,37 +119,33 @@ const professionCoreDirectory = join(resolvedProfessionDbRoot, "Data", gameVersi
 const itemCoreDirectory = join(resolvedItemDbRoot, "Data", gameVersion, "_core");
 const itemCoreFiles = (await readdir(itemCoreDirectory)).filter((name) => name.endsWith(".lua"));
 const [
-  coreLua,
   acquireMethodsLua,
   recipeItemsLua,
   sourcesLua,
   hiddenRecipesLua,
-  recipeNamesLua,
   itemNamesLua,
   itemCoreSources,
 ] = await Promise.all([
-  readFile(join(resolvedProfessionDbRoot, "Data", gameVersion, "_core", "Leatherworking.lua"), "utf8"),
   readFile(join(resolvedProfessionDbRoot, "Data", gameVersion, "_core", "AcquireMethods.lua"), "utf8"),
   readFile(join(professionCoreDirectory, "RecipeItems.lua"), "utf8"),
   readFile(join(professionCoreDirectory, "Sources.lua"), "utf8"),
   readFile(join(professionCoreDirectory, "HiddenRecipes.lua"), "utf8"),
-  readFile(join(resolvedProfessionDbRoot, "Data", gameVersion, "enUS", "Leatherworking.lua"), "utf8"),
   readFile(join(resolvedItemDbRoot, "Data", gameVersion, "enUS", "Names.lua"), "utf8"),
   Promise.all(itemCoreFiles.map((name) => readFile(join(itemCoreDirectory, name), "utf8"))),
 ]);
 const itemCoreLua = itemCoreSources.filter((source) => source.includes("lib:LoadCore("));
 const resolvedCanonicalItemNames = await canonicalItemNames;
 
-const converted = convertProfessionDbSnapshot({
-  coreLua,
+const convertedProfessions = await Promise.all(RECIPE_PROFESSIONS.map(async (profession) => convertProfessionDbSnapshot({
+  coreLua: await readFile(join(professionCoreDirectory, `${profession.sourceName}.lua`), "utf8"),
   acquireMethodsLua,
   recipeItemsLua,
   sourcesLua,
   hiddenRecipesLua,
-  recipeNamesLua,
+  recipeNamesLua: await readFile(join(resolvedProfessionDbRoot, "Data", gameVersion, "enUS", `${profession.sourceName}.lua`), "utf8"),
   itemNamesLua,
   itemCoreLua,
-  profession: { id: "leatherworking", name: "Leatherworking", skillLineId: 165 },
+  profession,
   professionDbVersion: process.env.PROFESSION_DB_VERSION?.trim() || pinnedSources.professionDb.version,
   itemDbVersion: process.env.ITEM_DB_VERSION?.trim() || pinnedSources.itemDb.version,
   sourceUrl:
@@ -157,7 +155,11 @@ const converted = convertProfessionDbSnapshot({
   ...(resolvedCanonicalItemNames === undefined
     ? {}
     : { canonicalItemNames: resolvedCanonicalItemNames }),
-});
+})));
+const converted = {
+  dataset: bundleProfessionDbSnapshots(convertedProfessions.map(({ dataset }) => dataset)),
+  report: { professions: convertedProfessions.map(({ dataset, report }) => ({ professionId: dataset.professions[0]!.id, ...report })) },
+};
 const resolvedRecipeOverrides = await recipeOverrides;
 const overridden = resolvedRecipeOverrides === undefined
   ? { dataset: converted.dataset, appliedRecipeIds: [] }
