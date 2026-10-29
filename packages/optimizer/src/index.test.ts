@@ -30,6 +30,38 @@ const routeDataset = {
 } as const;
 
 describe("leveling route optimizer", () => {
+  it.each(["drop", "vendor", "quest", "reputation"] as const)("Practical prefers a slower trainer route over %s patterns", acquisition => {
+    const trainer: RouteRecipe = { ...changingChanceRecipe, id: "trainer", thresholds: { orange: 1, yellow: 1, green: 2, gray: 15 } };
+    const pattern: RouteRecipe = { ...changingChanceRecipe, id: "pattern", acquisition, thresholds: { orange: 1, yellow: 10, green: 15, gray: 20 } };
+    const input = { ...routeDataset, startSkill: 2, targetSkill: 6, objective: "crafts" as const, recipes: [pattern, trainer] };
+    const practical = optimizeLevelingRoute({ ...input, preset: "practical" });
+    expect(practical.status).toBe("complete");
+    expect(practical.steps.every(step => step.recipeId === "trainer")).toBe(true);
+    expect(practical.totals.expectedCrafts).toBeGreaterThan(4);
+    expect(practical.segments[0]?.recommendation.reasons).toContain("trainer-preference");
+    expect(practical.segments[0]?.alternatives.find(a => a.recipeId === "pattern")?.lossReason).toBe("trainer-preference");
+    expect(optimizeLevelingRoute({ ...input, preset: "fewest-crafts" }).steps.every(step => step.recipeId === "pattern")).toBe(true);
+    expect(optimizeLevelingRoute({ ...input, preset: "practical", recipes: [trainer, pattern] })).toEqual(practical);
+  });
+
+  it("uses an external pattern only for the gap that trainer recipes cannot cover", () => {
+    const trainer: RouteRecipe = { ...changingChanceRecipe, id: "trainer", thresholds: { orange: 1, yellow: 2, green: 2, gray: 3 } };
+    const pattern: RouteRecipe = { ...changingChanceRecipe, id: "pattern", acquisition: "drop", thresholds: { orange: 1, yellow: 10, green: 15, gray: 20 } };
+    const result = optimizeLevelingRoute({ ...routeDataset, startSkill: 1, targetSkill: 6, objective: "crafts", preset: "practical", recipes: [pattern, trainer] });
+    expect(result.status).toBe("complete");
+    expect(result.segments.map(s => [s.recipeId, s.startSkill, s.endSkill])).toEqual([["trainer", 1, 3], ["pattern", 3, 6]]);
+    expect(result.segments[1]?.recommendation.reasons).toContain("trainer-fallback");
+    expect(result.segments[1]?.evidence.acquisition).toBe("drop");
+  });
+
+  it("preserves Scarce avoidance and evidence priority ahead of trainer access", () => {
+    const trainer: RouteRecipe = { ...changingChanceRecipe, id: "trainer", reagents: [{ itemId: "scarce", quantity: 1 }] };
+    const pattern: RouteRecipe = { ...changingChanceRecipe, id: "pattern", acquisition: "drop" };
+    const input = { ...routeDataset, startSkill: 1, targetSkill: 2, objective: "crafts" as const, preset: "practical" as const, recipes: [trainer, pattern] };
+    expect(optimizeLevelingRoute({ ...input, scarceItemIds: ["scarce"] }).steps[0]?.recipeId).toBe("pattern");
+    expect(optimizeLevelingRoute({ ...input, recipes: [{ ...trainer, availability: "unknown" }, pattern] }).steps[0]?.recipeId).toBe("pattern");
+  });
+
   it.each([
     ["practical", "crafts", "practical"],
     ["trainer-friendly", "crafts", "supported-only"],
@@ -244,7 +276,7 @@ describe("leveling route optimizer", () => {
       },
     ]);
     expect(result.segments[0]?.recommendation).toMatchObject({
-      reasons: ["practical-balance"],
+      reasons: ["trainer-preference"],
       summary: expect.any(String),
     });
   });

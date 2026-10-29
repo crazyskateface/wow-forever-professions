@@ -59,6 +59,9 @@ data.
   once in the shared domain package.
 - Automatically generates the web guide with the Practical preset. The optimizer API
   also supports Trainer friendly, Cheapest, Fewest crafts, Fewest materials, and Experimental.
+- Practical prefers automatic and trainer recipes over separately acquired patterns,
+  even when a drop recipe saves crafts. External patterns are used only for gaps
+  under the existing Scarce-material and evidence priorities, with explicit explanations.
 - Uses dynamic programming with preset-owned recipe-switch, acquisition-friction,
   evidence, and cost policies. Practical uses complete stored price coverage as a
   deterministic tie-breaker when the stronger safeguards and craft score are equal.

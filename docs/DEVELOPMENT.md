@@ -69,6 +69,10 @@ The main workspace contains Recipe calculator, with Best crafts available only f
 Leatherworking, Tailoring, and Blacksmithing. Their initial class profiles are
 Rogue, Mage, and Warrior respectively. The left panel owns
 the automatic Practical leveling guide and individual completion checkboxes.
+Practical ranks automatic/trainer access ahead of craft efficiency, after Scarce
+avoidance and supported-evidence priorities. Drop/vendor/quest/reputation patterns
+are fallback choices, not automatic exclusions; unknown acquisition is never
+reclassified as trainer access. This policy lives in the optimizer's full-route score.
 The calculator starts with the selected recipe. It does not display an active-route
 comparison panel above the recipe; route progress remains in the left panel.
 On a guide landing without a valid recipe link, the first generated guide recipe

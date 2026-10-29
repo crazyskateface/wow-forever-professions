@@ -35,6 +35,13 @@ trainer paths. `cheapest`, `fewest-crafts`, and `fewest-materials` apply their n
 supported-only objective without hidden friction weights. `experimental` minimizes
 crafts while permitting clearly labeled unknown acquisition or availability.
 Rejected evidence remains ineligible for every preset.
+After Scarce and evidence priorities, Practical minimizes skill gains that rely on
+recipes acquired outside automatic learning or trainers. Drop, vendor, quest, and
+reputation patterns are fallbacks even when they require fewer crafts. This is a
+full-route preference, not a hard exclusion: required gaps still use an eligible
+pattern with a `trainer-fallback` explanation. Unknown acquisition stays unknown.
+Other presets retain their own objectives. The web's catalog-wide eligibility
+allowlist is not an owned-pattern inventory.
 
 The default `practical` confidence policy treats unknown acquisition or availability
 as a route-level last resort. After Scarce avoidance, the dynamic-programming score
