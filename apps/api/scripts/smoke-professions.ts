@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { getSkillUpProbability } from "@forever-professions/domain";
 import { readFile } from "node:fs/promises";
 import { RECIPE_PROFESSIONS, professionFixtureSchema, professionsResponseSchema, recipeChangesResponseSchema, recipeChangesSummaryResponseSchema, routeOptimizationResponseSchema, shoppingListResponseSchema } from "@forever-professions/contracts";
 import { createPostgresTransactionRunner, parseRawDatasetBytes, SqlRecipeCatalogReader, SqlRecipeChangeReader } from "@forever-professions/ingestion";
@@ -39,6 +40,15 @@ try {
     assert.equal(route.statusCode, 200, route.body);
     const optimized = routeOptimizationResponseSchema.parse(JSON.parse(route.body));
     assert.equal(optimized.professionId, definition.id);
+    assert.ok(optimized.result.steps.every(step => step.skillUpProbability === 1), `${definition.name}: recommendations must guarantee skill-ups`);
+    for (const segment of optimized.result.segments) {
+      for (const alternative of segment.alternatives) {
+        const recipe = profession.recipes.find(recipe => recipe.id === alternative.recipeId)!;
+        for (let skill = alternative.startSkill; skill < alternative.endSkill; skill += 1) {
+          assert.ok(getSkillUpProbability(skill, recipe.thresholds) >= 0.75, `${definition.name}: ${recipe.name} alternative falls below 75% at ${skill}`);
+        }
+      }
+    }
     const allowed = new Set(profession.recipes.filter(({ learnSkill, availability }) => learnSkill !== null && availability !== "unavailable").map(({ id }) => id));
     assert.ok(optimized.result.segments.every(({ recipeId }) => allowed.has(recipeId)));
     const recipe = profession.recipes.find(({ outputs, reagents }) => outputs.length === 0 && reagents.length > 0) ?? profession.recipes[0]!;

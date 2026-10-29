@@ -620,6 +620,7 @@ export const blockedRouteOptimizationResultSchema = z.object({
     "no-eligible-recipe",
     "missing-price-data",
     "unsupported-recipe-evidence",
+    "no-guaranteed-skill-up",
   ]),
   explanation: z.string().min(1),
 });
@@ -765,6 +766,7 @@ export const productEventSchema = z.discriminatedUnion("name", [
       "no-eligible-recipe",
       "missing-price-data",
       "unsupported-recipe-evidence",
+      "no-guaranteed-skill-up",
     ]),
   }).strict(),
   z.object({

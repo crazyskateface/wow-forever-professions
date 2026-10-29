@@ -60,11 +60,13 @@ data.
 - Automatically generates the web guide with the Practical preset. The optimizer API
   also supports Trainer friendly, Cheapest, Fewest crafts, Fewest materials, and Experimental.
 - Practical prefers automatic and trainer recipes over separately acquired patterns,
-  even when a drop recipe saves crafts. External patterns are used only for gaps
+  among recipes with a 100% modeled skill-up chance. External patterns are used only for gaps
   under the existing Scarce-material and evidence priorities, with explicit explanations.
-- Uses dynamic programming with preset-owned recipe-switch, acquisition-friction,
-  evidence, and cost policies. Practical uses complete stored price coverage as a
-  deterministic tie-breaker when the stronger safeguards and craft score are equal.
+- Practical recommendations require 100% modeled skill-up chance at every skill in
+  their range. Alternatives stop before dropping below 75%; guaranteed coverage gaps
+  are explicit. It minimizes material units after Scarce, evidence, and acquisition
+  priorities, with complete price evidence breaking material ties. Missing prices
+  never count as zero. Other presets retain their own objectives and chance behavior.
 - Uses Practical by default: supported acquisition and availability win over unknown
   evidence whenever they can complete the same route. Supported presets block at the
   first skill that would require unknown evidence; Experimental may use those gaps but

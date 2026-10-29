@@ -69,10 +69,17 @@ The main workspace contains Recipe calculator, with Best crafts available only f
 Leatherworking, Tailoring, and Blacksmithing. Their initial class profiles are
 Rogue, Mage, and Warrior respectively. The left panel owns
 the automatic Practical leveling guide and individual completion checkboxes.
-Practical ranks automatic/trainer access ahead of craft efficiency, after Scarce
+Practical requires 100% modeled skill-up chance throughout every recommendation;
+alternatives are limited to contiguous sub-ranges at or above 75%. It minimizes
+material units among qualifying recipes, with complete prices breaking ties and no
+switch penalty overriding fewer materials. Automatic/trainer access comes first, after Scarce
 avoidance and supported-evidence priorities. Drop/vendor/quest/reputation patterns
 are fallback choices, not automatic exclusions; unknown acquisition is never
 reclassified as trainer access. This policy lives in the optimizer's full-route score.
+`no-guaranteed-skill-up` identifies a missing 100% option; the route remains blocked
+rather than silently relaxing the floor. These guarantees refer to imported curves,
+not independent verification of in-game behavior. Other presets and raw objectives
+retain their own probability behavior. Guide validation explicitly requests Practical.
 The calculator starts with the selected recipe. It does not display an active-route
 comparison panel above the recipe; route progress remains in the left panel.
 On a guide landing without a valid recipe link, the first generated guide recipe

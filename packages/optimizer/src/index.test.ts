@@ -30,14 +30,41 @@ const routeDataset = {
 } as const;
 
 describe("leveling route optimizer", () => {
-  it.each(["drop", "vendor", "quest", "reputation"] as const)("Practical prefers a slower trainer route over %s patterns", acquisition => {
-    const trainer: RouteRecipe = { ...changingChanceRecipe, id: "trainer", thresholds: { orange: 1, yellow: 1, green: 2, gray: 15 } };
-    const pattern: RouteRecipe = { ...changingChanceRecipe, id: "pattern", acquisition, thresholds: { orange: 1, yellow: 10, green: 15, gray: 20 } };
+  it("requires 100% recommendations and clips alternatives at the inclusive 75% boundary", () => {
+    const guaranteed: RouteRecipe = { ...changingChanceRecipe, id: "guaranteed", thresholds: { orange: 1, yellow: 20, green: 25, gray: 30 }, reagents: [{ itemId: "cloth", quantity: 3 }] };
+    const yellow: RouteRecipe = { ...guaranteed, id: "yellow", thresholds: { orange: 1, yellow: 1, green: 9, gray: 17 }, reagents: [{ itemId: "cloth", quantity: 1 }] };
+    const low: RouteRecipe = { ...yellow, id: "too-low", thresholds: { orange: 1, yellow: 1, green: 8, gray: 17 } };
+    const result = optimizeLevelingRoute({ ...routeDataset, startSkill: 5, targetSkill: 7, objective: "crafts", preset: "practical", recipes: [yellow, guaranteed, low] });
+    expect(result.status).toBe("complete");
+    expect(result.objective).toBe("materials");
+    expect(result.steps.every(step => step.recipeId === "guaranteed" && step.skillUpProbability === 1)).toBe(true);
+    expect(result.segments[0]?.alternatives).toMatchObject([{ recipeId: "yellow", startSkill: 5, endSkill: 6, expectedCrafts: 1 / 0.75 }]);
+    expect(result.segments.flatMap(s => s.alternatives).some(a => a.recipeId === "too-low")).toBe(false);
+  });
+
+  it("stops before any sub-100% recommendation, including a yellow 75% craft", () => {
+    const result = optimizeLevelingRoute({ ...routeDataset, startSkill: 1, targetSkill: 5, objective: "crafts", preset: "practical", recipes: [changingChanceRecipe] });
+    expect(result).toMatchObject({ status: "blocked", blockedAtSkill: 3, reason: "no-guaranteed-skill-up" });
+    expect(result.steps.map(step => [step.skill, step.skillUpProbability])).toEqual([[1, 1], [2, 1]]);
+  });
+
+  it("chooses the fewest material units without switch penalties overriding the minimum", () => {
+    const costly: RouteRecipe = { ...changingChanceRecipe, id: "a-costly", thresholds: { orange: 1, yellow: 20, green: 25, gray: 30 }, reagents: [{ itemId: "cloth", quantity: 100, unitPriceCopper: 1 }] };
+    const lean: RouteRecipe = { ...costly, id: "z-lean", learnSkill: 2, thresholds: { orange: 2, yellow: 20, green: 25, gray: 30 }, reagents: [{ itemId: "cloth", quantity: 99 }] };
+    const result = optimizeLevelingRoute({ ...routeDataset, startSkill: 1, targetSkill: 4, objective: "crafts", preset: "practical", recipes: [costly, lean] });
+    expect(result.steps.map(step => step.recipeId)).toEqual(["a-costly", "z-lean", "z-lean"]);
+    expect(result.totals.expectedMaterials).toBe(298);
+    expect(result.totals.expectedCostCopper).toBeUndefined();
+  });
+
+  it.each(["drop", "vendor", "quest", "reputation"] as const)("Practical prefers accessible guaranteed trainer recipes over %s patterns", acquisition => {
+    const trainer: RouteRecipe = { ...changingChanceRecipe, id: "trainer", reagents: [{ itemId: "cloth", quantity: 10 }], thresholds: { orange: 1, yellow: 10, green: 15, gray: 20 } };
+    const pattern: RouteRecipe = { ...trainer, id: "pattern", acquisition, reagents: [{ itemId: "cloth", quantity: 1 }] };
     const input = { ...routeDataset, startSkill: 2, targetSkill: 6, objective: "crafts" as const, recipes: [pattern, trainer] };
     const practical = optimizeLevelingRoute({ ...input, preset: "practical" });
     expect(practical.status).toBe("complete");
     expect(practical.steps.every(step => step.recipeId === "trainer")).toBe(true);
-    expect(practical.totals.expectedCrafts).toBeGreaterThan(4);
+    expect(practical.totals.expectedCrafts).toBe(4);
     expect(practical.segments[0]?.recommendation.reasons).toContain("trainer-preference");
     expect(practical.segments[0]?.alternatives.find(a => a.recipeId === "pattern")?.lossReason).toBe("trainer-preference");
     expect(optimizeLevelingRoute({ ...input, preset: "fewest-crafts" }).steps.every(step => step.recipeId === "pattern")).toBe(true);
@@ -49,7 +76,7 @@ describe("leveling route optimizer", () => {
     const pattern: RouteRecipe = { ...changingChanceRecipe, id: "pattern", acquisition: "drop", thresholds: { orange: 1, yellow: 10, green: 15, gray: 20 } };
     const result = optimizeLevelingRoute({ ...routeDataset, startSkill: 1, targetSkill: 6, objective: "crafts", preset: "practical", recipes: [pattern, trainer] });
     expect(result.status).toBe("complete");
-    expect(result.segments.map(s => [s.recipeId, s.startSkill, s.endSkill])).toEqual([["trainer", 1, 3], ["pattern", 3, 6]]);
+    expect(result.segments.map(s => [s.recipeId, s.startSkill, s.endSkill])).toEqual([["trainer", 1, 2], ["pattern", 2, 6]]);
     expect(result.segments[1]?.recommendation.reasons).toContain("trainer-fallback");
     expect(result.segments[1]?.evidence.acquisition).toBe("drop");
   });
@@ -63,7 +90,7 @@ describe("leveling route optimizer", () => {
   });
 
   it.each([
-    ["practical", "crafts", "practical"],
+    ["practical", "materials", "practical"],
     ["trainer-friendly", "crafts", "supported-only"],
     ["cheapest", "cost", "supported-only"],
     ["fewest-crafts", "crafts", "supported-only"],

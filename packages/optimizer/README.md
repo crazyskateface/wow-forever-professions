@@ -28,16 +28,22 @@ Supported objectives and constraints:
 - faction, specialization, branch, availability, unknown-data, and cooldown rules;
 - configurable switch and acquisition-friction policy.
 
-Product callers select one of six named presets. `practical` balances expected
-crafts, switches, acquisition friction, Scarce avoidance, evidence confidence, and
-complete available price evidence. `trainer-friendly` strongly prefers supported
+Product callers select one of six named presets. `practical` requires a modeled
+100% skill-up chance for every recommended skill point and minimizes material units
+after Scarce avoidance, evidence confidence, and trainer-access priorities. Complete
+price coverage breaks material ties; switch/friction penalties do not outweigh a
+material saving. Alternatives require at least 75% throughout their displayed
+sub-range, including exactly 75%, and stop before falling below it. A gap in
+guaranteed coverage reports `no-guaranteed-skill-up`, never green filler.
+Raw objective/policy requests and other named presets retain their existing chance
+behavior. `trainer-friendly` strongly prefers supported
 trainer paths. `cheapest`, `fewest-crafts`, and `fewest-materials` apply their named
 supported-only objective without hidden friction weights. `experimental` minimizes
 crafts while permitting clearly labeled unknown acquisition or availability.
 Rejected evidence remains ineligible for every preset.
 After Scarce and evidence priorities, Practical minimizes skill gains that rely on
 recipes acquired outside automatic learning or trainers. Drop, vendor, quest, and
-reputation patterns are fallbacks even when they require fewer crafts. This is a
+reputation patterns are fallbacks among guaranteed recipes even when they use fewer materials. This is a
 full-route preference, not a hard exclusion: required gaps still use an eligible
 pattern with a `trainer-fallback` explanation. Unknown acquisition stays unknown.
 Other presets retain their own objectives. The web's catalog-wide eligibility
