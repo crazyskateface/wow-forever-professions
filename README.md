@@ -77,6 +77,8 @@ data.
   a complete non-Scarce route wins even when its ordinary objective score is higher.
 - Opens each guide step in the calculator at the relevant skill and shows New/Updated
   Forever badges when comparison data exists.
+- Defaults a profession landing to its first guide recipe once the guide loads.
+  Explicit recipe links and selections made while loading take precedence.
 - Presents generated segments as a checklist in the left panel with the active skill range
   and acquisition. The calculator shows materials and recipe evidence. Completion is saved only for the exact matching
   build, range, preset, resolved objective and confidence policy, constraints,

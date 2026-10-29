@@ -36,6 +36,7 @@ import { ItemIcon } from "./ItemIcon.js";
 import { ItemTooltip, ItemTooltipButton } from "./ItemTooltip.js";
 import { BestCrafts, type CraftSelection } from "./BestCrafts.js";
 import { bestCraftDefaults } from "./best-crafts-professions.js";
+import { createInitialRecipeSelection } from "./initial-recipe-selection.js";
 import { SiteFooter } from "./SiteFooter.js";
 import { ChevronDownIcon, SearchIcon } from "./UiIcons.js";
 import {
@@ -546,7 +547,12 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
   const profession = initialProfession;
   const craftDefaults = bestCraftDefaults(profession.id);
   const catalogState = initialCatalogState;
-  const [recipeId, setRecipeId] = useState(() => profession.recipes.find(({ id }) => id === recipeIdFromUrl())?.id ?? profession.recipes[0]!.id);
+  const [initialRecipeSelection] = useState(() => createInitialRecipeSelection(
+    profession.recipes,
+    recipeIdFromUrl(),
+    typeof window === "undefined" ? "guide" : recipeListViewFromUrlValue(window.location.href),
+  ));
+  const [recipeId, setRecipeId] = useState(initialRecipeSelection.recipeId);
   const recipe =
     profession.recipes.find(({ id }) => id === recipeId) ?? profession.recipes[0]!;
   const maxCatalogLearningSkill = useMemo(
@@ -609,6 +615,7 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
   const missingDataEventsRecordedRef = useRef(new Set<string>());
 
   useEffect(() => {
+    if (initialRecipeSelection.pendingGuide) return;
     const explicitlySelected = recipeIdFromUrl() === recipeId;
     writeRecipeUrl(recipeId, "replace");
     if (explicitlySelected) scrollToWorkspaceOnMobile();
@@ -782,6 +789,7 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
 
   useEffect(() => {
     function selectRecipeFromHistory(): void {
+      initialRecipeSelection.cancelGuide();
       setRecipeListView(recipeListViewFromUrlValue(window.location.href));
       const requestedRecipeId = recipeIdFromUrl();
       const requestedRecipe = profession.recipes.find(
@@ -1158,6 +1166,11 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
       segments: response.result.segments,
     });
     setRouteResponse(response);
+    const firstGuideRecipeId = initialRecipeSelection.resolveGuide(response.result.segments[0]?.recipeId);
+    if (firstGuideRecipeId !== undefined) {
+      setRecipeId(firstGuideRecipeId);
+      writeRecipeUrl(firstGuideRecipeId, "replace");
+    }
     setRouteProgress(readRouteProgress(fingerprint));
     firstStepEngagementRecordedRef.current = false;
     void recordProductEvent({
@@ -1256,6 +1269,7 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
   }
 
   function selectRecipe(nextRecipe: Recipe, historyMode: "push" | "replace" = "push"): void {
+    initialRecipeSelection.cancelGuide();
     setRecipeId(nextRecipe.id);
     setWorkspaceView("calculator");
     writeRecipeUrl(nextRecipe.id, historyMode);
@@ -1275,10 +1289,12 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
     historyMode: "push" | "replace" = "push",
   ): void {
     setRecipeListView(nextView);
+    initialRecipeSelection.cancelGuide();
     writeRecipeListViewUrl(nextView, historyMode);
   }
 
   function openChangedRecipe(nextRecipe: Recipe): void {
+    initialRecipeSelection.cancelGuide();
     setRecipeId(nextRecipe.id);
     setRecipeListView("recipes");
     setWorkspaceView("calculator");
@@ -1307,6 +1323,7 @@ export function App({ initialProfession = leatherworkingFixture, initialCatalogS
   function openRouteRecipe(nextRecipeId: string): void {
     const nextRecipe = profession.recipes.find(({ id }) => id === nextRecipeId);
     if (nextRecipe === undefined) return;
+    initialRecipeSelection.cancelGuide();
     recordFirstStepEngagement();
     setRecipeId(nextRecipe.id);
     setWorkspaceView("calculator");
